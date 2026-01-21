@@ -14,12 +14,9 @@ Bootstrap d'un VPS pour services web exposes avec des modules activables.
 - Zsh + oh-my-zsh + config perso
 - Cron: apt update/upgrade + certbot dns + fail2ban list
 
-## Usage
+## One-liner
 ```bash
-sudo apt update && sudo apt install -y git
-git clone https://github.com/aliceout/vps-install.git
-cd vps-install
-sudo bash ./bootstrap.sh
+curl -fsSL https://raw.githubusercontent.com/aliceout/vps-install/main/install.sh | bash
 ```
 
 ## Logique du bootstrap
