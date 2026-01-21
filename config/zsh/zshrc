@@ -1,0 +1,81 @@
+﻿# Enable Powerlevel10k instant prompt.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="powerlevel10k/powerlevel10k"
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions)
+source $ZSH/oh-my-zsh.sh
+
+#######################################
+## Affichage
+clear
+
+if command -v fastfetch >/dev/null 2>&1; then
+  fastfetch | lolcat 2>/dev/null || fastfetch
+fi
+
+# IP locale + IP publique (timeout)
+LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+PUBLIC_IP="$(curl -m 1 -s https://api.ipify.org 2>/dev/null || true)"
+print -r -- "🏠 ${LOCAL_IP} · 🌐 ${PUBLIC_IP}" | lolcat 2>/dev/null || print -r -- "🏠 ${LOCAL_IP} · 🌐 ${PUBLIC_IP}"
+
+cat <<'EOF' | lolcat 2>/dev/null || cat <<'EOF'
+🌸  Bienvenue Alice
+✨  Vive la révolution féministe
+💜  Pour la sororité, la liberté, et la joie
+✊  Femme, vie, liberté
+
+🌻  Слава Україні · Героям слава 💙💛
+EOF
+echo ""
+
+#######################################
+# User configuration
+
+alias l='lsd --icon=always'
+alias ll='lsd -l --icon=always --blocks permission,user,size,name'
+alias ln='lsd -l --icon=always --blocks permission,user,size,name'
+alias ls='lsd --tree --depth 2 --icon=always'
+alias la='lsd -la --icon=always'
+alias cat='batcat'
+
+alias web='cd /var/www'
+alias nginx='cd /etc/nginx'
+
+eval "$(zoxide init zsh)"
+
+cd() {
+  builtin cd "$@" && l
+}
+
+unalias histo 2>/dev/null
+
+histo() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: histo <terme à chercher>"
+    return 1
+  fi
+  grep -i --color=always -a "$*" "${HISTFILE:-$HOME/.zsh_history}" \
+    | sed -E 's/^: [0-9]+:[0-9]+;//'
+}
+
+tools() {
+  echo "\n📦  Outils installés sur ce serveur :\n"
+  echo "🗃️   ncdu"
+  echo "🧠  btop"
+  echo "📊  ctop"
+  echo "🔎  htop"
+  echo "🔍  glances"
+  echo "🧭  lazydocker"
+  echo "🔤  fzf"
+  echo ""
+}
+
+alias rm="rm -i"
+
+export LANG=fr_FR.UTF-8
+export LC_ALL=fr_FR.UTF-8
+
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
