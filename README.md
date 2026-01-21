@@ -17,8 +17,8 @@ Bootstrap d'un VPS pour services web exposes avec des modules activables.
 ## Usage
 ```bash
 sudo apt update && sudo apt install -y git
-git clone <ton_repo> vps-bootstrap
-cd vps-bootstrap
+git clone https://github.com/aliceout/vps-install.git
+cd vps-install
 sudo bash ./bootstrap.sh
 ```
 
