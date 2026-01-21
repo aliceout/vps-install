@@ -11,7 +11,7 @@ fi
 
 echo "Mise à jour APT de base..."
 apt-get update -y
-apt-get install -y ca-certificates curl gnupg lsb-release apt-transport-https software-properties-common
+apt-get install -y ca-certificates curl gnupg lsb-release apt-transport-https
 
 echo "Timezone/locale (fr_FR.UTF-8)..."
 apt-get install -y locales
