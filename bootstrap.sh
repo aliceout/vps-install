@@ -20,15 +20,27 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+read_tty() {
+  local prompt="$1"
+  local var_name="$2"
+  local value=""
+  if [[ -t 0 ]]; then
+    read -r -p "$prompt" value
+  else
+    read -r -p "$prompt" value < /dev/tty
+  fi
+  printf -v "$var_name" '%s' "$value"
+}
+
 ask_yes_no() {
   local prompt="$1"
   local default="$2"
   local reply
   while true; do
     if [[ "$default" == "yes" ]]; then
-      read -r -p "$prompt [O/n]: " reply
+      read_tty "$prompt [O/n]: " reply
     else
-      read -r -p "$prompt [o/N]: " reply
+      read_tty "$prompt [o/N]: " reply
     fi
     reply="${reply,,}"
     if [[ -z "$reply" ]]; then
@@ -42,17 +54,17 @@ ask_yes_no() {
   done
 }
 
-read -r -p "Utilisateur a creer [choupi]: " VPS_USER_INPUT
+read_tty "Utilisateur a creer [choupi]: " VPS_USER_INPUT
 if [[ -n "${VPS_USER_INPUT// }" ]]; then
   VPS_USER="$VPS_USER_INPUT"
 fi
 
-read -r -p "Port SSH [45675]: " SSH_PORT_INPUT
+read_tty "Port SSH [45675]: " SSH_PORT_INPUT
 if [[ -n "${SSH_PORT_INPUT// }" ]]; then
   SSH_PORT="$SSH_PORT_INPUT"
 fi
 
-read -r -p "Colle ta cle SSH publique a autoriser (ex: ssh-ed25519 AAAA...): " SSH_PUBKEY
+read_tty "Colle ta cle SSH publique a autoriser (ex: ssh-ed25519 AAAA...): " SSH_PUBKEY
 if [[ -z "${SSH_PUBKEY// }" ]]; then
   echo "Cle vide -> stop."
   exit 1
