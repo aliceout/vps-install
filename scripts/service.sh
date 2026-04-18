@@ -153,7 +153,19 @@ EOF
     echo "AVERTISSEMENT: $SECRETS_DIR/$name.env pas genere (verifie l'agent: journalctl -u infisical-agent -n 50)"
     return 1
   fi
-  chmod 600 "$SECRETS_DIR/$name.env" || true
+
+  # Le hook script de chaque service tourne en tant que VPS_USER (via runuser),
+  # il doit pouvoir lire son env file. /etc/secrets/ reste en 700, mais on
+  # rend le fichier lisible par le groupe VPS_USER (chgrp + 640).
+  if [[ -n "${VPS_USER:-}" ]]; then
+    chgrp "$VPS_USER" "$SECRETS_DIR/$name.env" 2>/dev/null || true
+    chmod 640 "$SECRETS_DIR/$name.env" || true
+    # Le dir parent doit etre traversable par VPS_USER
+    chgrp "$VPS_USER" "$SECRETS_DIR" 2>/dev/null || true
+    chmod 750 "$SECRETS_DIR" || true
+  else
+    chmod 600 "$SECRETS_DIR/$name.env" || true
+  fi
   echo "Secrets injectes: $SECRETS_DIR/$name.env"
 }
 

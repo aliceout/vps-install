@@ -152,16 +152,21 @@ sync_one() {
         or ($s=="@" and (.source=="." or .source=="" or .source==null))
       )) | .target' 2>/dev/null | head -n1)"
 
-  local payload
-  payload="$(jq -n --arg s "$sub" --arg t "$PUBLIC_IP" --argjson ttl "$TTL" \
+  local create_payload update_payload
+  create_payload="$(jq -n --arg s "$sub" --arg t "$PUBLIC_IP" --argjson ttl "$TTL" \
     '{source:$s, target:$t, type:"A", ttl:$ttl}')"
+  # PUT : payload minimal (uniquement target + ttl). Inclure source dans un PUT
+  # apex declenche un 500 cote Infomaniak quand le source stocke ('.') diverge
+  # de celui qu'on envoie ('@').
+  update_payload="$(jq -n --arg t "$PUBLIC_IP" --argjson ttl "$TTL" \
+    '{target:$t, ttl:$ttl}')"
 
   if [[ -z "$record_id" || "$record_id" == "null" ]]; then
     log "CREATE A $fqdn -> $PUBLIC_IP"
-    api_call POST "/1/domain/$domain_id/dns/record" "$payload" >/dev/null
+    api_call POST "/1/domain/$domain_id/dns/record" "$create_payload" >/dev/null
   elif [[ "$current_target" != "$PUBLIC_IP" ]]; then
     log "UPDATE A $fqdn $current_target -> $PUBLIC_IP"
-    api_call PUT "/1/domain/$domain_id/dns/record/$record_id" "$payload" >/dev/null
+    api_call PUT "/1/domain/$domain_id/dns/record/$record_id" "$update_payload" >/dev/null
   else
     log "OK     A $fqdn -> $PUBLIC_IP (a jour)"
   fi
