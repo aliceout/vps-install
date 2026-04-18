@@ -16,11 +16,6 @@ for d in /usr/share/keyrings /etc/apt/keyrings; do
   fi
 done
 
-# Supprime les sources list connues pour etre cassees suite a des tentatives anterieures
-# (packagecloud netdata pas de suite trixie, etc.) pour ne pas bloquer apt-get update
-rm -f /etc/apt/sources.list.d/netdata_netdata.list \
-      /etc/apt/sources.list.d/netdata_netdata-source.list
-
 echo "Mise à jour APT de base..."
 apt-get update -y
 apt-get install -y ca-certificates curl gnupg lsb-release apt-transport-https

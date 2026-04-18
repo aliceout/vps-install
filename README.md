@@ -32,7 +32,7 @@ Le script te demandera :
 - Project ID
 - Client ID
 - Client Secret
-- Questions yes/no pour activer features (web / docker / node / netdata)
+- Questions yes/no pour activer features (web / docker / node)
 
 Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises automatiquement si tu relances le bootstrap.
 
@@ -46,7 +46,6 @@ Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises auto
 - **Docker Engine + compose** (optionnel)
 - **Node.js + pm2** (optionnel)
 - **Nginx** reverse proxy + includes TLS (optionnel)
-- **Netdata** monitoring (optionnel, expose en HTTPS avec basic auth via cert wildcard, config depuis `/services/netdata/`)
 - **Zsh + oh-my-zsh + powerlevel10k** (config p10k + zshrc avec alias, pfetch banner, `histo`, `tools`, alias `services`)
 - **Outils CLI** : lsd, bat, zoxide, fzf, btop, htop, ncdu, glances, lnav, ctop, lazydocker, pfetch, lolcat
 - **Cron** : apt update/upgrade, fail2ban blocklists, sync DNS Infomaniak (auto-heal records A sur IP publique)
@@ -90,7 +89,6 @@ modules/                 etapes numerotees (00 -> 99)
   40_docker.sh           Docker Engine + compose (optionnel)
   45_node_pm2.sh         Node.js + pm2 (optionnel)
   50_nginx.sh            reverse proxy (optionnel)
-  55_netdata.sh          monitoring (optionnel)
   60_zsh.sh              zsh + oh-my-zsh + p10k + deploiement .zshrc/.p10k.zsh
   70_cron_updates.sh     cron apt + blocklists
   75_certbot.sh          certbot + token Infomaniak via agent (optionnel)

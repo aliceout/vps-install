@@ -7,7 +7,6 @@ apt-get install -y \
   ncdu btop htop fzf glances \
   bat lsd zoxide lolcat \
   jq unzip zip lnav \
-  apache2-utils \
   logrotate
 
 echo "Depot azlux pour docker-ctop"

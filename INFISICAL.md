@@ -16,11 +16,6 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         LE_EMAIL
         INFOMANIAK_TOKEN
     services/
-      netdata/             # charge si Netdata active
-        NETDATA_ADRESS
-        NETDATA_DOMAIN
-        NETDATA_AUTH_USER
-        NETDATA_AUTH_PASSWORD
       <service>/           # charge a l'install du service via scripts/service.sh
         ...
 ```
@@ -40,18 +35,7 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Toutes les
 | `LE_EMAIL` | string | `toi@exemple.fr` | `75_certbot.sh` | email Let's Encrypt (ecrit dans `/etc/letsencrypt/email`) |
 | `INFOMANIAK_TOKEN` | secret | `...` | `75_certbot.sh`, `scripts/infomaniak-dns-sync.sh` | token API Infomaniak, synce via l'agent dans `/etc/letsencrypt/infomaniak.ini` pour certbot-dns + DNS auto-sync |
 
-## `/services/netdata/` - Netdata
-
-Lu uniquement si tu reponds `oui` a "Installer Netdata" au prompt. Les 4 cles sont obligatoires pour exposer Netdata en HTTPS ; sans elles, Netdata est installe mais reste sur `127.0.0.1:19999` seulement.
-
-| Cle | Type | Exemple | Role |
-|-----|------|---------|------|
-| `NETDATA_ADRESS` | string | `netdata.mondomaine.fr` | FQDN d'expo - sert de `server_name` nginx, cible du record DNS A cree chez Infomaniak |
-| `NETDATA_DOMAIN` | string | `mondomaine.fr` | apex pour le cert Let's Encrypt - le script demande `*.mondomaine.fr`, le cert est mutualise avec tes autres services sous le meme apex |
-| `NETDATA_AUTH_USER` | string | `alice` | utilisateur basic auth nginx |
-| `NETDATA_AUTH_PASSWORD` | secret | `...` | mot de passe basic auth (stocke en clair cote Infisical, hashe bcrypt a l'install dans `/etc/nginx/.htpasswd-netdata`) |
-
-## `/services/<autre>/` - services tiers
+## `/services/<nom>/` - services tiers
 
 Pour chaque service sous `services/<nom>/` dans le repo, cree un path Infisical `/services/<nom>/` avec les secrets dont le service a besoin. Le fichier `services/<nom>/secrets.tmpl` utilise le template agent Infisical pour les rapatrier vers `/etc/secrets/<nom>.env` a l'install.
 
@@ -74,7 +58,7 @@ Le bootstrap te les demande au 1er run et les persiste en `/etc/infisical/{clien
 infisical secrets --env=prod --path=/vps/_infra
 
 # Secrets d'un service (synces en continu par l'agent)
-cat /etc/secrets/netdata.env      # n'existe que si secrets.tmpl est configure
+cat /etc/secrets/<service>.env    # n'existe que si secrets.tmpl est configure
 
 # Agent status
 systemctl status infisical-agent

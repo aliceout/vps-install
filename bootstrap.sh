@@ -6,8 +6,6 @@ LOG="/var/log/vps-bootstrap.log"
 
 export DOMAIN_MAIN=""
 export PROXY_UPSTREAM=""
-export NETDATA_DOMAIN=""
-export NETDATA_UPSTREAM="http://127.0.0.1:19999"
 
 exec > >(tee -a "$LOG") 2>&1
 
@@ -220,23 +218,10 @@ else
   NODE_ENABLED=0
 fi
 
-if ask_yes_no "Installer Netdata (monitoring) ?" "yes"; then
-  NETDATA_ENABLED=1
-else
-  NETDATA_ENABLED=0
-fi
-
-export WEB_ENABLED DOCKER_ENABLED NODE_ENABLED NETDATA_ENABLED
+export WEB_ENABLED DOCKER_ENABLED NODE_ENABLED
 export INFISICAL_ENABLED=1
 
-if [[ "$NETDATA_ENABLED" -eq 1 && "$WEB_ENABLED" -ne 1 ]]; then
-  say_warn "Netdata desactive (besoin du reverse proxy web)."
-  NETDATA_ENABLED=0
-fi
-
-export NETDATA_DOMAIN NETDATA_UPSTREAM
-
-say_info "Config: user=${VPS_USER} | ssh_port=${SSH_PORT} | web=${WEB_ENABLED} | docker=${DOCKER_ENABLED} | node=${NODE_ENABLED} | netdata=${NETDATA_ENABLED}"
+say_info "Config: user=${VPS_USER} | ssh_port=${SSH_PORT} | web=${WEB_ENABLED} | docker=${DOCKER_ENABLED} | node=${NODE_ENABLED}"
 
 # --- Deroulement des modules ---
 run_module "10_user_ssh.sh"
@@ -256,28 +241,6 @@ fi
 if [[ "$WEB_ENABLED" -eq 1 ]]; then
   run_module "50_nginx.sh"
   run_module "75_certbot.sh"
-fi
-
-if [[ "$NETDATA_ENABLED" -eq 1 ]]; then
-  say_info "Recuperation secrets Netdata depuis Infisical (/services/netdata)..."
-  NETDATA_ENV_CONTENT="$(
-    infisical export \
-      --domain="$INFISICAL_ADDRESS" \
-      --token="$INFISICAL_TOKEN" \
-      --projectId="$INFISICAL_PROJECT_ID" \
-      --env="$INFISICAL_ENV" \
-      --path=/services/netdata \
-      --format=dotenv 2>/dev/null
-  )"
-  if [[ -n "$NETDATA_ENV_CONTENT" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source <(printf '%s\n' "$NETDATA_ENV_CONTENT")
-    set +a
-  else
-    say_warn "Aucun secret sous /services/netdata (${INFISICAL_ENV}). Netdata sera installe mais pas expose."
-  fi
-  run_module "55_netdata.sh"
 fi
 
 run_module "60_zsh.sh"
