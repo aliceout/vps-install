@@ -137,12 +137,20 @@ sync_one() {
     return 1
   fi
 
-  record_id="$(printf '%s' "$records" | jq -r --arg s "$sub" \
-    'if type=="object" and has("data") then .data[] else .[] end
-     | select(.source==$s and .type=="A") | .id' 2>/dev/null | head -n1)"
-  current_target="$(printf '%s' "$records" | jq -r --arg s "$sub" \
-    'if type=="object" and has("data") then .data[] else .[] end
-     | select(.source==$s and .type=="A") | .target' 2>/dev/null | head -n1)"
+  # Apex : Infomaniak stocke les records apex avec source="." (parfois "" ou null)
+  # mais accepte "@" en POST. On cherche large pour matcher les record existants.
+  record_id="$(printf '%s' "$records" | jq -r --arg s "$sub" '
+    if type=="object" and has("data") then .data[] else .[] end
+    | select(.type=="A" and (
+        .source==$s
+        or ($s=="@" and (.source=="." or .source=="" or .source==null))
+      )) | .id' 2>/dev/null | head -n1)"
+  current_target="$(printf '%s' "$records" | jq -r --arg s "$sub" '
+    if type=="object" and has("data") then .data[] else .[] end
+    | select(.type=="A" and (
+        .source==$s
+        or ($s=="@" and (.source=="." or .source=="" or .source==null))
+      )) | .target' 2>/dev/null | head -n1)"
 
   local payload
   payload="$(jq -n --arg s "$sub" --arg t "$PUBLIC_IP" --argjson ttl "$TTL" \
