@@ -6,6 +6,7 @@ say_header "Resume installation"
 echo "- SSH: port $SSH_PORT, root desactive, passwords off"
 echo "- UFW: allow $SSH_PORT/tcp + 80/443 (si web), deny all else"
 echo "- Kernel hardening: /etc/sysctl.d/99-hardening.conf"
+echo "- Audit: rkhunter (quotidien), debsecan (quotidien), lynis (hebdo) -> /var/log/audit/"
 if command -v cscli >/dev/null 2>&1; then
   if cscli console status 2>/dev/null | grep -q "enrolled"; then
     echo "- CrowdSec: engine + bouncer nftables, enroll OK (voir https://app.crowdsec.net)"

@@ -87,6 +87,7 @@ modules/                 etapes numerotees (00 -> 99)
   20_packages.sh         outils CLI (lsd, bat, btop, pfetch, ...)
   25_zram.sh             swap compresse
   28_sysctl.sh           kernel hardening
+  29_audit_tools.sh      lynis + rkhunter + debsecan (logs /var/log/audit/)
   30_ufw_crowdsec.sh     firewall + CrowdSec engine + bouncer nftables
   35_infisical.sh        persist creds + agent systemd
   40_docker.sh           Docker Engine + compose (optionnel)

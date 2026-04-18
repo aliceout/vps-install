@@ -53,20 +53,26 @@ systemctl reload ufw || true
 
 # --- CrowdSec : detection + bouncer nftables ----------------------------------
 
-echo "CrowdSec (repo + engine + bouncer nftables)"
+echo "CrowdSec (repo + engine)"
 
 if ! command -v cscli >/dev/null 2>&1; then
   curl -fsSL https://install.crowdsec.net | sh
 fi
-apt-get install -y crowdsec crowdsec-firewall-bouncer-nftables
+apt-get install -y crowdsec
+
+# Demarre le LAPI avant tout pour que le postinst du bouncer et les enrollments
+# puissent s'y connecter.
+systemctl enable --now crowdsec
+for i in $(seq 1 30); do
+  cscli lapi status >/dev/null 2>&1 && break
+  sleep 1
+done
 
 echo "CrowdSec collections"
-# Base Linux + SSH (toujours)
 cscli collections install crowdsecurity/linux --force
 cscli collections install crowdsecurity/sshd --force
 cscli collections install crowdsecurity/linux-lpe --force 2>/dev/null || true
 
-# Web (scenarios HTTP + CVE) si nginx present
 if [[ "${WEB_ENABLED:-1}" -eq 1 ]]; then
   cscli collections install crowdsecurity/nginx --force
   cscli collections install crowdsecurity/base-http-scenarios --force
@@ -84,7 +90,27 @@ else
   echo "Pour enroller plus tard: cscli console enroll <cle> (cle dispo sur https://app.crowdsec.net)"
 fi
 
-systemctl enable --now crowdsec
-systemctl restart crowdsec
+systemctl reload crowdsec
+
+echo "CrowdSec bouncer (nftables)"
+apt-get install -y crowdsec-firewall-bouncer-nftables
+
+# Safety net: si le postinst n'a pas ecrit l'API key (race avec le LAPI qui
+# demarrait), on la regenere nous-memes.
+BOUNCER_CONF="/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml"
+BOUNCER_NAME="cs-firewall-bouncer"
+if [[ -f "$BOUNCER_CONF" ]] && ! grep -qE '^api_key:\s+[A-Za-z0-9]' "$BOUNCER_CONF"; then
+  echo "Registration manuelle du bouncer..."
+  cscli bouncers delete "$BOUNCER_NAME" 2>/dev/null || true
+  API_KEY="$(cscli bouncers add "$BOUNCER_NAME" -o raw)"
+  sed -i "s|^api_key:.*|api_key: ${API_KEY}|" "$BOUNCER_CONF"
+fi
+
 systemctl enable --now crowdsec-firewall-bouncer
 systemctl restart crowdsec-firewall-bouncer
+
+if ! systemctl is-active --quiet crowdsec-firewall-bouncer; then
+  echo "ERREUR: crowdsec-firewall-bouncer.service n'a pas demarre. Diagnostic:"
+  systemctl status crowdsec-firewall-bouncer.service --no-pager || true
+  journalctl -xeu crowdsec-firewall-bouncer.service --no-pager -n 50 || true
+fi

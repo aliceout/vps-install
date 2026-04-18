@@ -228,6 +228,7 @@ run_module "10_user_ssh.sh"
 run_module "20_packages.sh"
 run_module "25_zram.sh"
 run_module "28_sysctl.sh"
+run_module "29_audit_tools.sh"
 run_module "30_ufw_crowdsec.sh"
 run_module "35_infisical.sh"
 
