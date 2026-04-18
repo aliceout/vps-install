@@ -164,25 +164,41 @@ fi
 export INFISICAL_TOKEN="$INFISICAL_ACCESS_TOKEN"
 
 say_info "Recuperation config depuis ${INFISICAL_ADDRESS} (${INFISICAL_ENV}${INFISICAL_PATH_INFRA})..."
-INFRA_ENV_CONTENT="$(
-  infisical export \
+
+# `infisical export --format=dotenv` encode les newlines en '\n' litteral,
+# que bash source ne decode pas. On fetch chaque cle individuellement avec
+# --plain pour preserver les valeurs multiligne (SSH keys, certs, etc.).
+fetch_infra_secret() {
+  local k="$1"
+  infisical secrets get "$k" \
     --domain="$INFISICAL_ADDRESS" \
-    --token="$INFISICAL_TOKEN" \
     --projectId="$INFISICAL_PROJECT_ID" \
     --env="$INFISICAL_ENV" \
     --path="$INFISICAL_PATH_INFRA" \
-    --format=dotenv 2>/dev/null
-)"
-if [[ -z "$INFRA_ENV_CONTENT" ]]; then
+    --token="$INFISICAL_TOKEN" \
+    --plain 2>/dev/null || true
+}
+
+INFRA_KEYS=(
+  VPS_USER VPS_USER_PASSWORD
+  SSH_PORT SSH_PUBKEY
+  LE_EMAIL INFOMANIAK_TOKEN
+  CROWDSEC_ENROLL_KEY GITHUB_SSH_PRIVKEY
+)
+
+got_any=0
+for k in "${INFRA_KEYS[@]}"; do
+  v="$(fetch_infra_secret "$k")"
+  if [[ -n "$v" ]]; then
+    export "$k=$v"
+    got_any=1
+  fi
+done
+
+if [[ "$got_any" -eq 0 ]]; then
   say_err "ERREUR: aucun secret recupere sous ${INFISICAL_PATH_INFRA}"
   exit 1
 fi
-
-# Charge les secrets dans l'env courant (export automatique)
-set -a
-# shellcheck disable=SC1090
-source <(printf '%s\n' "$INFRA_ENV_CONTENT")
-set +a
 
 # Validation : variables obligatoires
 REQUIRED=(VPS_USER VPS_USER_PASSWORD SSH_PORT SSH_PUBKEY LE_EMAIL)
