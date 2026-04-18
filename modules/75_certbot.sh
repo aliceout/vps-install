@@ -65,6 +65,28 @@ cp -a "$ROOT_DIR/scripts/certbot-dns.sh" /usr/local/sbin/certbot-dns
 chmod +x /usr/local/sbin/certbot-dns
 cp -a "$ROOT_DIR/scripts/certbot-request.sh" /usr/local/sbin/certbot-request
 chmod +x /usr/local/sbin/certbot-request
+cp -a "$ROOT_DIR/scripts/infomaniak-dns-sync.sh" /usr/local/sbin/infomaniak-dns-sync
+chmod +x /usr/local/sbin/infomaniak-dns-sync
+
+# Log rotation pour le sync DNS
+cat > /etc/logrotate.d/infomaniak-dns-sync <<'EOF'
+/var/log/infomaniak-dns-sync.log {
+    weekly
+    rotate 4
+    missingok
+    notifempty
+    compress
+    delaycompress
+}
+EOF
+
+# Cron: sync auto-heal des records A toutes les heures
+cat > /etc/cron.d/infomaniak-dns-sync <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+17 * * * * root /usr/local/sbin/infomaniak-dns-sync >/dev/null 2>&1
+EOF
+chmod 644 /etc/cron.d/infomaniak-dns-sync
 
 # Timer certbot renew (renouvelle automatiquement tous les certs existants)
 systemctl enable --now certbot.timer 2>/dev/null || true

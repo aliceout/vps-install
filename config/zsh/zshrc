@@ -46,6 +46,7 @@ alias cat='batcat'
 
 alias web='cd /var/www'
 alias nginx='cd /etc/nginx'
+alias services='sudo bash /opt/vps-install/scripts/service.sh'
 
 # Initialiser zoxide
 eval "$(zoxide init zsh)"

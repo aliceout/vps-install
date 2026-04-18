@@ -283,12 +283,21 @@ fi
 run_module "60_zsh.sh"
 run_module "70_cron_updates.sh"
 
+# Persiste le repo dans un chemin stable (/opt/vps-install) pour les re-runs
+# et l'alias `services` dans le zshrc.
+if [[ "$ROOT_DIR" != "/opt/vps-install" ]]; then
+  say_info "Copie du repo vers /opt/vps-install"
+  install -d /opt
+  rm -rf /opt/vps-install
+  cp -a "$ROOT_DIR" /opt/vps-install
+fi
+
 run_module "99_summary.sh"
 
 if ask_yes_no "Installer maintenant des services ?" "yes"; then
-  bash "$ROOT_DIR/scripts/service.sh"
+  bash /opt/vps-install/scripts/service.sh
 else
-  say_info "Tu pourras lancer plus tard: sudo bash $ROOT_DIR/scripts/service.sh"
+  say_info "Tu pourras lancer plus tard: sudo services (ou sudo bash /opt/vps-install/scripts/service.sh)"
 fi
 
 say_ok "Bootstrap termine. Log: $LOG"

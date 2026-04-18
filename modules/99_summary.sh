@@ -24,6 +24,9 @@ fi
 echo "- ZRAM: swap en memoire (zram-tools)"
 echo "- Cron: apt update/upgrade quotidiens"
 echo "- Certbot DNS Infomaniak: renouvellement auto (certbot.timer)"
+if [[ "${WEB_ENABLED:-1}" -eq 1 ]]; then
+  echo "- DNS Infomaniak: sync auto horaire (records A alignes sur IP publique)"
+fi
 echo "- Fail2ban: blocklists IP (maj quotidienne)"
 if [[ "${INFISICAL_ENABLED:-0}" -eq 1 ]]; then
   echo "- Infisical: CLI + agent (creds dans /etc/infisical/, secrets dans /etc/secrets/)"
@@ -50,4 +53,4 @@ say_header "APRES REBOOT"
 
 echo "- Re-ssh en ${VPS_USER} avec ta cle"
 echo "- Verifie les services : systemctl --failed"
-echo "- Installe un service : sudo bash scripts/service.sh"
+echo "- Installe un service : tape 'services' dans le zsh (alias vers service.sh)"

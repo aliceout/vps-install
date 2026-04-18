@@ -60,21 +60,23 @@ Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises auto
 - **Docker Engine + compose** (optionnel)
 - **Node.js + pm2** (optionnel)
 - **Nginx** reverse proxy + includes TLS (optionnel)
-- **Netdata** monitoring (optionnel, via reverse proxy)
-- **Zsh + oh-my-zsh + powerlevel10k** (config p10k + zshrc avec alias, pfetch banner, `histo`, `tools`)
+- **Netdata** monitoring (optionnel, expose en HTTPS avec basic auth depuis `/services/netdata/`)
+- **Zsh + oh-my-zsh + powerlevel10k** (config p10k + zshrc avec alias, pfetch banner, `histo`, `tools`, alias `services`)
 - **Outils CLI** : lsd, bat, zoxide, fzf, btop, htop, ncdu, glances, lnav, ctop, lazydocker, pfetch, lolcat
-- **Cron** : apt update/upgrade, fail2ban blocklists
+- **Cron** : apt update/upgrade, fail2ban blocklists, sync DNS Infomaniak (auto-heal records A sur IP publique)
 - **Certbot** : DNS Infomaniak via token synce depuis Infisical, renouvellement automatique
 
 ## Apres le bootstrap : installer des services
 
-Le helper `scripts/service.sh` gere les services individuels :
+Le repo est persiste en `/opt/vps-install/`. Le zshrc installe un alias `services` qui lance le helper :
 
 ```bash
-sudo bash scripts/service.sh            # menu interactif
-sudo bash scripts/service.sh install syncthing
-sudo bash scripts/service.sh list
+services               # menu interactif
+services install syncthing
+services list
 ```
+
+Equivalent direct : `sudo bash /opt/vps-install/scripts/service.sh [...]`.
 
 Chaque service vit dans `services/<nom>/` (voir `services/README.md` pour la structure). Trois templates fournis :
 - `_template_docker` - service Docker (Syncthing, Stirling PDF, ...)

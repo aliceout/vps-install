@@ -60,6 +60,9 @@ sed -i \
 sed -i -e "s|__DOMAIN__|${NETDATA_DOMAIN}|g" "$CERT_DST"
 ln -sf "$VHOST_DST" "/etc/nginx/sites-enabled/${NETDATA_DOMAIN}.conf"
 
+echo "Sync record DNS A chez Infomaniak pour ${NETDATA_DOMAIN}"
+/usr/local/sbin/infomaniak-dns-sync "$NETDATA_DOMAIN" || say_warn "DNS sync echoue (cert pourra ne pas resoudre)."
+
 echo "Requete cert Let's Encrypt pour ${NETDATA_DOMAIN}"
 /usr/local/sbin/certbot-request "$NETDATA_DOMAIN"
 
