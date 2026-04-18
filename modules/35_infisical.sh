@@ -26,6 +26,11 @@ printf '%s' "$INFISICAL_PROJECT_ID" > /etc/infisical/project-id
 printf '%s' "$INFISICAL_ENV"        > /etc/infisical/environment
 chmod 644 /etc/infisical/project-id /etc/infisical/environment
 
+# Nom du user non-root persiste aussi (scripts/service.sh et les install.sh
+# des services en ont besoin pour les perms et les systemd units)
+printf '%s' "$VPS_USER" > /etc/infisical/vps-user
+chmod 644 /etc/infisical/vps-user
+
 cat > /etc/infisical/agent.base.yaml <<EOF
 infisical:
   address: ${INFISICAL_ADDRESS}

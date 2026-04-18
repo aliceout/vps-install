@@ -21,6 +21,11 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
       pdf/                 # Stirling PDF (charge a l'install du service)
         ADRESS             # FQDN de l'expo
         DOMAIN             # apex (cert wildcard)
+      webhooks/            # GitHub webhooks receiver
+        ADRESS
+        DOMAIN
+        WEBHOOKS_REPOS     # JSON array: [{"repo":"...","secretEnv":"X_SECRET","script":"x.sh"}]
+        <X_SECRET>         # HMAC partage avec GitHub, 1 par repo
       <service>/           # autres services, meme convention
         ADRESS
         DOMAIN
@@ -52,6 +57,17 @@ Service ouvert (pas d'auth). Juste les coordonnees de l'expo.
 |-----|------|---------|------|
 | `ADRESS` | string | `pdf.backlice.dev` | FQDN expose (nginx `server_name` + record DNS A) |
 | `DOMAIN` | string | `backlice.dev` | apex du cert wildcard |
+
+## `/services/webhooks/` - GitHub webhooks receiver
+
+| Cle | Type | Exemple | Role |
+|-----|------|---------|------|
+| `ADRESS` | string | `webhooks.alyss.cc` | FQDN de l'expo |
+| `DOMAIN` | string | `alyss.cc` | apex cert wildcard |
+| `WEBHOOKS_REPOS` | JSON | `[{"repo":"aliceout/Work-resume","secretEnv":"WORK_SECRET","script":"work.sh"}]` | mapping repo -> secret -> script |
+| `<X_SECRET>` | secret | `Attach8-Catfight-...` | HMAC partage avec GitHub, 1 par repo (nomme selon `secretEnv` de WEBHOOKS_REPOS) |
+
+Voir `services/webhooks/README.md` pour l'install et l'ajout de repos.
 
 ## `/services/<nom>/` - autres services tiers
 

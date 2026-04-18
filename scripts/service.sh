@@ -11,6 +11,13 @@ AGENT_TEMPLATES_DIR="/etc/infisical/templates"
 SECRETS_DIR="/etc/secrets"
 NGINX_CONF_DIR="/etc/nginx/conf"
 
+# VPS_USER (user non-root principal) : chargé depuis le fichier persiste par
+# 35_infisical.sh. Transmis ensuite aux install.sh des services.
+if [[ -z "${VPS_USER:-}" && -s /etc/infisical/vps-user ]]; then
+  VPS_USER="$(cat /etc/infisical/vps-user)"
+fi
+export VPS_USER
+
 if [[ $EUID -ne 0 ]]; then
   echo "Lance-moi en root: sudo bash $0"
   exit 1
@@ -272,6 +279,7 @@ run_service_script() {
   SERVICE_NAME="$name" \
   SERVICE_DIR="$SERVICES_DIR/$name" \
   SECRETS_FILE="$SECRETS_DIR/$name.env" \
+  VPS_USER="${VPS_USER:-}" \
     bash "$script"
 }
 
