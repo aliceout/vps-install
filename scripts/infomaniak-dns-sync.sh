@@ -166,7 +166,15 @@ sync_one() {
     api_call POST "/1/domain/$domain_id/dns/record" "$create_payload" >/dev/null
   elif [[ "$current_target" != "$PUBLIC_IP" ]]; then
     log "UPDATE A $fqdn $current_target -> $PUBLIC_IP"
-    api_call PUT "/1/domain/$domain_id/dns/record/$record_id" "$update_payload" >/dev/null
+    if [[ "$sub" == "@" ]]; then
+      # Apex: PUT renvoie 500 chez Infomaniak quel que soit le payload.
+      # Workaround DELETE + CREATE.
+      api_call DELETE "/1/domain/$domain_id/dns/record/$record_id" >/dev/null \
+        && sleep 1 \
+        && api_call POST "/1/domain/$domain_id/dns/record" "$create_payload" >/dev/null
+    else
+      api_call PUT "/1/domain/$domain_id/dns/record/$record_id" "$update_payload" >/dev/null
+    fi
   else
     log "OK     A $fqdn -> $PUBLIC_IP (a jour)"
   fi
