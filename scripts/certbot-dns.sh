@@ -60,7 +60,7 @@ for DOMAIN in "${DOMAINS[@]}"; do
     -vv \
     --authenticator dns-infomaniak \
     --dns-infomaniak-credentials "$CREDENTIALS" \
-    --dns-infomaniak-propagation-seconds 180 \
+    --dns-infomaniak-propagation-seconds 300 \
     -d "$DOMAIN" -d "*.$DOMAIN" \
     --preferred-challenges dns \
     --agree-tos --non-interactive \

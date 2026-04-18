@@ -58,7 +58,7 @@ echo "Requete cert wildcard pour ${APEX} et *.${APEX}..."
 "$CERTBOT_BIN" certonly \
   --authenticator dns-infomaniak \
   --dns-infomaniak-credentials "$CREDENTIALS" \
-  --dns-infomaniak-propagation-seconds 180 \
+  --dns-infomaniak-propagation-seconds 300 \
   -d "$APEX" -d "*.${APEX}" \
   --preferred-challenges dns \
   --agree-tos --non-interactive \
