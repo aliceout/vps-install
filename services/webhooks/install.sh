@@ -30,11 +30,21 @@ list_subfolders() {
   env="$(cat /etc/infisical/environment)"
   token="$(infi_login)"
 
-  # `infisical secrets folders get` liste les sous-dossiers d'un path
+  # `infisical secrets folders get` sort un tableau en Unicode box drawing
+  # (│, ─, ┌, etc.). On filtre les lignes de donnees (qui commencent par │)
+  # et on extrait la 1ere colonne (le nom du folder).
   infisical secrets folders get \
     --projectId="$pid" --env="$env" --path="$path" \
     --token="$token" 2>/dev/null \
-    | awk 'NR>1 && /^\|/ {gsub(/[ \t|]+/, "", $0); if ($0 != "" && $0 !~ /^-+$/ && $0 != "FOLDERNAME") print}' \
+    | awk '
+        /^│/ && !/FOLDER NAME/ {
+          n = split($0, parts, "│")
+          if (n >= 2) {
+            name = parts[2]
+            gsub(/^[ \t]+|[ \t]+$/, "", name)
+            if (name != "") print name
+          }
+        }' \
     | sort -u
 }
 
