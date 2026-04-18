@@ -1,23 +1,33 @@
 #!/usr/bin/env bash
-# Deploy Work-resume (Next.js) via pm2.
-# Idempotent : clone si absent, sinon pull. Lance par webhooks a chaque push.
+# Deploy Work-resume via pm2.
+# Toute la config vient de /etc/secrets/work.env (synce par l'agent
+# Infisical depuis /services/work/) :
+#   REPO    : ex "aliceout/Work-resume" (slug GitHub)
+#   BRANCH  : ex "master"
+#   APP     : nom pm2 (ex "work")
+#   DIR     : chemin local (ex "/var/www/work")
+#   PORT    : ex "4154"
+#   GIT_URL : optionnel - URL clone explicite (default: git@github.com:$REPO.git)
 set -euo pipefail
 
-REPO="git@github.com:aliceout/Work-resume.git"
-DIR="/var/www/work"
-BRANCH="master"
-APP="work"
-PORT="4154"
+source /etc/secrets/work.env
+
+: "${REPO:?REPO manquant dans /etc/secrets/work.env}"
+: "${BRANCH:?BRANCH manquant}"
+: "${APP:?APP manquant}"
+: "${DIR:?DIR manquant}"
+: "${PORT:?PORT manquant}"
+
+GIT_URL="${GIT_URL:-git@github.com:${REPO}.git}"
 
 mkdir -p "$(dirname "$DIR")"
 
 if [[ ! -d "$DIR/.git" ]]; then
-  echo "[$(date -Iseconds)] Premier run : clone $REPO"
-  git clone --branch "$BRANCH" "$REPO" "$DIR"
+  echo "[$(date -Iseconds)] Premier run : clone $GIT_URL"
+  git clone --branch "$BRANCH" "$GIT_URL" "$DIR"
 fi
 
 cd "$DIR"
-
 git fetch origin "$BRANCH"
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"

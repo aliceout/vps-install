@@ -3,12 +3,22 @@ set -euo pipefail
 
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 
-DEPLOY_DIR="/var/www/${SERVICE_NAME}"
 WEBHOOKS_HOOKS_DIR="/var/lib/services/webhooks/hooks"
 HOOK_SRC="$SERVICE_DIR/hook.sh"
 HOOK_DST="$WEBHOOKS_HOOKS_DIR/${SERVICE_NAME}.sh"
 
 : "${VPS_USER:?VPS_USER manquant}"
+
+# Charge la config depuis l'env file (DIR, APP, etc. viennent de la)
+if [[ ! -s "$SECRETS_FILE" ]]; then
+  echo "ERREUR: $SECRETS_FILE absent. Verifie que les cles sont presentes"
+  echo "dans Infisical sous /services/${SERVICE_NAME}/ et que l'agent a sync."
+  exit 1
+fi
+# shellcheck disable=SC1090
+source "$SECRETS_FILE"
+: "${DIR:?DIR manquant dans $SECRETS_FILE}"
+: "${APP:?APP manquant dans $SECRETS_FILE}"
 
 trigger_webhooks_update() {
   if [[ -x /opt/vps-install/scripts/service.sh ]] && \
@@ -21,12 +31,11 @@ trigger_webhooks_update() {
 case "$ACTION" in
   install|update)
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 /var/www
-    install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$DEPLOY_DIR"
+    install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$(dirname "$DIR")"
+    install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$DIR"
 
-    # Lance le hook (clone-or-pull, build, pm2 start/restart)
     runuser -u "$VPS_USER" -- bash "$HOOK_SRC"
 
-    # Publie le hook chez webhooks (si webhooks installe) pour les push GitHub
     if [[ -d "$WEBHOOKS_HOOKS_DIR" ]]; then
       install -m 755 -o "$VPS_USER" -g "$VPS_USER" "$HOOK_SRC" "$HOOK_DST"
       echo "Hook publie: $HOOK_DST"
@@ -39,18 +48,18 @@ case "$ACTION" in
     ;;
 
   remove)
-    runuser -u "$VPS_USER" -- pm2 delete "$SERVICE_NAME" 2>/dev/null || true
+    runuser -u "$VPS_USER" -- pm2 delete "$APP" 2>/dev/null || true
     runuser -u "$VPS_USER" -- pm2 save 2>/dev/null || true
     rm -f "$HOOK_DST"
     trigger_webhooks_update
     echo "pm2 stoppe + hook retire de webhooks."
-    echo "Code source preserve dans $DEPLOY_DIR (a rm -rf manuel pour purger)."
+    echo "Code source preserve dans $DIR (a rm -rf manuel pour purger)."
     ;;
 
   status)
     runuser -u "$VPS_USER" -- pm2 list 2>/dev/null \
-      | awk -v app="$SERVICE_NAME" '$0 ~ app {print}' \
-      || echo "${SERVICE_NAME}: pas dans pm2"
+      | awk -v app="$APP" '$0 ~ app {print}' \
+      || echo "${APP}: pas dans pm2"
     ;;
 
   *)
