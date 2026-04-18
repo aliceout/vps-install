@@ -163,10 +163,4 @@ rc=0
 for d in "${DOMAINS[@]}"; do
   sync_one "$d" || { rc=1; log "Sync A echouee pour $d"; }
 done
-
-# Note: CAA auto desactive - le format JSON attendu par l'API Infomaniak
-# n'est pas trivial a reconstituer, et la creation echouait en 422.
-# A faire a la main via l'UI Infomaniak (DNS > Ajouter > CAA, value:
-# "0 issue letsencrypt.org"). Voir SECURITY.md.
-
 exit "$rc"

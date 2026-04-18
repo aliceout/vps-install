@@ -8,7 +8,7 @@ Le bootstrap met en place une stack de defense en profondeur. Rien a gerer au qu
 Internet
    |
    v
-[CAA DNS]                      seul Let's Encrypt peut emettre des certs pour tes domaines
+[CAA DNS] (manuel)             seul Let's Encrypt peut emettre des certs pour tes domaines
    |
    v
 [UFW]                          pare-feu, deny par defaut
@@ -38,7 +38,7 @@ Internet
 | Refresh CrowdSec hub | dimanche 04:42 | `cscli hub update && cscli hub upgrade` - maj des scenarios et parsers |
 | Apt update/upgrade | tous les jours 03:17 | `apt-get update` puis `apt-get upgrade -y` |
 | Renouvellement certs | quotidien via certbot.timer | Let's Encrypt |
-| DNS auto-sync (A + CAA) | toutes les heures | records A Infomaniak alignes sur l'IP publique + CAA (letsencrypt.org) sur chaque apex |
+| DNS auto-sync (A) | toutes les heures | records A Infomaniak alignes sur l'IP publique |
 | rkhunter | quotidien 05:15 | scan rootkits -> `/var/log/audit/rkhunter.log` |
 | debsecan | quotidien 05:30 | CVE vs paquets installes -> `/var/log/audit/debsecan.log` |
 | lynis | dimanche 05:45 | audit complet -> `/var/log/audit/lynis.log` |
@@ -159,13 +159,29 @@ Strict-Transport-Security: max-age=63072000; includeSubDomains
 ```
 = 2 ans de force-HTTPS apres la 1ere visite.
 
-## Record CAA (DNS)
+## Record CAA (DNS) - a faire a la main, une fois par domaine
 
-Le sync DNS Infomaniak (`infomaniak-dns-sync`, cron horaire) cree automatiquement un record CAA sur chaque apex qu'il rencontre :
+Le record CAA dit "seul cet emetteur peut signer un cert pour ce domaine". Si un attaquant pirate ton DNS et tente d'aller chez un autre CA, le CA refuse l'emission.
+
+A ajouter une seule fois sur chaque apex (`backlice.dev`, `alyss.cc`, ...) via l'UI Infomaniak :
+
+1. Connexion sur https://manager.infomaniak.com
+2. Domaines > [ton domaine] > Zone DNS
+3. Ajouter un record :
+   - **Type** : CAA
+   - **Source** : `@` (apex)
+   - **Flags** : `0`
+   - **Tag** : `issue`
+   - **Valeur** : `letsencrypt.org`
+   - TTL : laisse par defaut
+
+Optionnel : meme record avec `tag=issuewild` si tu veux explicitement autoriser les wildcards (Let's Encrypt accepte deja les wildcards via DNS-01, donc pas strictement necessaire mais propre).
+
+Verification :
+```bash
+dig CAA backlice.dev +short
+# Doit afficher: 0 issue "letsencrypt.org"
 ```
-<apex>  CAA  0 issue "letsencrypt.org"
-```
-= seul Let's Encrypt peut emettre des certs pour ce domaine. Si un attaquant pirate ton DNS et tente d'aller chez un autre CA, le CA refusera l'emission.
 
 ## Ce qui n'est PAS fait
 
