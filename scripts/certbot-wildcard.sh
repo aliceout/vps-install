@@ -19,6 +19,18 @@ DOMAINS_FILE="/etc/letsencrypt/domains.ini"
 CERTBOT_BIN="/usr/local/bin/certbot"
 [[ -x "$CERTBOT_BIN" ]] || CERTBOT_BIN="$(command -v certbot || true)"
 LIVE_DIR="/etc/letsencrypt/live/${APEX}"
+NGINX_CERT_INCLUDE="/etc/nginx/certificat/${APEX}.conf"
+
+# Genere le snippet nginx que les vhosts incluront.
+write_nginx_cert_include() {
+  install -d -m 755 /etc/nginx/certificat
+  cat > "$NGINX_CERT_INCLUDE" <<EOF
+ssl_certificate     /etc/letsencrypt/live/${APEX}/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/${APEX}/privkey.pem;
+ssl_trusted_certificate /etc/letsencrypt/live/${APEX}/chain.pem;
+EOF
+  chmod 644 "$NGINX_CERT_INCLUDE"
+}
 
 if [[ -z "$CERTBOT_BIN" ]]; then
   echo "certbot introuvable" >&2
@@ -52,6 +64,7 @@ fi
 
 if [[ -f "${LIVE_DIR}/fullchain.pem" ]]; then
   echo "Cert wildcard deja present pour ${APEX}, skip."
+  write_nginx_cert_include   # idempotent, utile si le snippet manque
   exit 0
 fi
 
@@ -66,3 +79,5 @@ echo "(le plugin cree un TXT + attend ~3 min que les NS Infomaniak propagent)"
   --agree-tos --non-interactive \
   --email "$EMAIL" \
   --keep-until-expiring --expand
+
+write_nginx_cert_include

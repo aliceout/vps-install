@@ -85,7 +85,40 @@ Tu peux ajouter d'autres placeholders : toute cle presente dans Infisical sous `
 4. Copie le vhost rendu dans `/etc/nginx/conf/<nom>.conf`
 5. `nginx -t` + `systemctl reload nginx`
 
-Inclut les bricks communes via `include /etc/nginx/include/*.conf`.
+### Bricks nginx communes (factorisees)
+
+Pour eviter de dupliquer 20 lignes par vhost, les includes suivants couvrent 90% du boilerplate :
+
+| Include | Contenu | A mettre dans |
+|---------|---------|---------------|
+| `/etc/nginx/include/vhost-head.conf` | `listen 443 ssl + http2`, SSL protocols, security headers | server block 443 |
+| `/etc/nginx/include/vhost-http-redirect.conf` | `listen 80` + `return 301 https://...` | server block 80 |
+| `/etc/nginx/certificat/<apex>.conf` | `ssl_certificate*` pour l'apex (auto-genere par `certbot-wildcard`) | server block 443 |
+| `/etc/nginx/include/proxy.conf` | `proxy_set_header *`, timeouts, websocket | block `location` |
+
+Un vhost de service type ressemble donc a :
+
+```nginx
+server {
+    server_name __ADRESS__;
+    include /etc/nginx/include/vhost-head.conf;
+    include /etc/nginx/certificat/__DOMAIN__.conf;
+
+    # overrides specifiques au service (client_max_body_size, CSP, ...)
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        include /etc/nginx/include/proxy.conf;
+    }
+}
+
+server {
+    server_name __ADRESS__;
+    include /etc/nginx/include/vhost-http-redirect.conf;
+}
+```
+
+Tout ce qui est commun est centralise dans les includes. Le vhost ne porte que ce qui est specifique au service.
 
 ## Creer un nouveau service
 
