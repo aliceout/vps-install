@@ -1,58 +1,77 @@
 #!/usr/bin/env node
 // GitHub webhooks receiver.
 //
-// Config venue de /etc/secrets/webhooks.env (synce par l'agent Infisical
-// depuis /services/webhooks/). Clés attendues :
-//   WEBHOOKS_REPOS = JSON array: [{"repo":"owner/name","secretEnv":"X_SECRET","script":"x.sh"}, ...]
-//   <X_SECRET>     = le secret HMAC partage avec GitHub (un par repo)
+// Sources :
+//  - process.env.HOOKS_ENV_DIR (default /etc/secrets/webhooks/) :
+//    un .env par hook, chacun contenant REPO, SECRET, SCRIPT.
+//  - process.env.HOOKS_DIR : ou trouver les scripts shell.
+//  - process.env.LOG_DIR   : ou logger l'execution.
 //
-// Les scripts de deploy vivent dans HOOKS_DIR (default
-// /var/lib/services/webhooks/hooks/). Les logs d'execution dans LOG_DIR.
+// Re-scan automatique du HOOKS_ENV_DIR a chaque requete : ajouter / modifier
+// un sous-dossier dans Infisical -> 60s plus tard l'agent ecrit le nouveau
+// fichier .env -> la prochaine requete le voit, sans restart du service.
 
-const http    = require("http");
-const crypto  = require("crypto");
-const fs      = require("fs");
-const path    = require("path");
+const http     = require("http");
+const crypto   = require("crypto");
+const fs       = require("fs");
+const path     = require("path");
 const { exec } = require("child_process");
 
-const PORT      = parseInt(process.env.PORT || "8070", 10);
-const HOOKS_DIR = process.env.HOOKS_DIR || "/var/lib/services/webhooks/hooks";
-const LOG_DIR   = process.env.LOG_DIR   || "/var/lib/services/webhooks/log";
+const PORT          = parseInt(process.env.PORT || "8070", 10);
+const HOOKS_DIR     = process.env.HOOKS_DIR     || "/var/lib/services/webhooks/hooks";
+const LOG_DIR       = process.env.LOG_DIR       || "/var/lib/services/webhooks/log";
+const HOOKS_ENV_DIR = process.env.HOOKS_ENV_DIR || "/etc/secrets/webhooks";
 
 fs.mkdirSync(LOG_DIR, { recursive: true });
 
-// --- Charge la config repos -> secret + script --------------------------------
+// --- Lecture des hooks -------------------------------------------------------
 
-const DEPLOY = {};
-try {
-  const raw = process.env.WEBHOOKS_REPOS || "[]";
-  const entries = JSON.parse(raw);
-  for (const e of entries) {
-    if (!e.repo || !e.secretEnv || !e.script) {
-      console.warn(`Skip entree incomplete:`, e);
-      continue;
+function parseEnvFile(file) {
+  const out = {};
+  for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    let v = line.slice(eq + 1).trim();
+    // strip surrounding quotes
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1);
     }
-    const secret = process.env[e.secretEnv];
-    if (!secret) {
-      console.warn(`Pas de secret dans env[${e.secretEnv}] pour ${e.repo}, skip`);
-      continue;
-    }
-    DEPLOY[e.repo] = { secret, script: e.script };
+    out[line.slice(0, eq).trim()] = v;
   }
-} catch (err) {
-  console.error("Parsing WEBHOOKS_REPOS echoue:", err.message);
-  process.exit(1);
+  return out;
 }
 
-console.log(`HOOKS_DIR: ${HOOKS_DIR}`);
-console.log(`Repos configures: ${Object.keys(DEPLOY).join(", ") || "(aucun)"}`);
+function loadDeployConfig() {
+  const map = {};
+  if (!fs.existsSync(HOOKS_ENV_DIR)) return map;
 
-// --- HMAC verify --------------------------------------------------------------
+  for (const f of fs.readdirSync(HOOKS_ENV_DIR)) {
+    if (!f.endsWith(".env")) continue;
+    const full = path.join(HOOKS_ENV_DIR, f);
+    let cfg;
+    try { cfg = parseEnvFile(full); }
+    catch (e) {
+      console.warn(`Skip ${f}: ${e.message}`);
+      continue;
+    }
+    const { REPO, SECRET, SCRIPT } = cfg;
+    if (!REPO || !SECRET || !SCRIPT) {
+      console.warn(`Skip ${f}: REPO / SECRET / SCRIPT manquants`);
+      continue;
+    }
+    map[REPO] = { secret: SECRET, script: SCRIPT, source: f };
+  }
+  return map;
+}
+
+// --- HMAC verify -------------------------------------------------------------
 
 function verifySignature(req, body, secret) {
   const signature = req.headers["x-hub-signature-256"];
   if (!signature) return false;
-  const hmac = crypto.createHmac("sha256", secret);
+  const hmac   = crypto.createHmac("sha256", secret);
   const digest = `sha256=${hmac.update(body).digest("hex")}`;
   try {
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
@@ -61,7 +80,7 @@ function verifySignature(req, body, secret) {
   }
 }
 
-// --- HTTP ---------------------------------------------------------------------
+// --- HTTP --------------------------------------------------------------------
 
 const server = http.createServer((req, res) => {
   if (req.method !== "POST" || !["/webhook", "/webhooks"].includes(req.url)) {
@@ -87,6 +106,9 @@ const server = http.createServer((req, res) => {
       res.writeHead(200);
       return res.end("pong");
     }
+
+    // Re-charge a chaque requete : pas besoin de restart si on ajoute un hook
+    const DEPLOY = loadDeployConfig();
 
     const repo = data.repository?.full_name;
     if (!repo || !DEPLOY[repo]) {
@@ -115,7 +137,7 @@ const server = http.createServer((req, res) => {
     res.end("Deploy started");
 
     const logFile = path.join(LOG_DIR, `${repo.replace(/\//g, "_")}.log`);
-    const cmd = `bash "${scriptPath}" >> "${logFile}" 2>&1`;
+    const cmd     = `bash "${scriptPath}" >> "${logFile}" 2>&1`;
     exec(cmd, { timeout: 0 }, (err) => {
       if (err) console.error(`${script} exit ${err.code}: ${err.message}`);
       else     console.log(`${script} OK`);
@@ -124,5 +146,9 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => {
+  const initial = loadDeployConfig();
   console.log(`Webhook receiver en ecoute sur 127.0.0.1:${PORT}`);
+  console.log(`HOOKS_DIR     = ${HOOKS_DIR}`);
+  console.log(`HOOKS_ENV_DIR = ${HOOKS_ENV_DIR}`);
+  console.log(`Repos charges au boot: ${Object.keys(initial).join(", ") || "(aucun)"}`);
 });
