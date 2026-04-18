@@ -273,7 +273,14 @@ run_module "99_summary.sh"
 if ask_yes_no "Installer maintenant des services ?" "yes"; then
   bash /opt/vps-install/scripts/service.sh
 else
-  say_info "Tu pourras lancer plus tard: sudo services (ou sudo bash /opt/vps-install/scripts/service.sh)"
+  say_info "Tu pourras lancer plus tard: services"
 fi
 
 say_ok "Bootstrap termine. Log: $LOG"
+say_warn "Reboot dans 15 secondes (Ctrl-C pour annuler)..."
+for i in $(seq 15 -1 1); do
+  printf "\r  %2d s..." "$i"
+  sleep 1
+done
+printf "\r%-20s\n" ""
+systemctl reboot
