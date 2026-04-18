@@ -225,6 +225,7 @@ say_info "Config: user=${VPS_USER} | ssh_port=${SSH_PORT} | web=${WEB_ENABLED} |
 
 # --- Deroulement des modules ---
 run_module "10_user_ssh.sh"
+run_module "15_github_ssh.sh"
 run_module "20_packages.sh"
 run_module "25_zram.sh"
 run_module "28_sysctl.sh"

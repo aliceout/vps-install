@@ -84,6 +84,7 @@ install.sh               one-liner (clone + lance bootstrap.sh)
 modules/                 etapes numerotees (00 -> 99)
   00_preflight.sh        apt base + ca-certificates
   10_user_ssh.sh         user, sudo, SSH durci
+  15_github_ssh.sh       cle SSH GitHub depuis Infisical (optionnel)
   20_packages.sh         outils CLI (lsd, bat, btop, pfetch, ...)
   25_zram.sh             swap compresse
   28_sysctl.sh           kernel hardening
