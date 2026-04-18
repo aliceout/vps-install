@@ -183,6 +183,16 @@ dig CAA backlice.dev +short
 # Doit afficher: 0 issue "letsencrypt.org"
 ```
 
+## Fast Anycast Infomaniak - GARDER DESACTIVE
+
+L'option "Fast Anycast" sur les domaines Infomaniak **casse DNS-01** pour Let's Encrypt : les records crees via API (ce que fait `certbot-dns-infomaniak`) sont stockes en DB mais jamais publies sur les NS, donc NXDOMAIN au moment du challenge ACME.
+
+Reference upstream : https://github.com/Infomaniak/certbot-dns-infomaniak/issues/47
+
+**Regle** : sur CHAQUE domaine ou tu veux un cert wildcard Let's Encrypt, passe dans le panel Infomaniak > Domaine > Zone DNS > Options avancees, et **desactive Fast Anycast**. Laisse-le off en permanence (l'impact perf est minime pour un VPS perso).
+
+Sans ca, les renouvellements cron (tous les 60j) casseront silencieusement la nuit.
+
 ## Ce qui n'est PAS fait
 
 - Pas de backup offsite (volontaire tant qu'aucune donnee persistante n'est hebergee).
