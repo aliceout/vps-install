@@ -117,7 +117,9 @@ EOF
 case "$ACTION" in
   install|update)
     install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR" "$HOOKS_DIR" "$LOG_DIR"
-    install -d -m 700 -o root -g root "$HOOKS_ENV_DIR"
+    # HOOKS_ENV_DIR accessible en lecture par VPS_USER (le systemd unit tourne
+    # sous cet utilisateur et doit pouvoir scanner + lire les *.env)
+    install -d -m 750 -o root -g "$VPS_USER" "$HOOKS_ENV_DIR"
     install -m 644 -o "$VPS_USER" -g "$VPS_USER" "$SERVICE_DIR/app.js" "$DATA_DIR/app.js"
 
     if [[ -d "$SERVICE_DIR/hooks" ]]; then
@@ -139,6 +141,14 @@ case "$ACTION" in
       sleep 1
     done
 
+    # L'agent ecrit en 600 root:root, on rend lisible par VPS_USER
+    shopt -s nullglob
+    for f in "$HOOKS_ENV_DIR"/*.env; do
+      chgrp "$VPS_USER" "$f" 2>/dev/null || true
+      chmod 640 "$f" 2>/dev/null || true
+    done
+    shopt -u nullglob
+
     cat > "$UNIT" <<EOF
 [Unit]
 Description=GitHub webhooks receiver
@@ -155,6 +165,13 @@ EnvironmentFile=${SECRETS_FILE}
 Environment=HOOKS_DIR=${HOOKS_DIR}
 Environment=LOG_DIR=${LOG_DIR}
 Environment=HOOKS_ENV_DIR=${HOOKS_ENV_DIR}
+
+# Infisical agent ecrit les *.env en 600 root:root. On les rend lisibles
+# par le groupe VPS_USER avant chaque start (safety net si le chmod post-install
+# a ete rewrite).
+PermissionsStartOnly=true
+ExecStartPre=+/bin/sh -c 'chgrp ${VPS_USER} ${HOOKS_ENV_DIR}/*.env 2>/dev/null || true; chmod 640 ${HOOKS_ENV_DIR}/*.env 2>/dev/null || true'
+
 ExecStart=/usr/bin/node ${DATA_DIR}/app.js
 Restart=on-failure
 RestartSec=5s
