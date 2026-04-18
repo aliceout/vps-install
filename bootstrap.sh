@@ -255,18 +255,33 @@ fi
 
 if [[ "$WEB_ENABLED" -eq 1 ]]; then
   run_module "50_nginx.sh"
+  run_module "75_certbot.sh"
 fi
 
 if [[ "$NETDATA_ENABLED" -eq 1 ]]; then
+  say_info "Recuperation secrets Netdata depuis Infisical (/services/netdata)..."
+  NETDATA_ENV_CONTENT="$(
+    infisical export \
+      --domain="$INFISICAL_ADDRESS" \
+      --token="$INFISICAL_TOKEN" \
+      --projectId="$INFISICAL_PROJECT_ID" \
+      --env="$INFISICAL_ENV" \
+      --path=/services/netdata \
+      --format=dotenv 2>/dev/null
+  )"
+  if [[ -n "$NETDATA_ENV_CONTENT" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source <(printf '%s\n' "$NETDATA_ENV_CONTENT")
+    set +a
+  else
+    say_warn "Aucun secret sous /services/netdata (${INFISICAL_ENV}). Netdata sera installe mais pas expose."
+  fi
   run_module "55_netdata.sh"
 fi
 
 run_module "60_zsh.sh"
 run_module "70_cron_updates.sh"
-
-if [[ "$WEB_ENABLED" -eq 1 ]]; then
-  run_module "75_certbot.sh"
-fi
 
 run_module "99_summary.sh"
 

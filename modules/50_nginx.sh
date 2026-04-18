@@ -35,9 +35,6 @@ if [[ -n "${DOMAIN_MAIN:-}" && -n "${PROXY_UPSTREAM:-}" ]]; then
   create_vhost "$DOMAIN_MAIN" "$PROXY_UPSTREAM"
 fi
 
-if [[ -n "${NETDATA_DOMAIN:-}" && -n "${NETDATA_UPSTREAM:-}" ]]; then
-  create_vhost "$NETDATA_DOMAIN" "$NETDATA_UPSTREAM"
-fi
 rm -f /etc/nginx/sites-enabled/default || true
 
 nginx -t

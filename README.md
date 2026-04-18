@@ -24,6 +24,14 @@ Cree un projet Infisical Cloud avec un environnement (ex: `prod`). Sous le path 
 | `LE_EMAIL` | `toi@exemple.fr` | email Let's Encrypt |
 | `INFOMANIAK_TOKEN` | `...` | token API Infomaniak pour Certbot DNS |
 
+Si tu actives Netdata, ajoute aussi sous `/services/netdata/` :
+
+| Cle | Exemple | Description |
+|-----|---------|-------------|
+| `NETDATA_DOMAIN` | `netdata.mondomaine.fr` | domaine d'expo HTTPS |
+| `NETDATA_AUTH_USER` | `alice` | basic auth nginx |
+| `NETDATA_AUTH_PASSWORD` | `...` | basic auth nginx (clair, hashe bcrypt a l'install) |
+
 Cree ensuite une **Machine Identity** (Universal Auth) ayant la permission **Read** sur ce projet et note le **Client ID** + **Client Secret**.
 
 ## One-liner

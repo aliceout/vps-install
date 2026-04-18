@@ -15,7 +15,11 @@ if [[ "${WEB_ENABLED:-1}" -eq 1 ]]; then
   echo "- Nginx: installe (vhosts crees par services/<nom>/nginx.conf)"
 fi
 if [[ "${NETDATA_ENABLED:-0}" -eq 1 ]]; then
-  echo "- Netdata: installe, ecoute sur 127.0.0.1:19999 (a exposer via un vhost nginx)"
+  if [[ -n "${NETDATA_DOMAIN:-}" ]]; then
+    echo "- Netdata: https://${NETDATA_DOMAIN} (basic auth user: ${NETDATA_AUTH_USER:-?})"
+  else
+    echo "- Netdata: installe, ecoute sur 127.0.0.1:19999 (secrets /services/netdata absents, pas expose)"
+  fi
 fi
 echo "- ZRAM: swap en memoire (zram-tools)"
 echo "- Cron: apt update/upgrade quotidiens"
