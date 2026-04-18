@@ -61,14 +61,16 @@ if [[ ! -f /etc/letsencrypt/domains.ini ]]; then
 fi
 
 install -d /usr/local/sbin
-cp -a "$ROOT_DIR/scripts/certbot-dns.sh" /usr/local/sbin/certbot-dns
-chmod +x /usr/local/sbin/certbot-dns
-cp -a "$ROOT_DIR/scripts/certbot-request.sh" /usr/local/sbin/certbot-request
-chmod +x /usr/local/sbin/certbot-request
-cp -a "$ROOT_DIR/scripts/certbot-wildcard.sh" /usr/local/sbin/certbot-wildcard
-chmod +x /usr/local/sbin/certbot-wildcard
-cp -a "$ROOT_DIR/scripts/infomaniak-dns-sync.sh" /usr/local/sbin/infomaniak-dns-sync
-chmod +x /usr/local/sbin/infomaniak-dns-sync
+# Symlinks vers /opt/vps-install/scripts/ : un git pull sur le repo propage
+# automatiquement les fix sans avoir a redeployer manuellement.
+chmod +x "$ROOT_DIR/scripts/certbot-dns.sh" \
+         "$ROOT_DIR/scripts/certbot-request.sh" \
+         "$ROOT_DIR/scripts/certbot-wildcard.sh" \
+         "$ROOT_DIR/scripts/infomaniak-dns-sync.sh"
+ln -sf /opt/vps-install/scripts/certbot-dns.sh         /usr/local/sbin/certbot-dns
+ln -sf /opt/vps-install/scripts/certbot-request.sh     /usr/local/sbin/certbot-request
+ln -sf /opt/vps-install/scripts/certbot-wildcard.sh    /usr/local/sbin/certbot-wildcard
+ln -sf /opt/vps-install/scripts/infomaniak-dns-sync.sh /usr/local/sbin/infomaniak-dns-sync
 
 # Log rotation pour le sync DNS
 cat > /etc/logrotate.d/infomaniak-dns-sync <<'EOF'
