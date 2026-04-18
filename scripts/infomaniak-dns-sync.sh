@@ -159,49 +159,14 @@ sync_one() {
   fi
 }
 
-ensure_caa() {
-  local apex="$1"
-  local domain_id records record_id current_flags current_tag current_target
-  domain_id="$(find_domain_id "$apex")" || return 0
-
-  records="$(api_call GET "/1/domain/$domain_id/dns/record" 2>/dev/null || true)"
-  [[ -n "$records" ]] || return 0
-
-  record_id="$(printf '%s' "$records" | jq -r '
-    if type=="object" and has("data") then .data[] else .[] end
-    | select(.source=="@" and .type=="CAA" and (.target|test("letsencrypt.org")))
-    | .id' 2>/dev/null | head -n1)"
-
-  if [[ -n "$record_id" && "$record_id" != "null" ]]; then
-    log "OK     CAA $apex (letsencrypt.org deja autorise)"
-    return 0
-  fi
-
-  log "CREATE CAA $apex -> letsencrypt.org"
-  # Format Infomaniak: target contient flags + tag + valeur
-  local payload
-  payload="$(jq -n '{source:"@", target:"0 issue \"letsencrypt.org\"", type:"CAA", ttl:3600}')"
-  api_call POST "/1/domain/$domain_id/dns/record" "$payload" >/dev/null || log "CREATE CAA $apex echoue"
-}
-
-# Apex a proteger par CAA : dedupes a partir des FQDNs
-declare -A APEX_SEEN=()
-
 rc=0
 for d in "${DOMAINS[@]}"; do
   sync_one "$d" || { rc=1; log "Sync A echouee pour $d"; }
-
-  # Garde l'apex pour le CAA
-  pair="$(split_fqdn "$d" 2>/dev/null || true)"
-  if [[ -n "$pair" ]]; then
-    apex="${pair#*|}"
-    APEX_SEEN[$apex]=1
-  fi
 done
 
-# CAA pour chaque apex distinct rencontre
-for apex in "${!APEX_SEEN[@]}"; do
-  ensure_caa "$apex" || true
-done
+# Note: CAA auto desactive - le format JSON attendu par l'API Infomaniak
+# n'est pas trivial a reconstituer, et la creation echouait en 422.
+# A faire a la main via l'UI Infomaniak (DNS > Ajouter > CAA, value:
+# "0 issue letsencrypt.org"). Voir SECURITY.md.
 
 exit "$rc"

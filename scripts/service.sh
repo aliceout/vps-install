@@ -243,8 +243,13 @@ apply_nginx() {
     systemctl reload nginx || true
     echo "Vhost nginx installe: $dst (domaines: ${domains[*]:-aucun})"
   else
-    echo "ERREUR: nginx -t KO, vhost laisse en place mais non recharge"
-    nginx -t || true
+    # Vhost casse : on le degage pour ne pas bloquer les autres au prochain reload
+    echo "ERREUR: nginx -t KO apres ajout de $dst. Vhost retire pour preserver nginx."
+    nginx -t 2>&1 | sed 's/^/  /' || true
+    mv "$dst" "${dst}.broken"
+    echo "Vhost casse archive en ${dst}.broken (corrige et renomme pour reessayer)."
+    nginx -t 2>/dev/null && systemctl reload nginx || true
+    return 1
   fi
 }
 
