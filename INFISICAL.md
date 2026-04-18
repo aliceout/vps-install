@@ -17,6 +17,12 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         INFOMANIAK_TOKEN
         CROWDSEC_ENROLL_KEY  # optionnel
     services/
+      pdf/                 # Stirling PDF
+        LANGS
+        DOCKER_ENABLE_SECURITY
+        INSTALL_BOOK_AND_ADVANCED_HTML_OPS
+        SECURITY_INITIALLOGIN_USERNAME
+        SECURITY_INITIALLOGIN_PASSWORD
       <service>/           # charge a l'install du service via scripts/service.sh
         ...
 ```
@@ -37,7 +43,19 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 | `INFOMANIAK_TOKEN` | secret | `...` | `75_certbot.sh`, `scripts/infomaniak-dns-sync.sh` | token API Infomaniak, synce via l'agent dans `/etc/letsencrypt/infomaniak.ini` pour certbot-dns + DNS auto-sync |
 | `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - cle d'enrollment CrowdSec (obtenue sur https://app.crowdsec.net). Si absente, CrowdSec tourne en standalone sans dashboard. |
 
-## `/services/<nom>/` - services tiers
+## `/services/pdf/` - Stirling PDF
+
+Les cles sont copies tel quel dans `/etc/secrets/pdf.env` (nom de cle = variable d'env consommee par l'image `frooodle/s-pdf`).
+
+| Cle | Type | Exemple | Role |
+|-----|------|---------|------|
+| `LANGS` | string | `en_GB` ou `fr_FR,en_GB` | langues OCR |
+| `DOCKER_ENABLE_SECURITY` | bool | `true` | active le login integre de Stirling - **recommande si expose** |
+| `INSTALL_BOOK_AND_ADVANCED_HTML_OPS` | bool | `false` | installe calibre + outils eBook (lourd) |
+| `SECURITY_INITIALLOGIN_USERNAME` | string | `alice` | user admin cree au premier lancement |
+| `SECURITY_INITIALLOGIN_PASSWORD` | secret | `...` | mdp admin initial (a changer via l'UI apres le premier login) |
+
+## `/services/<nom>/` - autres services tiers
 
 Pour chaque service sous `services/<nom>/` dans le repo, cree un path Infisical `/services/<nom>/` avec les secrets dont le service a besoin. Le fichier `services/<nom>/secrets.tmpl` utilise le template agent Infisical pour les rapatrier vers `/etc/secrets/<nom>.env` a l'install.
 

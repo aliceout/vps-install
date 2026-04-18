@@ -160,20 +160,34 @@ remove_secrets() {
 }
 
 ensure_cert() {
-  local domain="$1"
-  [[ -n "$domain" ]] || return 0
-  if [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]]; then
+  local fqdn="$1"
+  [[ -n "$fqdn" ]] || return 0
+
+  # Apex = tout ce qui est apres le 1er point. Le cert est un wildcard
+  # (apex + *.apex), partageable entre tous les services du meme apex.
+  local apex="${fqdn#*.}"
+  if [[ -f "/etc/letsencrypt/live/${apex}/fullchain.pem" ]]; then
     return 0
   fi
-  if ! command -v certbot-request >/dev/null 2>&1; then
-    echo "AVERTISSEMENT: certbot-request absent (module 75_certbot pas execute ?), skip cert pour $domain"
+  if ! command -v certbot-wildcard >/dev/null 2>&1; then
+    echo "AVERTISSEMENT: certbot-wildcard absent (module 75_certbot pas execute ?), skip cert pour $apex"
     return 0
   fi
-  echo "Demande cert Let's Encrypt pour $domain..."
-  if ! certbot-request "$domain"; then
-    echo "AVERTISSEMENT: cert non obtenu pour $domain. Vhost deploye sans SSL operationnel."
+  echo "Demande cert wildcard Let's Encrypt pour $apex..."
+  if ! certbot-wildcard "$apex"; then
+    echo "AVERTISSEMENT: cert non obtenu pour $apex. Vhost deploye sans SSL operationnel."
     return 1
   fi
+}
+
+ensure_dns() {
+  local fqdn="$1"
+  [[ -n "$fqdn" ]] || return 0
+  if ! command -v infomaniak-dns-sync >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "Sync record DNS A chez Infomaniak pour $fqdn..."
+  infomaniak-dns-sync "$fqdn" || echo "AVERTISSEMENT: DNS sync echoue pour $fqdn (le service sera injoignable le temps que tu corriges)."
 }
 
 apply_nginx() {
@@ -185,16 +199,17 @@ apply_nginx() {
     return 0
   fi
 
-  # Recupere les domaines du vhost et demande un cert pour chacun
+  # Recupere les domaines du vhost. Pour chacun : sync DNS A puis cert wildcard.
   local domains=()
   while IFS= read -r d; do
     [[ -n "$d" ]] && domains+=("$d")
   done < <(extract_domains_from_nginx "$vhost_src")
 
   if [[ ${#domains[@]} -eq 0 ]]; then
-    echo "AVERTISSEMENT: aucun server_name trouve dans $vhost_src, skip cert."
+    echo "AVERTISSEMENT: aucun server_name trouve dans $vhost_src, skip DNS/cert."
   else
     for d in "${domains[@]}"; do
+      ensure_dns  "$d" || true
       ensure_cert "$d" || true
     done
   fi

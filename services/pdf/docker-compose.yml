@@ -1,0 +1,13 @@
+services:
+  pdf:
+    image: frooodle/s-pdf:latest
+    container_name: pdf
+    restart: unless-stopped
+    env_file:
+      - /etc/secrets/pdf.env
+    ports:
+      - "127.0.0.1:8097:8080"
+    volumes:
+      - /var/lib/services/pdf/configs:/configs
+      - /var/lib/services/pdf/logs:/logs
+      - /var/lib/services/pdf/tessdata:/usr/share/tessdata
