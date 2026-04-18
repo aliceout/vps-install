@@ -168,8 +168,8 @@ Environment=HOOKS_ENV_DIR=${HOOKS_ENV_DIR}
 
 # Infisical agent ecrit les *.env en 600 root:root. On les rend lisibles
 # par le groupe VPS_USER avant chaque start (safety net si le chmod post-install
-# a ete rewrite).
-PermissionsStartOnly=true
+# a ete ecrase par un re-sync). Le prefix '+' lance la commande en tant que
+# root, peu importe le User= plus bas.
 ExecStartPre=+/bin/sh -c 'chgrp ${VPS_USER} ${HOOKS_ENV_DIR}/*.env 2>/dev/null || true; chmod 640 ${HOOKS_ENV_DIR}/*.env 2>/dev/null || true'
 
 ExecStart=/usr/bin/node ${DATA_DIR}/app.js

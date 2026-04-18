@@ -5,11 +5,24 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# Tourne sous VPS_USER autant que possible (remplace par le nom reel au
+# moment de l'install via install.sh). User=root uniquement si le binaire
+# a besoin de ports <1024 ou de capacites privilegiees.
+User=__VPS_USER__
+Group=__VPS_USER__
+
 EnvironmentFile=-/etc/secrets/mon-service.env
 ExecStart=/usr/local/bin/mon-binaire --config /etc/mon-service/config.yaml
 Restart=on-failure
 RestartSec=5s
-User=root
+
+# Hardening de base. Ajoute ProtectSystem=strict + ReadWritePaths=<dir>
+# si le service ecrit seulement dans un repertoire connu.
+NoNewPrivileges=true
+ProtectHome=yes
+PrivateTmp=true
+# ProtectSystem=strict
+# ReadWritePaths=/var/lib/services/mon-service
 
 [Install]
 WantedBy=multi-user.target

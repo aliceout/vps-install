@@ -4,61 +4,63 @@ Serveur Node.js qui reçoit les push GitHub, vérifie la signature HMAC, et lanc
 
 Installé en systemd natif (tourne sous `$VPS_USER`), exposé via nginx sur `https://<ADRESS>/webhooks`.
 
-## Secrets Infisical - `/services/webhooks/`
+## Secrets Infisical
+
+### `/services/webhooks/` (config du service)
 
 | Cle | Type | Exemple | Role |
 |-----|------|---------|------|
-| `ADRESS` | string | `webhooks.alyss.cc` | FQDN public |
-| `DOMAIN` | string | `alyss.cc` | apex cert wildcard |
-| `WEBHOOKS_REPOS` | JSON | `[{"repo":"aliceout/Work-resume","secretEnv":"WORK_SECRET","script":"work.sh"}]` | mapping repo → secret → script |
-| `<X_SECRET>` | secret | `Attach8-Catfight-...` | 1 cle par repo, le secret HMAC partage avec GitHub (doit matcher ce que tu poses dans Settings → Webhooks d'un repo) |
+| `ADRESS` | string | `webhooks.backlice.dev` | FQDN public |
+| `DOMAIN` | string | `backlice.dev` | apex cert wildcard |
 
-Format de `WEBHOOKS_REPOS` :
+### `/services/webhooks/<repo>/` (un sous-dossier par webhook)
 
-```json
-[
-  {"repo": "aliceout/Work-resume",           "secretEnv": "WORK_SECRET",           "script": "work.sh"},
-  {"repo": "aliceout/Nodea",                 "secretEnv": "NODEA_SECRET",          "script": "nodea.sh"},
-  {"repo": "aliceout/Relationship-spectrum", "secretEnv": "RELATIONSHIP_SECRET",   "script": "relationship.sh"},
-  {"repo": "aliceout/Korai",                 "secretEnv": "KORAI_SECRET",          "script": "korai.sh"},
-  {"repo": "Watizat/WebApp",                 "secretEnv": "WATIZAT_WEBAPP_SECRET", "script": "watizat-front.sh"}
-]
-```
+Chaque repo GitHub que tu veux brancher a son propre sous-dossier :
 
-Pour ajouter un repo, trois actions :
+| Cle | Exemple | Role |
+|-----|---------|------|
+| `REPO` | `aliceout/Work-resume` | slug GitHub (`owner/name`), doit matcher le `full_name` envoye par GitHub dans le payload |
+| `SECRET` | `Attach8-Catfight-...` | HMAC partage avec GitHub (`openssl rand -hex 32`), doit etre identique a ce que tu poses dans Settings > Webhooks > Secret cote repo |
+| `SCRIPT` | `work.sh` | nom du fichier dans `/var/lib/services/webhooks/hooks/` a executer |
 
-1. Ajoute une entrée à `WEBHOOKS_REPOS` (JSON)
-2. Ajoute le secret correspondant (ex: `WORK_SECRET`)
-3. Dépose le script `.sh` dans `/var/lib/services/webhooks/hooks/` sur le VPS
+**Note** : les scripts eux-memes (`work.sh`, etc.) ne sont pas dans Infisical. Ils vivent dans le repo `vps-install` au sein du service qui les consomme (ex: `services/work/hook.sh`). Quand tu `services install <nom>`, le service y copie son hook et declenche `services update webhooks` pour enregistrer le mapping Infisical.
 
-Puis `sudo systemctl restart webhooks` pour que Node recharge l'env.
+## Flow complet pour brancher un nouveau repo
 
-## Install
+1. Dans Infisical, cree le sous-dossier `/services/webhooks/<nom>/` avec `REPO`, `SECRET`, `SCRIPT`.
+2. Dans le repo `vps-install`, cree un `services/<nom>/` avec son `hook.sh` + `install.sh` qui publie le hook dans `/var/lib/services/webhooks/hooks/`.
+3. Commit + push le repo `vps-install`, pull sur le VPS.
+4. `services install <nom>` → installe l'app, publie le hook, trigger `services update webhooks`.
+5. Sur GitHub, Settings > Webhooks > Add : Payload URL `https://<ADRESS>/webhooks`, Content-type `application/json`, Secret = la meme valeur que dans Infisical, Events = Just push.
+
+## Install du service webhooks lui-meme
 
 ```bash
 services install webhooks
 ```
 
-Ça :
-- Déploie `app.js` dans `/var/lib/services/webhooks/`
-- Crée `/var/lib/services/webhooks/hooks/` (scripts de deploy) et `log/` (sortie des scripts)
-- Installe `/etc/systemd/system/webhooks.service`
-- Synchronise les secrets Infisical dans `/etc/secrets/webhooks.env`
+Ca :
+- Deploie `app.js` dans `/var/lib/services/webhooks/`
+- Cree `/var/lib/services/webhooks/hooks/` (scripts de deploy) et `log/` (sortie)
+- Installe `/etc/systemd/system/webhooks.service` avec hardening (ProtectSystem, ReadWritePaths, NoNewPrivileges)
+- Genere les templates Infisical (un par sous-dossier sous `/services/webhooks/`) → `/etc/secrets/webhooks.env` (main) + `/etc/secrets/webhooks/<repo>.env` (un par hook)
 - Reverse proxy nginx `https://<ADRESS>/webhooks` → `127.0.0.1:8070`
-- Cert wildcard `*.<DOMAIN>` (skip si déjà présent)
+- Cert wildcard `*.<DOMAIN>` (skip si deja present)
 
-## Côté GitHub
+## Update apres ajout d'un sous-dossier Infisical
 
-Pour chaque repo, Settings → Webhooks → Add webhook :
+```bash
+services update webhooks
+```
 
-- **Payload URL** : `https://<ADRESS>/webhooks`
-- **Content type** : `application/json`
-- **Secret** : la même valeur que dans Infisical (`WORK_SECRET`, etc.)
-- **Events** : Just the push event (ou selon besoin)
+Rescanne les sous-dossiers sous `/services/webhooks/` (via `infomaniak secrets folders get`) et (re)genere les templates Infisical + fragments agent.
 
 ## Debug
 
 ```bash
+# Service status
+systemctl status webhooks
+
 # Logs du service
 journalctl -u webhooks -f
 
@@ -66,15 +68,19 @@ journalctl -u webhooks -f
 ls /var/lib/services/webhooks/log/
 tail -f /var/lib/services/webhooks/log/aliceout_Work-resume.log
 
-# Test en local depuis le VPS (simule un ping GitHub)
+# Test en local (simule un ping GitHub, pas de HMAC requis)
 curl -X POST -H "X-GitHub-Event: ping" -H "Content-Type: application/json" \
   -d '{"repository":{"full_name":"aliceout/Work-resume"}}' \
-  http://127.0.0.1:8070/webhooks
+  https://<ADRESS>/webhooks
 # Reponse attendue: pong
 ```
 
-## Scripts de deploy
+## Architecture interne
 
-Les scripts vivent dans `/var/lib/services/webhooks/hooks/`, tournent sous `$VPS_USER`, et sont totalement libres — ce que tu veux. Chacun gère le repo qu'il reçoit (git pull, build, restart service, etc.).
+- `/etc/secrets/webhooks.env` : ADRESS, DOMAIN (main)
+- `/etc/secrets/webhooks/<repo>.env` : REPO, SECRET, SCRIPT par repo
+- `/var/lib/services/webhooks/app.js` : le serveur Node (stdlib only, pas de deps)
+- `/var/lib/services/webhooks/hooks/` : scripts bash deployes par les services consommateurs
+- `/var/lib/services/webhooks/log/` : sortie d'execution des hooks (rotated par logrotate si tu l'ajoutes)
 
-Le serveur leur fait juste un `bash <script>` en background avec `>> log/<repo>.log 2>&1`.
+`app.js` scanne `/etc/secrets/webhooks/*.env` a chaque requete entrante (pas au boot), donc ajouter un nouveau hook prend effet des que l'agent Infisical a synce le nouveau fichier (~60s). Pas besoin de redemarrer le service.

@@ -4,9 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG="/var/log/vps-bootstrap.log"
 
-export DOMAIN_MAIN=""
-export PROXY_UPSTREAM=""
-
 exec > >(tee -a "$LOG") 2>&1
 
 # --- Couleurs / helpers d'affichage (disponibles dans les modules via source) ---
@@ -144,7 +141,9 @@ fi
 
 INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/vps/_infra}"
 
-export INFISICAL_ADDRESS INFISICAL_ENV INFISICAL_PATH_INFRA INFISICAL_PROJECT_ID
+# INFISICAL_PATH_INFRA reste local au bootstrap (les modules utilisent /etc/infisical/*
+# pour leurs propres lookups).
+export INFISICAL_ADDRESS INFISICAL_ENV INFISICAL_PROJECT_ID
 export INFISICAL_CLIENT_ID INFISICAL_CLIENT_SECRET
 
 # --- Auth + fetch config depuis Infisical ---

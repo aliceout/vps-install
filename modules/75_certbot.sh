@@ -76,12 +76,11 @@ fi
 chmod 600 /etc/letsencrypt/infomaniak.ini 2>/dev/null || true
 chmod 644 /etc/letsencrypt/email 2>/dev/null || true
 
-# Fichier domains.ini pour les renouvelements en masse (wildcards)
+# Fichier domains.ini pour les renouvelements en masse (wildcards). Il est
+# rempli par certbot-wildcard au fur et a mesure que des apex sont demandes
+# par les services.
 if [[ ! -f /etc/letsencrypt/domains.ini ]]; then
   cp -a "$ROOT_DIR/config/certbot/domains.ini" /etc/letsencrypt/domains.ini
-  if [[ -n "${DOMAIN_MAIN:-}" ]]; then
-    printf '%s\n' "${DOMAIN_MAIN}" >> /etc/letsencrypt/domains.ini
-  fi
   chmod 600 /etc/letsencrypt/domains.ini
 fi
 
