@@ -9,6 +9,10 @@ install -d /etc/nginx/conf
 install -d /etc/nginx/conf.d
 install -d /etc/nginx/certificat
 
+# /var/www accessible en ecriture par $VPS_USER (les hook scripts des
+# webhooks y clonent les repos + y build)
+install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 /var/www
+
 # Includes (repo -> /etc/nginx/...)
 cp -a "$ROOT_DIR/nginx/include/." /etc/nginx/include/
 cp -a "$ROOT_DIR/nginx/conf/common.conf" /etc/nginx/conf.d/common.conf

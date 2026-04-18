@@ -15,6 +15,16 @@ case "$ACTION" in
     install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR" "$HOOKS_DIR" "$LOG_DIR"
     install -m 644 -o "$VPS_USER" -g "$VPS_USER" "$SERVICE_DIR/app.js" "$DATA_DIR/app.js"
 
+    # Deploie les hook scripts committes dans le repo
+    if [[ -d "$SERVICE_DIR/hooks" ]]; then
+      shopt -s nullglob
+      for h in "$SERVICE_DIR/hooks/"*.sh; do
+        install -m 755 -o "$VPS_USER" -g "$VPS_USER" "$h" "$HOOKS_DIR/$(basename "$h")"
+      done
+      shopt -u nullglob
+      echo "Hook scripts deployes dans $HOOKS_DIR/"
+    fi
+
     cat > "$UNIT" <<EOF
 [Unit]
 Description=GitHub webhooks receiver
