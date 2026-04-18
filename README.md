@@ -13,27 +13,12 @@ Cela permet de :
 
 ## Pre-requis dans Infisical
 
-Cree un projet Infisical Cloud avec un environnement (ex: `prod`). Sous le path `/vps/_infra/`, declare ces secrets :
+Structure complete des secrets, paths et cles : voir [`INFISICAL.md`](INFISICAL.md).
 
-| Cle | Exemple | Description |
-|-----|---------|-------------|
-| `VPS_USER` | `choupi` | utilisateur a creer |
-| `VPS_USER_PASSWORD` | `...` | mdp sudo de ce user |
-| `SSH_PORT` | `45675` | port SSH custom |
-| `SSH_PUBKEY` | `ssh-ed25519 AAAA...` | cle(s) publique(s), multiples separees par `\n` |
-| `LE_EMAIL` | `toi@exemple.fr` | email Let's Encrypt |
-| `INFOMANIAK_TOKEN` | `...` | token API Infomaniak pour Certbot DNS |
-
-Si tu actives Netdata, ajoute aussi sous `/services/netdata/` :
-
-| Cle | Exemple | Description |
-|-----|---------|-------------|
-| `NETDATA_ADRESS` | `netdata.mondomaine.fr` | FQDN d'expo HTTPS (server_name + record DNS A) |
-| `NETDATA_DOMAIN` | `mondomaine.fr` | apex pour le cert wildcard Let's Encrypt (`*.mondomaine.fr`) |
-| `NETDATA_AUTH_USER` | `alice` | basic auth nginx |
-| `NETDATA_AUTH_PASSWORD` | `...` | basic auth nginx (clair, hashe bcrypt a l'install) |
-
-Cree ensuite une **Machine Identity** (Universal Auth) ayant la permission **Read** sur ce projet et note le **Client ID** + **Client Secret**.
+En resume, il te faut :
+- un projet Infisical avec un environnement (`prod`)
+- les secrets sous `/vps/_infra/` (bootstrap) et `/services/<nom>/` (services)
+- une **Machine Identity** (Universal Auth) avec la permission **Read** sur ce projet : note le **Project ID**, le **Client ID** et le **Client Secret**
 
 ## One-liner
 
