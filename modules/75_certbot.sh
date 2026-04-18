@@ -3,19 +3,24 @@ set -euo pipefail
 
 echo "Certbot DNS Infomaniak"
 
-# Le paquet Debian python3-certbot-dns-infomaniak est casse (API endpoint
-# deprecated qui POST des records qui ne sont jamais publies dans la zone
-# live). On installe certbot + le plugin via un venv pip dedie.
-apt-get install -y python3-venv python3-pip
+# Le paquet upstream certbot-dns-infomaniak utilise l'API v1 Infomaniak qui est
+# deprecated : les POST de nouveaux records DNS ne sont jamais publies sur les
+# NS autoritatifs (bug cote Infomaniak). On installe :
+# - certbot officiel depuis PyPI
+# - notre fork du plugin qui cible l'API v2 (publie correctement)
+# Ref: https://github.com/Infomaniak/certbot-dns-infomaniak/issues/47
+apt-get install -y python3-venv python3-pip git
 
-# Si l'ancien paquet apt traine, on le vire (nos scripts preferent /usr/local/bin).
+# Vire l'eventuel ancien paquet apt qui trainerait.
 apt-get remove -y python3-certbot-dns-infomaniak certbot 2>/dev/null || true
 
 if [[ ! -x /opt/certbot-venv/bin/certbot ]]; then
   python3 -m venv /opt/certbot-venv
 fi
 /opt/certbot-venv/bin/pip install --upgrade --quiet pip
-/opt/certbot-venv/bin/pip install --upgrade --quiet certbot certbot-dns-infomaniak
+/opt/certbot-venv/bin/pip install --upgrade --quiet certbot
+/opt/certbot-venv/bin/pip install --upgrade --quiet \
+  git+https://github.com/aliceout/certbot-dns-infomaniak.git
 ln -sf /opt/certbot-venv/bin/certbot /usr/local/bin/certbot
 
 install -d -m 700 /etc/letsencrypt
