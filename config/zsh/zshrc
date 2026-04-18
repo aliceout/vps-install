@@ -1,0 +1,95 @@
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="powerlevel10k/powerlevel10k"
+plugins=(
+  git
+  zsh-autosuggestions
+  zsh-syntax-highlighting
+  zsh-completions
+)
+source $ZSH/oh-my-zsh.sh
+
+#######################################
+## Affichage
+clear
+PF_INFO="ascii os host kernel uptime pkgs shell term cpu gpu memory" pfetch | lolcat
+{
+  echo -n "🏠 $(hostname -I | awk '{print $1}') · 🌐 $(curl -s https://api.ipify.org) "
+} | lolcat
+echo ""
+cat <<'EOF' | lolcat
+🌸  Bienvenue Alice
+✨  Vive la révolution féministe
+💜  Pour la sororité, la liberté, et la joie
+✊  Femme, vie, liberté
+
+🌻  Слава Україні · Героям слава 💙💛
+EOF
+echo ""
+
+#######################################
+# User configuration
+
+## Alias
+alias l='lsd --icon=always'
+alias ll='lsd -l --icon=always --blocks permission,user,size,name'
+alias ln='lsd -l --icon=always --blocks permission,user,size,name'
+alias ls='lsd --tree --depth 2 --icon=always '
+alias la='lsd -la --icon=always'
+alias cat='batcat'
+
+alias web='cd /var/www'
+alias nginx='cd /etc/nginx'
+
+# Initialiser zoxide
+eval "$(zoxide init zsh)"
+
+# Redefinir cd pour ajouter un ls apres
+cd() {
+  builtin cd "$@" && l
+}
+
+# --- histo (clean) ---
+unalias histo 2>/dev/null   # supprime un alias existant s'il y en a un
+
+histo() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: histo <terme à chercher>"
+    return 1
+  fi
+  grep -i --color=always -a "$*" "${HISTFILE:-$HOME/.zsh_history}" \
+    | sed -E 's/^: [0-9]+:[0-9]+;//'
+}
+# --- /histo ---
+
+
+## Tools list
+tools() {
+  echo "\n📦  Outils installés sur ce serveur :\n"
+  echo "🗃️   ncdu             → Analyse visuelle de l'espace disque"
+  echo "🧠  btop             → Monitoring système joli"
+  echo "📊  ctop             → Vue rapide des conteneurs Docker"
+  echo "🔎  htop             → Affichage clair des processus"
+  echo "🔍  glances          → Vue d'ensemble système"
+  echo "🧭  lazydocker       → Interface complète Docker"
+  echo "🔤  fzf              → Recherche floue dans fichiers, historique, etc."
+  echo "📜  lnav             → Visualiseur de logs avec coloration et navigation"
+  echo "🔍  histo <terme>    → Cherche dans l'historique zsh"
+  echo ""
+}
+
+# Protection commande dangereuse
+alias rm="rm -i"
+
+# Locale
+export LANG=fr_FR.UTF-8
+export LC_ALL=fr_FR.UTF-8
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh

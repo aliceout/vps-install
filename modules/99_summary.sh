@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+say_header "Resume installation"
+
+echo "- SSH: port $SSH_PORT, root desactive, passwords off"
+echo "- UFW: allow $SSH_PORT/tcp + 80/443 (si web)"
+if [[ "${DOCKER_ENABLED:-0}" -eq 1 ]]; then
+  echo "- Docker: installe + user $VPS_USER dans groupe docker (relogin)"
+fi
+if [[ "${NODE_ENABLED:-0}" -eq 1 ]]; then
+  echo "- Node.js + pm2: installes, pm2 au demarrage"
+fi
+if [[ "${WEB_ENABLED:-1}" -eq 1 ]]; then
+  echo "- Nginx: installe (vhosts crees par services/<nom>/nginx.conf)"
+fi
+if [[ "${NETDATA_ENABLED:-0}" -eq 1 ]]; then
+  echo "- Netdata: installe, ecoute sur 127.0.0.1:19999 (a exposer via un vhost nginx)"
+fi
+echo "- ZRAM: swap en memoire (zram-tools)"
+echo "- Cron: apt update/upgrade quotidiens"
+echo "- Certbot DNS Infomaniak: renouvellement auto (certbot.timer)"
+echo "- Fail2ban: blocklists IP (maj quotidienne)"
+if [[ "${INFISICAL_ENABLED:-0}" -eq 1 ]]; then
+  echo "- Infisical: CLI + agent (creds dans /etc/infisical/, secrets dans /etc/secrets/)"
+fi
+
+say_header "A FAIRE MAINTENANT"
+
+say_warn "1. TESTER la connexion SSH depuis ton laptop, dans un NOUVEAU terminal"
+say_warn "   (garde la session actuelle ouverte au cas ou) :"
+echo
+echo "     ssh -p ${SSH_PORT} ${VPS_USER}@<ip-du-vps>"
+echo
+
+say_warn "2. Si le login passe : rebooter pour appliquer le groupe docker a"
+say_warn "   ${VPS_USER} et valider que tous les services remontent proprement :"
+echo
+echo "     sudo reboot"
+echo
+
+say_warn "3. Si le login echoue : debug depuis la session actuelle, NE PAS reboot,"
+say_warn "   relance le bootstrap apres correction."
+
+say_header "APRES REBOOT"
+
+echo "- Re-ssh en ${VPS_USER} avec ta cle"
+echo "- Verifie les services : systemctl --failed"
+echo "- Installe un service : sudo bash scripts/service.sh"

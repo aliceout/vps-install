@@ -1,0 +1,15 @@
+[Unit]
+Description=Mon service natif
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/secrets/mon-service.env
+ExecStart=/usr/local/bin/mon-binaire --config /etc/mon-service/config.yaml
+Restart=on-failure
+RestartSec=5s
+User=root
+
+[Install]
+WantedBy=multi-user.target
