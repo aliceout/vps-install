@@ -34,9 +34,12 @@ git reset --hard "origin/$BRANCH"
 
 rm -f yarn.lock
 
-if [[ -f package-lock.json ]]; then
-  npm ci
+# npm ci si la lock existe et est compatible, sinon fallback npm install
+if [[ -f package-lock.json ]] && npm ci; then
+  :
 else
+  echo "[$(date -Is)] npm ci absent ou KO, fallback sur npm install"
+  rm -f package-lock.json
   npm install
 fi
 
