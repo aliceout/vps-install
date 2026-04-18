@@ -47,7 +47,6 @@ chmod 640 /etc/nginx/.htpasswd-netdata
 echo "Vhost nginx pour ${NETDATA_ADRESS}"
 install -d /etc/nginx/conf
 install -d /etc/nginx/certificat
-install -d /etc/nginx/sites-enabled
 
 VHOST_DST="/etc/nginx/conf/${NETDATA_ADRESS}.conf"
 CERT_DST="/etc/nginx/certificat/${NETDATA_ADRESS}.conf"
@@ -64,8 +63,6 @@ ssl_certificate /etc/letsencrypt/live/${NETDATA_DOMAIN}/fullchain.pem;
 ssl_certificate_key /etc/letsencrypt/live/${NETDATA_DOMAIN}/privkey.pem;
 ssl_trusted_certificate /etc/letsencrypt/live/${NETDATA_DOMAIN}/chain.pem;
 EOF
-
-ln -sf "$VHOST_DST" "/etc/nginx/sites-enabled/${NETDATA_ADRESS}.conf"
 
 echo "Sync record DNS A chez Infomaniak pour ${NETDATA_ADRESS}"
 /usr/local/sbin/infomaniak-dns-sync "$NETDATA_ADRESS" || say_warn "DNS sync echoue (cert pourra ne pas resoudre)."

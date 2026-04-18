@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Aligne les records A Infomaniak sur l'IP publique du VPS.
-# Auto-discovery des domaines depuis /etc/nginx/sites-enabled/*.conf,
+# Auto-discovery des domaines depuis /etc/nginx/conf/*.conf,
 # ou liste explicite en argument.
 #
 # Usage:
@@ -36,11 +36,11 @@ fi
 declare -a DOMAINS=()
 if [[ $# -gt 0 ]]; then
   DOMAINS=("$@")
-elif [[ -d /etc/nginx/sites-enabled ]]; then
+elif [[ -d /etc/nginx/conf ]]; then
   while IFS= read -r d; do
     [[ -n "$d" && "$d" != "_" ]] && DOMAINS+=("$d")
   done < <(
-    grep -hE '^\s*server_name\s+' /etc/nginx/sites-enabled/*.conf 2>/dev/null \
+    grep -hE '^\s*server_name\s+' /etc/nginx/conf/*.conf 2>/dev/null \
       | sed -E 's/^\s*server_name\s+//; s/;.*$//' \
       | tr ' ' '\n' \
       | sed '/^$/d' \

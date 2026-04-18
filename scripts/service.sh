@@ -9,8 +9,7 @@ AGENT_CONF="/etc/infisical/agent.yaml"
 AGENT_FRAGMENTS_DIR="/etc/infisical/agent.d"
 AGENT_TEMPLATES_DIR="/etc/infisical/templates"
 SECRETS_DIR="/etc/secrets"
-NGINX_AVAIL="/etc/nginx/sites-available"
-NGINX_ENABLED="/etc/nginx/sites-enabled"
+NGINX_CONF_DIR="/etc/nginx/conf"
 
 if [[ $EUID -ne 0 ]]; then
   echo "Lance-moi en root: sudo bash $0"
@@ -181,7 +180,7 @@ apply_nginx() {
   local name="$1"
   local vhost_src="$SERVICES_DIR/$name/nginx.conf"
   [[ -f "$vhost_src" ]] || return 0
-  if [[ ! -d "$NGINX_AVAIL" ]]; then
+  if [[ ! -d "$NGINX_CONF_DIR" ]]; then
     echo "Nginx pas installe, skip vhost."
     return 0
   fi
@@ -200,10 +199,9 @@ apply_nginx() {
     done
   fi
 
-  local dst="$NGINX_AVAIL/$name.conf"
+  local dst="$NGINX_CONF_DIR/$name.conf"
   cp "$vhost_src" "$dst"
   chmod 644 "$dst"
-  ln -sf "$dst" "$NGINX_ENABLED/$name.conf"
   if nginx -t 2>/dev/null; then
     systemctl reload nginx || true
     echo "Vhost nginx installe: $dst (domaines: ${domains[*]:-aucun})"
@@ -215,8 +213,7 @@ apply_nginx() {
 
 remove_nginx() {
   local name="$1"
-  rm -f "$NGINX_ENABLED/$name.conf"
-  rm -f "$NGINX_AVAIL/$name.conf"
+  rm -f "$NGINX_CONF_DIR/$name.conf"
   if command -v nginx >/dev/null 2>&1 && nginx -t 2>/dev/null; then
     systemctl reload nginx || true
   fi

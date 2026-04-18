@@ -65,7 +65,7 @@ Voir la doc Infisical : https://infisical.com/docs/integrations/platforms/infisi
 
 ## `nginx.conf`
 
-Vhost du service, **copie tel quel** dans `/etc/nginx/sites-available/<nom>.conf`. Valeurs en dur (domaine, upstream, chemin du cert), pas de placeholders.
+Vhost du service, **copie tel quel** dans `/etc/nginx/conf/<nom>.conf` (inclus directement par nginx, pas de jeu sites-available/sites-enabled). Valeurs en dur (domaine, upstream, chemin du cert), pas de placeholders.
 
 `service.sh` extrait les `server_name` du fichier et demande automatiquement un cert Let's Encrypt pour chaque domaine (via Certbot DNS Infomaniak).
 
