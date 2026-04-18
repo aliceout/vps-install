@@ -34,7 +34,7 @@ cat > /etc/infisical/templates/_certbot.tmpl <<EOF
 dns_infomaniak_token = {{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/vps/_infra" "INFOMANIAK_TOKEN" }} {{ .Value }}{{- end }}
 EOF
 
-cat > /etc/infisical/templates/_le_email.tmpl <<EOF
+cat > /etc/infisical/templates/_certbot_email.tmpl <<EOF
 {{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/vps/_infra" "CERTBOT_EMAIL" }}{{ .Value }}{{- end }}
 EOF
 
@@ -43,7 +43,7 @@ cat > /etc/infisical/agent.d/_certbot.yaml <<'EOF'
     destination-path: /etc/letsencrypt/infomaniak.ini
     config:
       polling-interval: 300s
-  - source-path: /etc/infisical/templates/_le_email.tmpl
+  - source-path: /etc/infisical/templates/_certbot_email.tmpl
     destination-path: /etc/letsencrypt/email
     config:
       polling-interval: 300s
