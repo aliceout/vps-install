@@ -49,7 +49,7 @@ for DOMAIN in "$@"; do
   "$CERTBOT_BIN" certonly \
     --authenticator dns-infomaniak \
     --dns-infomaniak-credentials "$CREDENTIALS" \
-    --dns-infomaniak-propagation-seconds 300 \
+    --dns-infomaniak-propagation-seconds 240 \
     -d "$DOMAIN" \
     --preferred-challenges dns \
     --agree-tos --non-interactive \

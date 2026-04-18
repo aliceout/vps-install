@@ -54,11 +54,13 @@ if [[ -f "${LIVE_DIR}/fullchain.pem" ]]; then
   exit 0
 fi
 
-echo "Requete cert wildcard pour ${APEX} et *.${APEX}..."
+echo "Requete cert wildcard pour ${APEX} et *.${APEX}"
+echo "(le plugin va creer un TXT puis attendre ~4 min que les NS Infomaniak"
+echo " propagent avant que Let's Encrypt verifie - aucun bug, c'est normal)"
 "$CERTBOT_BIN" certonly \
   --authenticator dns-infomaniak \
   --dns-infomaniak-credentials "$CREDENTIALS" \
-  --dns-infomaniak-propagation-seconds 300 \
+  --dns-infomaniak-propagation-seconds 240 \
   -d "$APEX" -d "*.${APEX}" \
   --preferred-challenges dns \
   --agree-tos --non-interactive \
