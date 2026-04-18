@@ -16,7 +16,8 @@ fi
 CREDENTIALS="/etc/letsencrypt/infomaniak.ini"
 EMAIL_FILE="/etc/letsencrypt/email"
 DOMAINS_FILE="/etc/letsencrypt/domains.ini"
-CERTBOT_BIN="$(command -v certbot || true)"
+CERTBOT_BIN="/usr/local/bin/certbot"
+[[ -x "$CERTBOT_BIN" ]] || CERTBOT_BIN="$(command -v certbot || true)"
 LIVE_DIR="/etc/letsencrypt/live/${APEX}"
 
 if [[ -z "$CERTBOT_BIN" ]]; then
@@ -55,12 +56,11 @@ if [[ -f "${LIVE_DIR}/fullchain.pem" ]]; then
 fi
 
 echo "Requete cert wildcard pour ${APEX} et *.${APEX}"
-echo "(le plugin va creer un TXT puis attendre ~4 min que les NS Infomaniak"
-echo " propagent avant que Let's Encrypt verifie - aucun bug, c'est normal)"
+echo "(le plugin cree un TXT + attend ~3 min que les NS Infomaniak propagent)"
 "$CERTBOT_BIN" certonly \
   --authenticator dns-infomaniak \
   --dns-infomaniak-credentials "$CREDENTIALS" \
-  --dns-infomaniak-propagation-seconds 240 \
+  --dns-infomaniak-propagation-seconds 180 \
   -d "$APEX" -d "*.${APEX}" \
   --preferred-challenges dns \
   --agree-tos --non-interactive \

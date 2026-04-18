@@ -6,7 +6,8 @@ set -euo pipefail
 
 CREDENTIALS="/etc/letsencrypt/infomaniak.ini"
 EMAIL_FILE="/etc/letsencrypt/email"
-CERTBOT_BIN="$(command -v certbot || true)"
+CERTBOT_BIN="/usr/local/bin/certbot"
+[[ -x "$CERTBOT_BIN" ]] || CERTBOT_BIN="$(command -v certbot || true)"
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <domain> [<domain>...]"
@@ -49,7 +50,7 @@ for DOMAIN in "$@"; do
   "$CERTBOT_BIN" certonly \
     --authenticator dns-infomaniak \
     --dns-infomaniak-credentials "$CREDENTIALS" \
-    --dns-infomaniak-propagation-seconds 240 \
+    --dns-infomaniak-propagation-seconds 180 \
     -d "$DOMAIN" \
     --preferred-challenges dns \
     --agree-tos --non-interactive \
