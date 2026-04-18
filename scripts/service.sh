@@ -179,14 +179,15 @@ ensure_cert() {
     apex="${fqdn#*.}"
   fi
 
-  if [[ -f "/etc/letsencrypt/live/${apex}/fullchain.pem" ]]; then
-    return 0
-  fi
   if ! command -v certbot-wildcard >/dev/null 2>&1; then
     echo "AVERTISSEMENT: certbot-wildcard absent (module 75_certbot pas execute ?), skip cert pour $apex"
     return 0
   fi
-  echo "Demande cert wildcard Let's Encrypt pour $apex..."
+
+  # certbot-wildcard est idempotent :
+  # - demande le cert wildcard si absent
+  # - skip si present, MAIS ecrit quand meme /etc/nginx/certificat/<apex>.conf
+  #   (indispensable pour les vhosts qui l'incluent)
   if ! certbot-wildcard "$apex"; then
     echo "AVERTISSEMENT: cert non obtenu pour $apex. Vhost deploye sans SSL operationnel."
     return 1
