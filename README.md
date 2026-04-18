@@ -28,7 +28,8 @@ Si tu actives Netdata, ajoute aussi sous `/services/netdata/` :
 
 | Cle | Exemple | Description |
 |-----|---------|-------------|
-| `NETDATA_DOMAIN` | `netdata.mondomaine.fr` | domaine d'expo HTTPS |
+| `NETDATA_ADRESS` | `netdata.mondomaine.fr` | FQDN d'expo HTTPS (server_name + record DNS A) |
+| `NETDATA_DOMAIN` | `mondomaine.fr` | apex pour le cert wildcard Let's Encrypt (`*.mondomaine.fr`) |
 | `NETDATA_AUTH_USER` | `alice` | basic auth nginx |
 | `NETDATA_AUTH_PASSWORD` | `...` | basic auth nginx (clair, hashe bcrypt a l'install) |
 
@@ -60,7 +61,7 @@ Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises auto
 - **Docker Engine + compose** (optionnel)
 - **Node.js + pm2** (optionnel)
 - **Nginx** reverse proxy + includes TLS (optionnel)
-- **Netdata** monitoring (optionnel, expose en HTTPS avec basic auth depuis `/services/netdata/`)
+- **Netdata** monitoring (optionnel, expose en HTTPS avec basic auth via cert wildcard, config depuis `/services/netdata/`)
 - **Zsh + oh-my-zsh + powerlevel10k** (config p10k + zshrc avec alias, pfetch banner, `histo`, `tools`, alias `services`)
 - **Outils CLI** : lsd, bat, zoxide, fzf, btop, htop, ncdu, glances, lnav, ctop, lazydocker, pfetch, lolcat
 - **Cron** : apt update/upgrade, fail2ban blocklists, sync DNS Infomaniak (auto-heal records A sur IP publique)

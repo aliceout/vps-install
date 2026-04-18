@@ -28,10 +28,11 @@ touch /etc/netdata/.opt-out-from-anonymous-statistics
 systemctl enable --now netdata
 systemctl restart netdata
 
-# --- Expose via nginx + basic auth + cert Let's Encrypt -----------------------
+# --- Expose via nginx + basic auth + cert Let's Encrypt wildcard -------------
 
-if [[ -z "${NETDATA_DOMAIN:-}" || -z "${NETDATA_AUTH_USER:-}" || -z "${NETDATA_AUTH_PASSWORD:-}" ]]; then
-  say_warn "Netdata installe mais pas expose: NETDATA_DOMAIN / NETDATA_AUTH_USER / NETDATA_AUTH_PASSWORD manquants dans Infisical (/services/netdata)."
+if [[ -z "${NETDATA_ADRESS:-}" || -z "${NETDATA_DOMAIN:-}" \
+   || -z "${NETDATA_AUTH_USER:-}" || -z "${NETDATA_AUTH_PASSWORD:-}" ]]; then
+  say_warn "Netdata installe mais pas expose: NETDATA_ADRESS / NETDATA_DOMAIN / NETDATA_AUTH_USER / NETDATA_AUTH_PASSWORD manquants dans Infisical (/services/netdata)."
   exit 0
 fi
 
@@ -43,33 +44,34 @@ htpasswd -Bbc /etc/nginx/.htpasswd-netdata "$NETDATA_AUTH_USER" "$NETDATA_AUTH_P
 chown root:www-data /etc/nginx/.htpasswd-netdata
 chmod 640 /etc/nginx/.htpasswd-netdata
 
-echo "Vhost nginx pour ${NETDATA_DOMAIN}"
+echo "Vhost nginx pour ${NETDATA_ADRESS}"
 install -d /etc/nginx/conf
 install -d /etc/nginx/certificat
 install -d /etc/nginx/sites-enabled
 
-VHOST_DST="/etc/nginx/conf/${NETDATA_DOMAIN}.conf"
-CERT_DST="/etc/nginx/certificat/${NETDATA_DOMAIN}.conf"
+VHOST_DST="/etc/nginx/conf/${NETDATA_ADRESS}.conf"
+CERT_DST="/etc/nginx/certificat/${NETDATA_ADRESS}.conf"
 
 cp -a "$ROOT_DIR/nginx/conf/netdata.conf" "$VHOST_DST"
-cp -a /etc/nginx/certificat/certbot-template.conf "$CERT_DST"
 sed -i \
-  -e "s|__DOMAIN__|${NETDATA_DOMAIN}|g" \
+  -e "s|__DOMAIN__|${NETDATA_ADRESS}|g" \
   -e "s|__UPSTREAM__|${NETDATA_UPSTREAM}|g" \
   "$VHOST_DST"
-sed -i -e "s|__DOMAIN__|${NETDATA_DOMAIN}|g" "$CERT_DST"
-ln -sf "$VHOST_DST" "/etc/nginx/sites-enabled/${NETDATA_DOMAIN}.conf"
 
-echo "Sync record DNS A chez Infomaniak pour ${NETDATA_DOMAIN}"
-/usr/local/sbin/infomaniak-dns-sync "$NETDATA_DOMAIN" || say_warn "DNS sync echoue (cert pourra ne pas resoudre)."
+# Include cert pointe sur le wildcard (/etc/letsencrypt/live/<apex>/)
+cat > "$CERT_DST" <<EOF
+ssl_certificate /etc/letsencrypt/live/${NETDATA_DOMAIN}/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/${NETDATA_DOMAIN}/privkey.pem;
+ssl_trusted_certificate /etc/letsencrypt/live/${NETDATA_DOMAIN}/chain.pem;
+EOF
 
-echo "Requete cert Let's Encrypt pour ${NETDATA_DOMAIN}"
-/usr/local/sbin/certbot-request "$NETDATA_DOMAIN"
+ln -sf "$VHOST_DST" "/etc/nginx/sites-enabled/${NETDATA_ADRESS}.conf"
+
+echo "Sync record DNS A chez Infomaniak pour ${NETDATA_ADRESS}"
+/usr/local/sbin/infomaniak-dns-sync "$NETDATA_ADRESS" || say_warn "DNS sync echoue (cert pourra ne pas resoudre)."
+
+echo "Requete cert wildcard Let's Encrypt pour ${NETDATA_DOMAIN}"
+/usr/local/sbin/certbot-wildcard "$NETDATA_DOMAIN"
 
 nginx -t
 systemctl reload nginx
-
-# Ajoute le domaine a la liste des renouvellements wildcard/classiques
-if [[ -f /etc/letsencrypt/domains.ini ]] && ! grep -qxF "$NETDATA_DOMAIN" /etc/letsencrypt/domains.ini; then
-  printf '%s\n' "$NETDATA_DOMAIN" >> /etc/letsencrypt/domains.ini
-fi

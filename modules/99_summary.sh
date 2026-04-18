@@ -15,8 +15,8 @@ if [[ "${WEB_ENABLED:-1}" -eq 1 ]]; then
   echo "- Nginx: installe (vhosts crees par services/<nom>/nginx.conf)"
 fi
 if [[ "${NETDATA_ENABLED:-0}" -eq 1 ]]; then
-  if [[ -n "${NETDATA_DOMAIN:-}" ]]; then
-    echo "- Netdata: https://${NETDATA_DOMAIN} (basic auth user: ${NETDATA_AUTH_USER:-?})"
+  if [[ -n "${NETDATA_ADRESS:-}" ]]; then
+    echo "- Netdata: https://${NETDATA_ADRESS} (basic auth user: ${NETDATA_AUTH_USER:-?})"
   else
     echo "- Netdata: installe, ecoute sur 127.0.0.1:19999 (secrets /services/netdata absents, pas expose)"
   fi

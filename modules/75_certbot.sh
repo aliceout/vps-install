@@ -65,6 +65,8 @@ cp -a "$ROOT_DIR/scripts/certbot-dns.sh" /usr/local/sbin/certbot-dns
 chmod +x /usr/local/sbin/certbot-dns
 cp -a "$ROOT_DIR/scripts/certbot-request.sh" /usr/local/sbin/certbot-request
 chmod +x /usr/local/sbin/certbot-request
+cp -a "$ROOT_DIR/scripts/certbot-wildcard.sh" /usr/local/sbin/certbot-wildcard
+chmod +x /usr/local/sbin/certbot-wildcard
 cp -a "$ROOT_DIR/scripts/infomaniak-dns-sync.sh" /usr/local/sbin/infomaniak-dns-sync
 chmod +x /usr/local/sbin/infomaniak-dns-sync
 
