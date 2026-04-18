@@ -168,11 +168,17 @@ remove_secrets() {
 
 ensure_cert() {
   local fqdn="$1"
+  local apex="${2:-}"
   [[ -n "$fqdn" ]] || return 0
 
-  # Apex = tout ce qui est apres le 1er point. Le cert est un wildcard
-  # (apex + *.apex), partageable entre tous les services du meme apex.
-  local apex="${fqdn#*.}"
+  # Apex : soit fourni par le caller (lu depuis DOMAIN dans /etc/secrets/), soit
+  # derive en strippant le 1er label du FQDN (cas sub.apex). Pour un FQDN qui
+  # EST deja l'apex, le strip donne le TLD et LE refuse : il FAUT passer
+  # l'apex explicitement dans ce cas.
+  if [[ -z "$apex" ]]; then
+    apex="${fqdn#*.}"
+  fi
+
   if [[ -f "/etc/letsencrypt/live/${apex}/fullchain.pem" ]]; then
     return 0
   fi
@@ -232,12 +238,19 @@ apply_nginx() {
     [[ -n "$d" && "$d" != *__*__* ]] && domains+=("$d")
   done < <(extract_domains_from_nginx "$rendered")
 
+  # Extrait DOMAIN depuis l'env file pour le passer a ensure_cert
+  # (sinon ensure_cert calcule mal l'apex quand le FQDN est deja l'apex)
+  local apex_from_env=""
+  if [[ -f "$env_file" ]]; then
+    apex_from_env="$(grep -E '^DOMAIN=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'")"
+  fi
+
   if [[ ${#domains[@]} -eq 0 ]]; then
     echo "AVERTISSEMENT: aucun server_name valide dans $vhost_src apres templating (manque ADRESS dans Infisical ?), skip DNS/cert."
   else
     for d in "${domains[@]}"; do
       ensure_dns  "$d" || true
-      ensure_cert "$d" || true
+      ensure_cert "$d" "$apex_from_env" || true
     done
   fi
 
