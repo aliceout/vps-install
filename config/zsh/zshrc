@@ -46,7 +46,7 @@ alias cat='batcat'
 
 alias web='cd /var/www'
 alias nginx='cd /etc/nginx'
-alias services='sudo bash /opt/vps-install/scripts/service.sh'
+# `services` = wrapper /usr/local/bin/services (auto-sudo, marche aussi en bash)
 
 # Initialiser zoxide
 eval "$(zoxide init zsh)"

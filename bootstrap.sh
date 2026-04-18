@@ -257,6 +257,17 @@ if [[ "$ROOT_DIR" != "/opt/vps-install" ]]; then
   cp -a "$ROOT_DIR" /opt/vps-install
 fi
 
+# Wrapper /usr/local/bin/services : accessible depuis n'importe quel shell,
+# auto-sudo si lance par un user non-root.
+cat > /usr/local/bin/services <<'EOF'
+#!/usr/bin/env bash
+if [[ $EUID -ne 0 ]]; then
+  exec sudo bash /opt/vps-install/scripts/service.sh "$@"
+fi
+exec bash /opt/vps-install/scripts/service.sh "$@"
+EOF
+chmod 755 /usr/local/bin/services
+
 run_module "99_summary.sh"
 
 if ask_yes_no "Installer maintenant des services ?" "yes"; then
