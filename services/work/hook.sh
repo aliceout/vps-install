@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy Work-resume (Next.js) via pm2.
-# Idempotent : clone si absent, sinon pull. Safe a lancer manuellement.
+# Idempotent : clone si absent, sinon pull. Lance par webhooks a chaque push.
 set -euo pipefail
 
 REPO="git@github.com:aliceout/Work-resume.git"
@@ -18,25 +18,20 @@ fi
 
 cd "$DIR"
 
-# Reset complet sur HEAD distant (pas de merge foireux)
 git fetch origin "$BRANCH"
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
-# Vestiges yarn si jamais
 rm -f yarn.lock
 
-# Deps
 if [[ -f package-lock.json ]]; then
   npm ci
 else
   npm install
 fi
 
-# Build Next.js
 npm run build
 
-# pm2 start/restart
 if pm2 describe "$APP" >/dev/null 2>&1; then
   pm2 restart "$APP" --update-env
 else
