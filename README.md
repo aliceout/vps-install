@@ -29,7 +29,7 @@ Cree ensuite une **Machine Identity** (Universal Auth) ayant la permission **Rea
 ## One-liner
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aliceout/vps-install/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/aliceout/vps-install/main/install.sh | sudo bash
 ```
 
 Le script te demandera :

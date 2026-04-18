@@ -4,6 +4,12 @@ set -euo pipefail
 REPO_URL="https://github.com/aliceout/vps-install.git"
 DIR="vps-bootstrap"
 
+if [[ $EUID -ne 0 ]]; then
+  echo "Ce script doit tourner en root. Relance via:" >&2
+  echo "  curl -fsSL https://raw.githubusercontent.com/aliceout/vps-install/main/install.sh | sudo bash" >&2
+  exit 1
+fi
+
 if ! command -v git >/dev/null 2>&1; then
   apt-get update -y
   apt-get install -y git
@@ -32,4 +38,4 @@ if [[ "$BAD" -ne 0 ]]; then
   exit 1
 fi
 
-sudo bash ./bootstrap.sh
+bash ./bootstrap.sh
