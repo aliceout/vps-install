@@ -199,14 +199,34 @@ apply_nginx() {
     return 0
   fi
 
-  # Recupere les domaines du vhost. Pour chacun : sync DNS A puis cert wildcard.
+  # Rendu du vhost : substitue __KEY__ par la valeur depuis /etc/secrets/<name>.env
+  # (synce par l'agent Infisical depuis /services/<name>/).
+  local rendered
+  rendered="$(mktemp)"
+  cp "$vhost_src" "$rendered"
+
+  local env_file="$SECRETS_DIR/$name.env"
+  if [[ -f "$env_file" ]]; then
+    while IFS= read -r line; do
+      [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+      local k="${line%%=*}"
+      local v="${line#*=}"
+      # Protege | et & pour sed
+      v="${v//\\/\\\\}"
+      v="${v//|/\\|}"
+      v="${v//&/\\&}"
+      sed -i "s|__${k}__|${v}|g" "$rendered"
+    done < "$env_file"
+  fi
+
+  # Recupere les domaines du vhost RENDU (apres substitution) pour DNS + cert
   local domains=()
   while IFS= read -r d; do
-    [[ -n "$d" ]] && domains+=("$d")
-  done < <(extract_domains_from_nginx "$vhost_src")
+    [[ -n "$d" && "$d" != *__*__* ]] && domains+=("$d")
+  done < <(extract_domains_from_nginx "$rendered")
 
   if [[ ${#domains[@]} -eq 0 ]]; then
-    echo "AVERTISSEMENT: aucun server_name trouve dans $vhost_src, skip DNS/cert."
+    echo "AVERTISSEMENT: aucun server_name valide dans $vhost_src apres templating (manque ADRESS dans Infisical ?), skip DNS/cert."
   else
     for d in "${domains[@]}"; do
       ensure_dns  "$d" || true
@@ -215,8 +235,10 @@ apply_nginx() {
   fi
 
   local dst="$NGINX_CONF_DIR/$name.conf"
-  cp "$vhost_src" "$dst"
+  cp "$rendered" "$dst"
   chmod 644 "$dst"
+  rm -f "$rendered"
+
   if nginx -t 2>/dev/null; then
     systemctl reload nginx || true
     echo "Vhost nginx installe: $dst (domaines: ${domains[*]:-aucun})"

@@ -65,9 +65,25 @@ Voir la doc Infisical : https://infisical.com/docs/integrations/platforms/infisi
 
 ## `nginx.conf`
 
-Vhost du service, **copie tel quel** dans `/etc/nginx/conf/<nom>.conf` (inclus directement par nginx, pas de jeu sites-available/sites-enabled). Valeurs en dur (domaine, upstream, chemin du cert), pas de placeholders.
+Vhost du service, **rendu** dans `/etc/nginx/conf/<nom>.conf` (inclus directement par nginx, pas de jeu sites-available/sites-enabled).
 
-`service.sh` extrait les `server_name` du fichier et demande automatiquement un cert Let's Encrypt pour chaque domaine (via Certbot DNS Infomaniak).
+### Placeholders `__KEY__`
+
+Pour ne rien hardcoder (adresse, domaine, ...), le vhost peut contenir des placeholders de la forme `__KEY__`. Juste avant le deploiement, `service.sh` lit `/etc/secrets/<nom>.env` (synce depuis Infisical par l'agent) et substitue chaque `__KEY__` par la valeur correspondante.
+
+Convention minimale pour les services expose via nginx :
+- `__ADRESS__` = FQDN (`server_name`, cible du record DNS A)
+- `__DOMAIN__` = apex (chemin du cert wildcard `/etc/letsencrypt/live/<apex>/`)
+
+Tu peux ajouter d'autres placeholders : toute cle presente dans Infisical sous `/services/<nom>/` est substituable via `__KEY__`.
+
+### Ce que fait `service.sh apply_nginx`
+
+1. Rend le vhost (substitution des placeholders depuis `/etc/secrets/<nom>.env`)
+2. Extrait les `server_name` du vhost rendu
+3. Pour chaque FQDN : sync DNS A via `infomaniak-dns-sync`, puis cert wildcard via `certbot-wildcard` sur l'apex
+4. Copie le vhost rendu dans `/etc/nginx/conf/<nom>.conf`
+5. `nginx -t` + `systemctl reload nginx`
 
 Inclut les bricks communes via `include /etc/nginx/include/*.conf`.
 

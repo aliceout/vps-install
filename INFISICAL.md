@@ -17,14 +17,13 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         INFOMANIAK_TOKEN
         CROWDSEC_ENROLL_KEY  # optionnel
     services/
-      pdf/                 # Stirling PDF
-        LANGS
-        DOCKER_ENABLE_SECURITY
-        INSTALL_BOOK_AND_ADVANCED_HTML_OPS
-        SECURITY_INITIALLOGIN_USERNAME
-        SECURITY_INITIALLOGIN_PASSWORD
-      <service>/           # charge a l'install du service via scripts/service.sh
-        ...
+      pdf/                 # Stirling PDF (charge a l'install du service)
+        ADRESS             # FQDN de l'expo
+        DOMAIN             # apex (cert wildcard)
+      <service>/           # autres services, meme convention
+        ADRESS
+        DOMAIN
+        ... autres secrets/config du service ...
 ```
 
 Les `/` dans le path Infisical sont litteraux. L'environnement (`prod`, `staging`, etc.) est choisi au prompt du bootstrap et persiste dans `/etc/infisical/environment`.
@@ -45,17 +44,37 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 
 ## `/services/pdf/` - Stirling PDF
 
-Les cles sont copies tel quel dans `/etc/secrets/pdf.env` (nom de cle = variable d'env consommee par l'image `frooodle/s-pdf`).
+Service ouvert (pas d'auth). Juste les coordonnees de l'expo.
 
 | Cle | Type | Exemple | Role |
 |-----|------|---------|------|
-| `LANGS` | string | `en_GB` ou `fr_FR,en_GB` | langues OCR |
-| `DOCKER_ENABLE_SECURITY` | bool | `true` | active le login integre de Stirling - **recommande si expose** |
-| `INSTALL_BOOK_AND_ADVANCED_HTML_OPS` | bool | `false` | installe calibre + outils eBook (lourd) |
-| `SECURITY_INITIALLOGIN_USERNAME` | string | `alice` | user admin cree au premier lancement |
-| `SECURITY_INITIALLOGIN_PASSWORD` | secret | `...` | mdp admin initial (a changer via l'UI apres le premier login) |
+| `ADRESS` | string | `pdf.backlice.dev` | FQDN expose (nginx `server_name` + record DNS A) |
+| `DOMAIN` | string | `backlice.dev` | apex du cert wildcard |
 
 ## `/services/<nom>/` - autres services tiers
+
+### Convention commune : `ADRESS` + `DOMAIN`
+
+Pour TOUT service expose via nginx, on met au minimum ces 2 cles dans son path Infisical :
+
+| Cle | Role |
+|-----|------|
+| `ADRESS` | FQDN = `server_name` nginx + record DNS A chez Infomaniak |
+| `DOMAIN` | apex = chemin du cert wildcard `/etc/letsencrypt/live/<apex>/` |
+
+Ces cles sont referencees dans le `nginx.conf` du service via les placeholders `__ADRESS__` et `__DOMAIN__`. Au moment du `services install <nom>`, `scripts/service.sh` substitue automatiquement.
+
+### Secrets applicatifs
+
+Toute autre cle sous `/services/<nom>/` atterrit aussi dans `/etc/secrets/<nom>.env`. Si le service en a besoin, reference-le dans son `docker-compose.yml` :
+```yaml
+env_file: /etc/secrets/<nom>.env
+```
+Toutes les cles deviennent alors des variables d'env du conteneur.
+
+### Template Infisical
+
+Chaque service a un `secrets.tmpl` avec le pattern `listSecrets` → rapatrie tout ce qui est sous `/services/<nom>/`. Donc zero friction pour ajouter une cle : tu ajoutes dans Infisical, l'agent la sync dans `/etc/secrets/<nom>.env`.
 
 Pour chaque service sous `services/<nom>/` dans le repo, cree un path Infisical `/services/<nom>/` avec les secrets dont le service a besoin. Le fichier `services/<nom>/secrets.tmpl` utilise le template agent Infisical pour les rapatrier vers `/etc/secrets/<nom>.env` a l'install.
 
