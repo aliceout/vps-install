@@ -35,7 +35,7 @@ dns_infomaniak_token = {{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INF
 EOF
 
 cat > /etc/infisical/templates/_le_email.tmpl <<EOF
-{{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/vps/_infra" "LE_EMAIL" }}{{ .Value }}{{- end }}
+{{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/vps/_infra" "CERTBOT_EMAIL" }}{{ .Value }}{{- end }}
 EOF
 
 cat > /etc/infisical/agent.d/_certbot.yaml <<'EOF'
@@ -71,7 +71,7 @@ if [[ ! -s /etc/letsencrypt/infomaniak.ini ]]; then
   echo "AVERTISSEMENT: /etc/letsencrypt/infomaniak.ini non genere. Verifie que /vps/_infra/INFOMANIAK_TOKEN existe dans Infisical (${INFISICAL_ENV:-prod})."
 fi
 if [[ ! -s /etc/letsencrypt/email ]]; then
-  echo "AVERTISSEMENT: /etc/letsencrypt/email non genere. Verifie que /vps/_infra/LE_EMAIL existe dans Infisical (${INFISICAL_ENV:-prod})."
+  echo "AVERTISSEMENT: /etc/letsencrypt/email non genere. Verifie que /vps/_infra/CERTBOT_EMAIL existe dans Infisical (${INFISICAL_ENV:-prod})."
 fi
 chmod 600 /etc/letsencrypt/infomaniak.ini 2>/dev/null || true
 chmod 644 /etc/letsencrypt/email 2>/dev/null || true

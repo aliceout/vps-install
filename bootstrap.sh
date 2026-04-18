@@ -182,7 +182,7 @@ fetch_infra_secret() {
 INFRA_KEYS=(
   VPS_USER VPS_USER_PASSWORD
   SSH_PORT SSH_PUBKEY
-  LE_EMAIL INFOMANIAK_TOKEN
+  CERTBOT_EMAIL INFOMANIAK_TOKEN
   CROWDSEC_ENROLL_KEY GITHUB_SSH_PRIVKEY
 )
 
@@ -201,7 +201,7 @@ if [[ "$got_any" -eq 0 ]]; then
 fi
 
 # Validation : variables obligatoires
-REQUIRED=(VPS_USER VPS_USER_PASSWORD SSH_PORT SSH_PUBKEY LE_EMAIL)
+REQUIRED=(VPS_USER VPS_USER_PASSWORD SSH_PORT SSH_PUBKEY CERTBOT_EMAIL)
 missing=()
 for v in "${REQUIRED[@]}"; do
   if [[ -z "${!v:-}" ]]; then

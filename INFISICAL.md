@@ -13,7 +13,7 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         VPS_USER_PASSWORD
         SSH_PORT
         SSH_PUBKEY
-        LE_EMAIL
+        CERTBOT_EMAIL
         INFOMANIAK_TOKEN
         CROWDSEC_ENROLL_KEY  # optionnel
         GITHUB_SSH_PRIVKEY   # optionnel
@@ -39,7 +39,7 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 | `VPS_USER_PASSWORD` | secret | `...` | `10_user_ssh.sh` | mdp sudo du user |
 | `SSH_PORT` | int | `45675` | `10_user_ssh.sh`, `30_ufw_crowdsec.sh` | port SSH custom (UFW allow + sshd_config) |
 | `SSH_PUBKEY` | string | `ssh-ed25519 AAAA...` | `10_user_ssh.sh` | cle(s) publique(s) pour authorized_keys, plusieurs separees par `\n` |
-| `LE_EMAIL` | string | `toi@exemple.fr` | `75_certbot.sh` | email Let's Encrypt (ecrit dans `/etc/letsencrypt/email`) |
+| `CERTBOT_EMAIL` | string | `toi@exemple.fr` | `75_certbot.sh` | email utilise par certbot pour les notifs d'expiration et l'enregistrement compte ACME Let's Encrypt (synce vers `/etc/letsencrypt/email`) |
 | `INFOMANIAK_TOKEN` | secret | `...` | `75_certbot.sh`, `scripts/infomaniak-dns-sync.sh` | token API Infomaniak, synce via l'agent dans `/etc/letsencrypt/infomaniak.ini` pour certbot-dns + DNS auto-sync |
 | `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - cle d'enrollment CrowdSec (obtenue sur https://app.crowdsec.net). Si absente, CrowdSec tourne en standalone sans dashboard. |
 | `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_github_ssh.sh` | **optionnel** - cle SSH privee (ed25519) pour pull de repos GitHub prives. Mettre le contenu complet du fichier `id_ed25519`. La cle publique correspondante doit etre ajoutee sur https://github.com/settings/keys. Si absente, le module skip. |
