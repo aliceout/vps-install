@@ -15,6 +15,7 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         SSH_PUBKEY
         LE_EMAIL
         INFOMANIAK_TOKEN
+        CROWDSEC_ENROLL_KEY  # optionnel
     services/
       <service>/           # charge a l'install du service via scripts/service.sh
         ...
@@ -24,16 +25,17 @@ Les `/` dans le path Infisical sont litteraux. L'environnement (`prod`, `staging
 
 ## `/vps/_infra/` - bootstrap
 
-Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Toutes les cles sont obligatoires.
+Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles marquees **optionnel** peuvent etre absentes : le bootstrap continue sans l'integration correspondante.
 
 | Cle | Type | Exemple | Utilise par | Role |
 |-----|------|---------|-------------|------|
 | `VPS_USER` | string | `alice` | `10_user_ssh.sh` | nom du user sudo a creer |
 | `VPS_USER_PASSWORD` | secret | `...` | `10_user_ssh.sh` | mdp sudo du user |
-| `SSH_PORT` | int | `45675` | `10_user_ssh.sh`, `30_ufw_fail2ban.sh` | port SSH custom (UFW allow + sshd_config) |
+| `SSH_PORT` | int | `45675` | `10_user_ssh.sh`, `30_ufw_crowdsec.sh` | port SSH custom (UFW allow + sshd_config) |
 | `SSH_PUBKEY` | string | `ssh-ed25519 AAAA...` | `10_user_ssh.sh` | cle(s) publique(s) pour authorized_keys, plusieurs separees par `\n` |
 | `LE_EMAIL` | string | `toi@exemple.fr` | `75_certbot.sh` | email Let's Encrypt (ecrit dans `/etc/letsencrypt/email`) |
 | `INFOMANIAK_TOKEN` | secret | `...` | `75_certbot.sh`, `scripts/infomaniak-dns-sync.sh` | token API Infomaniak, synce via l'agent dans `/etc/letsencrypt/infomaniak.ini` pour certbot-dns + DNS auto-sync |
+| `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - cle d'enrollment CrowdSec (obtenue sur https://app.crowdsec.net). Si absente, CrowdSec tourne en standalone sans dashboard. |
 
 ## `/services/<nom>/` - services tiers
 

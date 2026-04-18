@@ -40,7 +40,9 @@ Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises auto
 
 - **User + sudo** (config tiree d'Infisical)
 - **SSH durci** : port custom, no-password, no-root, MaxAuthTries=3, cles auto-deployees
-- **UFW + Fail2ban** : SSH + blocklists publiques (FireHOL, Emerging Threats...)
+- **UFW** : deny-by-default, allow SSH + 80/443 (si web)
+- **CrowdSec** : detection auto SSH + HTTP brute-force, bouncer nftables, blocklists communautaires, enrollment optionnel sur app.crowdsec.net (voir [`SECURITY.md`](SECURITY.md))
+- **Kernel hardening** : sysctl anti-spoofing / anti-flood / masquage infos
 - **ZRAM** : swap compresse en RAM
 - **Infisical** : CLI + agent systemd pour syncer les secrets vers `/etc/secrets/`
 - **Docker Engine + compose** (optionnel)
@@ -48,7 +50,7 @@ Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises auto
 - **Nginx** reverse proxy + includes TLS (optionnel)
 - **Zsh + oh-my-zsh + powerlevel10k** (config p10k + zshrc avec alias, pfetch banner, `histo`, `tools`, alias `services`)
 - **Outils CLI** : lsd, bat, zoxide, fzf, btop, htop, ncdu, glances, lnav, ctop, lazydocker, pfetch, lolcat
-- **Cron** : apt update/upgrade, fail2ban blocklists, sync DNS Infomaniak (auto-heal records A sur IP publique)
+- **Cron** : apt update/upgrade, refresh CrowdSec hub, sync DNS Infomaniak (auto-heal records A sur IP publique)
 - **Certbot** : DNS Infomaniak via token synce depuis Infisical, renouvellement automatique
 
 ## Apres le bootstrap : installer des services
@@ -84,7 +86,8 @@ modules/                 etapes numerotees (00 -> 99)
   10_user_ssh.sh         user, sudo, SSH durci
   20_packages.sh         outils CLI (lsd, bat, btop, pfetch, ...)
   25_zram.sh             swap compresse
-  30_ufw_fail2ban.sh     firewall + blocklists
+  28_sysctl.sh           kernel hardening
+  30_ufw_crowdsec.sh     firewall + CrowdSec engine + bouncer nftables
   35_infisical.sh        persist creds + agent systemd
   40_docker.sh           Docker Engine + compose (optionnel)
   45_node_pm2.sh         Node.js + pm2 (optionnel)
@@ -99,10 +102,11 @@ config/
   zsh/zshrc              .zshrc deploye chez VPS_USER
   zsh/p10k.zsh           config Powerlevel10k deployee chez VPS_USER
 scripts/
-  service.sh             helper install/update/remove services
-  certbot-request.sh     requete cert single-domain (Let's Encrypt DNS Infomaniak)
-  certbot-dns.sh         renouvellement cron (wildcards)
-  fail2ban-list.sh       refresh blocklists
+  service.sh               helper install/update/remove services
+  certbot-request.sh       requete cert single-domain (Let's Encrypt DNS Infomaniak)
+  certbot-wildcard.sh      requete cert wildcard apex + *.apex
+  certbot-dns.sh           renouvellement cron (wildcards)
+  infomaniak-dns-sync.sh   sync auto des records A sur IP publique
 services/                services heberges sur le VPS (un dossier par service)
   README.md              structure d'un service
   _template_docker/      squelette docker-compose
@@ -114,7 +118,7 @@ services/                services heberges sur le VPS (un dossier par service)
 
 - Bootstrap : `/var/log/vps-bootstrap.log`
 - Cron : `/var/log/cron/`
-- Fail2ban blocklists : `/var/log/fail2ban-list.log`
+- CrowdSec : `journalctl -u crowdsec` / `journalctl -u crowdsec-firewall-bouncer`
 - Agent Infisical : `journalctl -u infisical-agent`
 
 ## Debug

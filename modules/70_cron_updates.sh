@@ -40,6 +40,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Certbot DNS (si installe)
 12 4 * * * root test -x /usr/local/sbin/certbot-dns && /usr/local/sbin/certbot-dns >> /var/log/cron/certbot-dns.log 2>&1
 
-# Fail2ban bad IP lists
-22 4 * * * root test -x /usr/local/sbin/fail2ban-list.sh && /usr/local/sbin/fail2ban-list.sh >> /var/log/cron/fail2ban-list.log 2>&1
+# CrowdSec: refresh des collections/scenarios/parsers depuis le hub (hebdo)
+42 4 * * 0 root test -x /usr/bin/cscli && /usr/bin/cscli hub update && /usr/bin/cscli hub upgrade >> /var/log/cron/crowdsec-hub.log 2>&1
 EOF
