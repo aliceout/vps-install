@@ -215,7 +215,7 @@ Un bot Telegram perso envoie chaque jour a 08:00 un recap de ce que les outils d
      | jq '.result[-5:] | .[] | .channel_post.chat | {id, title}'
    ```
    Tu y verras les derniers canaux/chats qui ont parle au bot, avec leur `id` (les ids de canaux sont negatifs, `-100xxxxxxxx`).
-4. Mets dans Infisical sous `/vps/_infra/` :
+4. Mets dans Infisical sous `/vps/telegram/` :
    - `TELEGRAM_BOT_TOKEN` (le meme pour tout le monde)
    - `TELEGRAM_CHAT_ID_AUDIT` (le chat id du canal audit)
    - `TELEGRAM_CHAT_ID_BACKUP`, `TELEGRAM_CHAT_ID_CERTBOT`, etc. selon les canaux que tu veux

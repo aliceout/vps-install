@@ -51,7 +51,7 @@ fi
 
 fetch() {
   infisical secrets get "$1" \
-    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path=/vps/_infra \
+    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path=/vps/telegram \
     --token="$TOKEN" --plain 2>/dev/null || true
 }
 
