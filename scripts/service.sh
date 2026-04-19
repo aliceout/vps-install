@@ -361,7 +361,9 @@ action_list() {
     fi
     printf '  %s%-25s %-15s%s\n' "$state" "$s" "($type)" "$extra"
   done < <(list_services)
-  [[ "$any" -eq 0 ]] && echo "  (aucun) - ajoute un service dans $SERVICES_DIR/<nom>/"
+  if [[ "$any" -eq 0 ]]; then
+    echo "  (aucun) - ajoute un service dans $SERVICES_DIR/<nom>/"
+  fi
 }
 
 action_install() {
