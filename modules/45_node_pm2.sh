@@ -19,7 +19,10 @@ npm install -g pm2
 # pm2 startup genere l'unit systemd (en root, base sur $VPS_USER)
 pm2 startup systemd -u "$VPS_USER" --hp "/home/$VPS_USER"
 
-# Garantit que pm2 est executable (npm -g met parfois des perms trop restrictives)
+# npm -g deploie parfois node_modules/pm2 en 0700 -> les users non-root se
+# prennent "permission denied" sur le binaire. On force r+X (X = exec only sur
+# dirs ou fichiers deja exec) sur tout l'arbre et on reaffirme +x sur la cli.
+chmod -R a+rX /usr/lib/node_modules/pm2 2>/dev/null || true
 chmod a+rx /usr/lib/node_modules/pm2/bin/pm2 2>/dev/null || true
 chmod a+rx /usr/bin/pm2 2>/dev/null || true
 
