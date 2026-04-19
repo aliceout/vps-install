@@ -304,9 +304,14 @@ for dir in "$ROOT_DIR/services/"*/; do
   case "$svc" in _*) continue ;; esac
   skip=0
   for c in "${CORE_SERVICES[@]}"; do
-    [[ "$svc" == "$c" ]] && skip=1 && break
+    if [[ "$svc" == "$c" ]]; then
+      skip=1
+      break
+    fi
   done
-  [[ "$skip" -eq 1 ]] && continue
+  if [[ "$skip" -eq 1 ]]; then
+    continue
+  fi
 
   if ask_yes_no "Installer le service '$svc' ?" "no"; then
     bash /opt/vps-install/scripts/service.sh install "$svc" || \
