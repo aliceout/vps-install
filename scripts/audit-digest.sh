@@ -65,5 +65,5 @@ if [[ -n "$DIGEST" ]]; then
   {
     echo "🛡️ Audit VPS ${HOSTNAME_SHORT} (${DATE_HUMAN})"
     echo "$DIGEST"
-  } | /usr/local/sbin/notify-telegram
+  } | /usr/local/sbin/notify-telegram --target audit
 fi

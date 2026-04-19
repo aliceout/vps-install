@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
-# Send a message to a Telegram bot.
+# Send a message to a Telegram bot, optionally routed to a specific channel.
+#
 # Usage:
 #   notify-telegram "Message text"
-#   echo "Message" | notify-telegram
+#   notify-telegram --target audit "Message text"
+#   echo "Message" | notify-telegram --target backup
 #
 # Secrets lus a chaque run depuis Infisical (/vps/_infra/) :
-#   - TELEGRAM_BOT_TOKEN
-#   - TELEGRAM_CHAT_ID
+#   - TELEGRAM_BOT_TOKEN            (le bot, partage)
+#   - TELEGRAM_CHAT_ID              (fallback)
+#   - TELEGRAM_CHAT_ID_<TARGET>     (si --target <name> est passe)
 #
-# Si une des deux cles manque, le script exit 0 silencieusement (pour ne
-# pas casser les chaines de cron).
+# Si le token ou l'id du target manque, skip silencieux (exit 0) pour ne
+# pas casser les chaines de cron.
 
 set -euo pipefail
 set +x
+
+TARGET=""
+if [[ "${1:-}" == "--target" ]]; then
+  TARGET="$(echo "${2:-}" | tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9' '_')"
+  shift 2
+fi
 
 MSG="${1:-}"
 if [[ -z "$MSG" && ! -t 0 ]]; then
@@ -20,7 +29,8 @@ if [[ -z "$MSG" && ! -t 0 ]]; then
 fi
 [[ -z "$MSG" ]] && exit 0
 
-# Fetch secrets
+# --- Fetch Infisical ---------------------------------------------------------
+
 CLIENT_ID="$(cat /etc/infisical/client-id 2>/dev/null || true)"
 CLIENT_SECRET="$(cat /etc/infisical/client-secret 2>/dev/null || true)"
 PROJECT_ID="$(cat /etc/infisical/project-id 2>/dev/null || true)"
@@ -46,14 +56,23 @@ fetch() {
 }
 
 BOT_TOKEN="$(fetch TELEGRAM_BOT_TOKEN)"
-CHAT_ID="$(fetch TELEGRAM_CHAT_ID)"
+CHAT_ID=""
+
+# Si un target est demande, on cherche d'abord TELEGRAM_CHAT_ID_<TARGET>,
+# puis fallback sur TELEGRAM_CHAT_ID si pas trouve.
+if [[ -n "$TARGET" ]]; then
+  CHAT_ID="$(fetch "TELEGRAM_CHAT_ID_${TARGET}")"
+fi
+if [[ -z "$CHAT_ID" ]]; then
+  CHAT_ID="$(fetch TELEGRAM_CHAT_ID)"
+fi
 
 if [[ -z "$BOT_TOKEN" || -z "$CHAT_ID" ]]; then
-  echo "TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID manquant dans /vps/_infra, skip" >&2
+  echo "TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID${TARGET:+_$TARGET} manquant, skip" >&2
   exit 0
 fi
 
-# Telegram limit = 4096 chars, on tronque a 3900 pour laisser de la marge
+# Telegram limit = 4096 chars, marge a 3900
 MSG="$(printf '%s' "$MSG" | head -c 3900)"
 
 curl --max-time 10 -sS -X POST \

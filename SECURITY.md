@@ -201,35 +201,41 @@ Sans ca, les renouvellements cron (tous les 60j) casseront silencieusement la nu
 - Pas de 2FA SSH : on assume que ta cle privee est protegee sur ton laptop. Si tu veux un cran au-dessus, ajoute `pam_google_authenticator`.
 - Pas d'alerting CrowdSec temps-reel vers Telegram ou autre : a activer via `cscli notifications` si besoin (le digest quotidien ci-dessous inclut par contre le count des bans actifs).
 
-## Alerting Telegram (digest quotidien)
+## Alerting Telegram (digest quotidien + routage par canal)
 
-Un bot Telegram perso envoie chaque jour a 08:00 un recap de ce que les outils d'audit ont trouve la veille (rkhunter warnings, debsecan CVE patchables, lynis count, CrowdSec bans actifs). Si aucun outil n'a rien a dire, le bot ne poste rien — tu n'es pas spammee par un "tout va bien" redondant.
+Un bot Telegram perso envoie chaque jour a 08:00 un recap de ce que les outils d'audit ont trouve la veille. Si aucun outil n'a rien a dire, le bot ne poste rien. Le notifier est reutilisable par n'importe quel script, avec un **routage par sujet** : chaque canal Telegram recoit un type de notif separe (audit, backups, certs, etc.) plutot que tout melanger.
 
-### Setup (une fois)
+### Setup du bot (une fois)
 
-1. Ouvre Telegram, cherche `@BotFather`, envoie `/newbot`. Donne-lui un nom (ex: "VPS Audit"). Il retourne un **bot token** (`123456789:AAE...`).
-2. Ouvre une conversation avec ton nouveau bot et envoie-lui `/start` (sinon il ne pourra pas t'ecrire).
-3. Recupere ton **chat ID** :
+1. Ouvre Telegram, cherche `@BotFather`, envoie `/newbot`. Donne-lui un nom (ex: "VPS Alyss"). Il retourne un **bot token** (`123456789:AAE...`).
+2. Cree un **canal ou groupe Telegram par sujet** que tu veux avoir : `#audit-alyss`, `#backups-alyss`, `#certbot-alyss`, etc. Invite ton bot dedans (pour un canal : ajoute-le comme admin).
+3. Pour chaque canal, recupere son **chat ID**. Le plus simple : envoie un message dans le canal, puis :
    ```bash
-   curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | jq '.result[0].message.chat.id'
+   curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" \
+     | jq '.result[-5:] | .[] | .channel_post.chat | {id, title}'
    ```
-4. Mets les deux dans Infisical sous `/vps/_infra/` :
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
-5. C'est tout — le cron quotidien de l'audit digest les lira via Infisical a chaque run.
+   Tu y verras les derniers canaux/chats qui ont parle au bot, avec leur `id` (les ids de canaux sont negatifs, `-100xxxxxxxx`).
+4. Mets dans Infisical sous `/vps/_infra/` :
+   - `TELEGRAM_BOT_TOKEN` (le meme pour tout le monde)
+   - `TELEGRAM_CHAT_ID_AUDIT` (le chat id du canal audit)
+   - `TELEGRAM_CHAT_ID_BACKUP`, `TELEGRAM_CHAT_ID_CERTBOT`, etc. selon les canaux que tu veux
+   - `TELEGRAM_CHAT_ID` (optionnel : fallback si un script notifie sans `--target`)
 
 ### Envoi manuel pour tester
 
 ```bash
-echo "Hello from $(hostname)" | sudo notify-telegram
+echo "Hello from $(hostname)" | sudo notify-telegram --target audit
+echo "Test backup" | sudo notify-telegram --target backup
+echo "Sans target" | sudo notify-telegram   # utilise le fallback TELEGRAM_CHAT_ID
 ```
 
-Si tu recois le message, le pipeline marche. Sinon : `sudo notify-telegram "test" 2>&1` donnera la raison (creds Infisical manquants, token invalide, etc.).
+### Utilisation par les scripts
 
-### Autres usages du notifier
+- `audit-digest` (cron quotidien 08:00) → `--target audit`
+- Tout autre script peut appeler `notify-telegram --target <nom>` :
+  ```bash
+  certbot-wildcard mondomaine.fr || \
+    echo "Certbot a plante sur mondomaine.fr" | notify-telegram --target certbot
+  ```
 
-`/usr/local/sbin/notify-telegram` est reutilisable par n'importe quel script/cron :
-```bash
-/usr/local/sbin/certbot-wildcard mondomaine.fr || \
-  echo "Certbot a plante sur mondomaine.fr" | notify-telegram
-```
+Si le `TELEGRAM_CHAT_ID_<TARGET>` demande n'existe pas dans Infisical, le notifier fallback sur `TELEGRAM_CHAT_ID` (le chat par defaut). Si ca aussi est absent, il skip silencieusement — rien ne casse dans le cron.

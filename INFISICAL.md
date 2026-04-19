@@ -17,8 +17,11 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         INFOMANIAK_TOKEN
         CROWDSEC_ENROLL_KEY  # optionnel
         GITHUB_SSH_PRIVKEY   # optionnel
-        TELEGRAM_BOT_TOKEN   # optionnel (alertes audit)
-        TELEGRAM_CHAT_ID     # optionnel
+        TELEGRAM_BOT_TOKEN   # optionnel (partage, 1 bot)
+        TELEGRAM_CHAT_ID     # optionnel (chat par defaut)
+        TELEGRAM_CHAT_ID_AUDIT    # optionnel (canal par sujet)
+        TELEGRAM_CHAT_ID_BACKUP   # ...
+        TELEGRAM_CHAT_ID_CERTBOT  # ...
     services/
       backup/              # Sauvegarde restic push ephemere vers home
         HOME_SSH_HOST
@@ -59,8 +62,9 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 | `INFOMANIAK_TOKEN` | secret | `...` | `75_certbot.sh`, `scripts/infomaniak-dns-sync.sh` | token API Infomaniak, synce via l'agent dans `/etc/letsencrypt/infomaniak.ini` pour certbot-dns + DNS auto-sync |
 | `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - cle d'enrollment CrowdSec (obtenue sur https://app.crowdsec.net). Si absente, CrowdSec tourne en standalone sans dashboard. |
 | `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_github_ssh.sh` | **optionnel** - cle SSH privee (ed25519) pour pull de repos GitHub prives. Mettre le contenu complet du fichier `id_ed25519`. La cle publique correspondante doit etre ajoutee sur https://github.com/settings/keys. Si absente, le module skip. |
-| `TELEGRAM_BOT_TOKEN` | secret | `123456789:AAE-...` | `notify-telegram`, `audit-digest` | **optionnel** - token d'un bot Telegram cree via @BotFather, pour recevoir les alertes audit sur ton Telegram. Si absent, les scripts d'alerte skip silencieusement. |
-| `TELEGRAM_CHAT_ID` | string | `123456789` | idem | **optionnel** - ton chat ID Telegram (perso ou groupe), recupere via `curl https://api.telegram.org/bot<TOKEN>/getUpdates` apres avoir envoye /start au bot. |
+| `TELEGRAM_BOT_TOKEN` | secret | `123456789:AAE-...` | `notify-telegram` | **optionnel** - token d'un bot Telegram cree via @BotFather, partage pour toutes les notifs. |
+| `TELEGRAM_CHAT_ID` | string | `123456789` | idem | **optionnel** - chat ID par defaut (fallback si aucun target specifique). |
+| `TELEGRAM_CHAT_ID_<TARGET>` | string | `987654321` | idem | **optionnel** - chat ID specifique pour un canal (ex: `TELEGRAM_CHAT_ID_AUDIT`, `TELEGRAM_CHAT_ID_BACKUP`, `TELEGRAM_CHAT_ID_CERTBOT`). `notify-telegram --target audit` cherche `TELEGRAM_CHAT_ID_AUDIT`, sinon fallback sur `TELEGRAM_CHAT_ID`. |
 
 ## `/services/backup/` - Sauvegarde vers home server
 
