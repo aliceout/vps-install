@@ -19,7 +19,8 @@ set +x
 
 TARGET=""
 if [[ "${1:-}" == "--target" ]]; then
-  TARGET="$(echo "${2:-}" | tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9' '_')"
+  # printf au lieu de echo pour eviter le \n final que tr convertirait en _
+  TARGET="$(printf '%s' "${2:-}" | tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9' '_')"
   shift 2
 fi
 
