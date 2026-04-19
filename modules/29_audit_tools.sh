@@ -34,15 +34,19 @@ ln -sf /opt/vps-install/scripts/notify-telegram.sh /usr/local/sbin/notify-telegr
 ln -sf /opt/vps-install/scripts/audit-digest.sh    /usr/local/sbin/audit-digest
 
 # --- Cron unifie des audits --------------------------------------------------
-cat > /etc/cron.d/vps-audit-tools <<'EOF'
+# On resout le codename Debian maintenant pour le passer a debsecan (qui exige
+# --suite des qu'on utilise --only-fixed).
+CODENAME="$(. /etc/os-release; echo "${VERSION_CODENAME:-trixie}")"
+
+cat > /etc/cron.d/vps-audit-tools <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Quotidien 05:15 - rkhunter (mise a jour + scan)
 15 5 * * * root /usr/bin/rkhunter --update --nocolors >> /var/log/audit/rkhunter-update.log 2>&1 && /usr/bin/rkhunter --cronjob --report-warnings-only --appendlog --nocolors >> /var/log/audit/rkhunter.log 2>&1
 
-# Quotidien 05:30 - debsecan (CVE vs paquets installes)
-30 5 * * * root /usr/bin/debsecan --format=report --only-fixed >> /var/log/audit/debsecan.log 2>&1
+# Quotidien 05:30 - debsecan (CVE vs paquets installes, uniquement celles patchables)
+30 5 * * * root /usr/bin/debsecan --format=report --suite ${CODENAME} --only-fixed >> /var/log/audit/debsecan.log 2>&1
 
 # Hebdomadaire dimanche 05:45 - lynis audit complet
 45 5 * * 0 root /usr/bin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat >/dev/null 2>&1
