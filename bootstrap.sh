@@ -292,6 +292,10 @@ else
   say_info "Tu pourras lancer plus tard: services"
 fi
 
+# Supprime les users par defaut du provider (debian, ubuntu, ...) AVANT
+# le reboot pour pas laisser de compte sudo non-utilise trainer.
+run_module "98_cleanup_default_users.sh"
+
 say_ok "Bootstrap termine. Log: $LOG"
 say_warn "Reboot dans 15 secondes (Ctrl-C pour annuler)..."
 for i in $(seq 15 -1 1); do

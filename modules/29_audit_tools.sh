@@ -26,6 +26,13 @@ rkhunter --propupd --nocolors 2>/dev/null || true
 chmod -x /etc/cron.d/debsecan 2>/dev/null || true
 rm -f /etc/cron.d/debsecan  # retire completement, on pilote depuis vps-bootstrap
 
+# --- Notifier Telegram + digest ---------------------------------------------
+install -d /usr/local/sbin
+chmod +x "$ROOT_DIR/scripts/notify-telegram.sh" \
+         "$ROOT_DIR/scripts/audit-digest.sh"
+ln -sf /opt/vps-install/scripts/notify-telegram.sh /usr/local/sbin/notify-telegram
+ln -sf /opt/vps-install/scripts/audit-digest.sh    /usr/local/sbin/audit-digest
+
 # --- Cron unifie des audits --------------------------------------------------
 cat > /etc/cron.d/vps-audit-tools <<'EOF'
 SHELL=/bin/bash
@@ -39,6 +46,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Hebdomadaire dimanche 05:45 - lynis audit complet
 45 5 * * 0 root /usr/bin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat >/dev/null 2>&1
+
+# Quotidien 08:00 - digest Telegram (silencieux si rien d'interessant)
+0 8 * * * root /usr/local/sbin/audit-digest >> /var/log/audit/digest.log 2>&1
 EOF
 chmod 644 /etc/cron.d/vps-audit-tools
 

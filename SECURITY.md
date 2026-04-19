@@ -199,4 +199,37 @@ Sans ca, les renouvellements cron (tous les 60j) casseront silencieusement la nu
 - Pas de WAF niveau applicatif type ModSecurity (CrowdSec + appsec couvre l'essentiel).
 - Pas de AIDE / auditd (file integrity monitoring) : overkill pour un VPS perso.
 - Pas de 2FA SSH : on assume que ta cle privee est protegee sur ton laptop. Si tu veux un cran au-dessus, ajoute `pam_google_authenticator`.
-- Pas d'alerting CrowdSec (email / Discord) : a activer a la main via `cscli notifications` si besoin.
+- Pas d'alerting CrowdSec temps-reel vers Telegram ou autre : a activer via `cscli notifications` si besoin (le digest quotidien ci-dessous inclut par contre le count des bans actifs).
+
+## Alerting Telegram (digest quotidien)
+
+Un bot Telegram perso envoie chaque jour a 08:00 un recap de ce que les outils d'audit ont trouve la veille (rkhunter warnings, debsecan CVE patchables, lynis count, CrowdSec bans actifs). Si aucun outil n'a rien a dire, le bot ne poste rien — tu n'es pas spammee par un "tout va bien" redondant.
+
+### Setup (une fois)
+
+1. Ouvre Telegram, cherche `@BotFather`, envoie `/newbot`. Donne-lui un nom (ex: "VPS Audit"). Il retourne un **bot token** (`123456789:AAE...`).
+2. Ouvre une conversation avec ton nouveau bot et envoie-lui `/start` (sinon il ne pourra pas t'ecrire).
+3. Recupere ton **chat ID** :
+   ```bash
+   curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | jq '.result[0].message.chat.id'
+   ```
+4. Mets les deux dans Infisical sous `/vps/_infra/` :
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+5. C'est tout — le cron quotidien de l'audit digest les lira via Infisical a chaque run.
+
+### Envoi manuel pour tester
+
+```bash
+echo "Hello from $(hostname)" | sudo notify-telegram
+```
+
+Si tu recois le message, le pipeline marche. Sinon : `sudo notify-telegram "test" 2>&1` donnera la raison (creds Infisical manquants, token invalide, etc.).
+
+### Autres usages du notifier
+
+`/usr/local/sbin/notify-telegram` est reutilisable par n'importe quel script/cron :
+```bash
+/usr/local/sbin/certbot-wildcard mondomaine.fr || \
+  echo "Certbot a plante sur mondomaine.fr" | notify-telegram
+```
