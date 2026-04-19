@@ -18,17 +18,26 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         CROWDSEC_ENROLL_KEY  # optionnel
         GITHUB_SSH_PRIVKEY   # optionnel
     services/
-      pdf/                 # Stirling PDF (charge a l'install du service)
-        ADRESS             # FQDN de l'expo
-        DOMAIN             # apex (cert wildcard)
+      backup/              # Sauvegarde restic push ephemere vers home
+        HOME_SSH_HOST
+        HOME_SSH_PORT
+        HOME_SSH_USER
+        HOME_SSH_PRIVKEY
+        RESTIC_REPOSITORY
+        RESTIC_PASSWORD
+        BACKUP_PATHS       # optionnel (defaut: /home/$VPS_USER/data)
+      pdf/                 # Stirling PDF (stateless, pas de data)
+        ADRESS, DOMAIN
+      work/                # Work-resume Next.js (stateless, build from git)
+        ADRESS, DOMAIN, APP, BRANCH, DIR, PORT, REPO
       webhooks/            # GitHub webhooks receiver
-        ADRESS
-        DOMAIN
-        WEBHOOKS_REPOS     # JSON array: [{"repo":"...","secretEnv":"X_SECRET","script":"x.sh"}]
-        <X_SECRET>         # HMAC partage avec GitHub, 1 par repo
-      <service>/           # autres services, meme convention
-        ADRESS
-        DOMAIN
+        ADRESS, DOMAIN
+        <repo>/            # un sous-dossier par hook (ex: work/, nodea/, ...)
+          REPO             # owner/name de GitHub
+          SECRET           # HMAC partage avec GitHub
+          SCRIPT           # nom du .sh dans /var/lib/services/webhooks/hooks/
+      <service-avec-data>/ # services stateful (Ghost, Wiki, etc.)
+        ADRESS, DOMAIN
         ... autres secrets/config du service ...
 ```
 
@@ -48,6 +57,22 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 | `INFOMANIAK_TOKEN` | secret | `...` | `75_certbot.sh`, `scripts/infomaniak-dns-sync.sh` | token API Infomaniak, synce via l'agent dans `/etc/letsencrypt/infomaniak.ini` pour certbot-dns + DNS auto-sync |
 | `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - cle d'enrollment CrowdSec (obtenue sur https://app.crowdsec.net). Si absente, CrowdSec tourne en standalone sans dashboard. |
 | `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_github_ssh.sh` | **optionnel** - cle SSH privee (ed25519) pour pull de repos GitHub prives. Mettre le contenu complet du fichier `id_ed25519`. La cle publique correspondante doit etre ajoutee sur https://github.com/settings/keys. Si absente, le module skip. |
+
+## `/services/backup/` - Sauvegarde vers home server
+
+Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.sh`. La cle privee SSH n'atterrit jamais sur disque : elle est piped directement dans `ssh-add` via stdin, vit dans la memoire de `ssh-agent` le temps du run, puis disparait quand l'agent est tue (trap EXIT).
+
+| Cle | Type | Exemple | Role |
+|-----|------|---------|------|
+| `HOME_SSH_HOST` | string | `home.mondomaine.fr` | FQDN ou IP publique du home server |
+| `HOME_SSH_PORT` | int | `22` | port SSH du home |
+| `HOME_SSH_USER` | string | `backup` | user SFTP-chroot dedie sur le home |
+| `HOME_SSH_PRIVKEY` | secret multiligne | `-----BEGIN OPENSSH PRIVATE KEY-----...` | cle privee ed25519 |
+| `RESTIC_REPOSITORY` | string | `sftp:backup@home.mondomaine.fr:/storage` | URL du repo restic (format SFTP) |
+| `RESTIC_PASSWORD` | secret | `...` | mdp de chiffrement du repo |
+| `BACKUP_PATHS` | string | `/home/choupi/data` | optionnel ; defaut `/home/<VPS_USER>/data` |
+
+Setup cote home server : voir `services/backup/README.md`.
 
 ## `/services/pdf/` - Stirling PDF
 

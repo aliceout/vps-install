@@ -4,9 +4,6 @@ services:
     container_name: pdf
     restart: unless-stopped
     environment:
-      # Stirling depuis ~2025 utilise /configs/settings.yml pour l'auth.
-      # SECURITY_ENABLELOGIN=false override le `security.enableLogin` du YAML
-      # et garantit "service ouvert, pas de login".
       - SECURITY_ENABLELOGIN=false
       - DOCKER_ENABLE_SECURITY=false
       - INSTALL_BOOK_AND_ADVANCED_HTML_OPS=false
@@ -14,6 +11,6 @@ services:
     ports:
       - "127.0.0.1:8097:8080"
     volumes:
-      - /var/lib/services/pdf/configs:/configs
-      - /var/lib/services/pdf/logs:/logs
-      - /var/lib/services/pdf/tessdata:/usr/share/tessdata
+      - ${DATA_DIR}/configs:/configs
+      - ${DATA_DIR}/logs:/logs
+      - ${DATA_DIR}/tessdata:/usr/share/tessdata

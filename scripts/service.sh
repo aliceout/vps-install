@@ -178,6 +178,34 @@ remove_secrets() {
   restart_agent_if_any
 }
 
+maybe_restore_data() {
+  # Si service.conf declare RESTORE_ON_INSTALL=yes ET DATA_DIR, on tente
+  # une restore du dernier snapshot restic sur ce path. Skip si backup-restore
+  # n'est pas installe, ou si le dossier contient deja des donnees.
+  local name="$1"
+  local conf="$SERVICES_DIR/$name/service.conf"
+  [[ -f "$conf" ]] || return 0
+
+  local restore_flag="" data_dir=""
+  restore_flag="$(grep -E '^RESTORE_ON_INSTALL=' "$conf" | head -n1 | cut -d= -f2- | tr -d '"'"'")"
+  data_dir="$(grep -E '^DATA_DIR=' "$conf" | head -n1 | cut -d= -f2- | tr -d '"'"'")"
+
+  # Remplace $VPS_USER / ${VPS_USER} si present dans la valeur
+  data_dir="${data_dir//\$VPS_USER/$VPS_USER}"
+  data_dir="${data_dir//\$\{VPS_USER\}/$VPS_USER}"
+
+  [[ "$restore_flag" == "yes" || "$restore_flag" == "true" || "$restore_flag" == "1" ]] || return 0
+  [[ -n "$data_dir" ]] || { echo "RESTORE_ON_INSTALL sans DATA_DIR, skip"; return 0; }
+
+  if ! command -v backup-restore >/dev/null 2>&1; then
+    echo "backup-restore absent (service 'backup' pas installe), skip restore."
+    return 0
+  fi
+
+  echo "Tentative de restore des donnees pour $name (target: $data_dir)..."
+  backup-restore "$data_dir" || echo "AVERTISSEMENT: restore KO (le service demarrera avec un dossier vide)."
+}
+
 ensure_cert() {
   local fqdn="$1"
   local apex="${2:-}"
@@ -350,6 +378,7 @@ action_install() {
 
   apply_secrets "$name" || true
   apply_nginx "$name"
+  maybe_restore_data "$name"
   run_service_script "$name" "install"
   mark_installed "$name"
 
