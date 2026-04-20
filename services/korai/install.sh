@@ -117,9 +117,9 @@ EOF
     fi
     rm -f "$HOOK_DST"
     rm -f "$KORAI_CREDS_FILE"
+    rm -rf "$DEPLOY_DIR"
     trigger_webhooks_update
-    echo "Hook + creds Korai retires, stack docker arretee."
-    echo "Code source preserve dans $DEPLOY_DIR (rm -rf manuel pour purger)."
+    echo "Hook + creds + repo source retires, stack docker arretee."
     ;;
 
   status)
