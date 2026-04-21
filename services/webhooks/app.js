@@ -56,12 +56,18 @@ function loadDeployConfig() {
       console.warn(`Skip ${f}: ${e.message}`);
       continue;
     }
-    const { REPO, SECRET, SCRIPT } = cfg;
+    const { REPO, SECRET, SCRIPT, WORKFLOW, BRANCH } = cfg;
     if (!REPO || !SECRET || !SCRIPT) {
       console.warn(`Skip ${f}: REPO / SECRET / SCRIPT manquants`);
       continue;
     }
-    map[REPO] = { secret: SECRET, script: SCRIPT, source: f };
+    map[REPO] = {
+      secret: SECRET,
+      script: SCRIPT,
+      workflow: WORKFLOW || null,  // filtre optionnel sur workflow_run.name
+      branch:   BRANCH   || null,  // filtre optionnel sur workflow_run.head_branch
+      source: f,
+    };
   }
   return map;
 }
@@ -107,23 +113,6 @@ const server = http.createServer((req, res) => {
       return res.end("pong");
     }
 
-    // Evenement workflow_run : ne deploie QUE si le run est completed + success.
-    // Sinon on risque un deploy premature (build pas encore push sur GHCR) ou
-    // inutile (build KO). GitHub envoie 3 actions (requested / in_progress /
-    // completed) et 8 conclusions possibles, on filtre tout sauf le happy path.
-    if (event === "workflow_run") {
-      const action     = data.action;
-      const conclusion = data.workflow_run?.conclusion;
-      if (action !== "completed" || conclusion !== "success") {
-        console.log(
-          `workflow_run ignored (action=${action}, conclusion=${conclusion}) ` +
-          `for ${data.repository?.full_name}`
-        );
-        res.writeHead(200);
-        return res.end("Ignored: workflow_run not completed+success");
-      }
-    }
-
     // Re-charge a chaque requete : pas besoin de restart si on ajoute un hook
     const DEPLOY = loadDeployConfig();
 
@@ -134,12 +123,43 @@ const server = http.createServer((req, res) => {
       return res.end("Unknown repo");
     }
 
-    const { secret, script } = DEPLOY[repo];
+    const { secret, script, workflow, branch } = DEPLOY[repo];
 
     if (!verifySignature(req, body, secret)) {
       console.warn(`Signature invalide pour ${repo}`);
       res.writeHead(401);
       return res.end("Invalid signature");
+    }
+
+    // Filtre workflow_run :
+    //   - action=completed + conclusion=success (sinon : build en cours,
+    //     echoue, cancel, etc -> pas de deploy)
+    //   - optionnellement le nom du workflow (WORKFLOW= dans le env file)
+    //     pour ne matcher qu'un CI precis (eviter les lint/test/scan qui
+    //     passent aussi)
+    //   - optionnellement la branche (BRANCH=) pour ignorer les runs sur
+    //     feature branches / PRs
+    if (event === "workflow_run") {
+      const action     = data.action;
+      const conclusion = data.workflow_run?.conclusion;
+      const wfName     = data.workflow_run?.name;
+      const wfBranch   = data.workflow_run?.head_branch;
+
+      if (action !== "completed" || conclusion !== "success") {
+        console.log(`${repo}: workflow_run ignored (action=${action}, conclusion=${conclusion})`);
+        res.writeHead(200);
+        return res.end("Ignored: not completed+success");
+      }
+      if (workflow && wfName !== workflow) {
+        console.log(`${repo}: workflow '${wfName}' != WORKFLOW='${workflow}', ignored`);
+        res.writeHead(200);
+        return res.end(`Ignored: workflow '${wfName}'`);
+      }
+      if (branch && wfBranch !== branch) {
+        console.log(`${repo}: workflow_run branch '${wfBranch}' != BRANCH='${branch}', ignored`);
+        res.writeHead(200);
+        return res.end(`Ignored: branch '${wfBranch}'`);
+      }
     }
 
     const scriptPath = path.join(HOOKS_DIR, script);
