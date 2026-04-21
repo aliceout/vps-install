@@ -6,7 +6,10 @@ set -Eeuo pipefail
 
 DEPLOY_DIR="/var/www/korai"
 BRANCH="main"
-REPO_URL="https://github.com/aliceout/Korai.git"
+# Repo prive : on passe par SSH (cle deployee par 15_github_ssh.sh sous
+# ~/.ssh/id_ed25519 + config Host github.com). Pas de HTTPS qui demanderait
+# un PAT.
+REPO_URL="git@github.com:aliceout/Korai.git"
 
 git config --global --add safe.directory "$DEPLOY_DIR" || true
 

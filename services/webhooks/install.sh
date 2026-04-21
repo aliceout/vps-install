@@ -177,9 +177,12 @@ Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=${DATA_DIR}
+# DATA_DIR (logs) + /var/www et /var/lib/services (repos clones par les hooks)
+# + home du user (gitconfig, ~/.pm2, ~/.docker, ~/.config/infisical/*.env).
+# Les hooks heritent du namespace systemd : sans ces RW, git fetch, pm2 save,
+# docker compose etc. plantent en "read-only filesystem".
+ReadWritePaths=${DATA_DIR} /var/www /var/lib/services /home/${VPS_USER}
 ReadOnlyPaths=${HOOKS_ENV_DIR}
-ProtectHome=read-only
 PrivateTmp=true
 
 [Install]
