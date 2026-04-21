@@ -107,6 +107,23 @@ const server = http.createServer((req, res) => {
       return res.end("pong");
     }
 
+    // Evenement workflow_run : ne deploie QUE si le run est completed + success.
+    // Sinon on risque un deploy premature (build pas encore push sur GHCR) ou
+    // inutile (build KO). GitHub envoie 3 actions (requested / in_progress /
+    // completed) et 8 conclusions possibles, on filtre tout sauf le happy path.
+    if (event === "workflow_run") {
+      const action     = data.action;
+      const conclusion = data.workflow_run?.conclusion;
+      if (action !== "completed" || conclusion !== "success") {
+        console.log(
+          `workflow_run ignored (action=${action}, conclusion=${conclusion}) ` +
+          `for ${data.repository?.full_name}`
+        );
+        res.writeHead(200);
+        return res.end("Ignored: workflow_run not completed+success");
+      }
+    }
+
     // Re-charge a chaque requete : pas besoin de restart si on ajoute un hook
     const DEPLOY = loadDeployConfig();
 
