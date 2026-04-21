@@ -186,9 +186,11 @@ maybe_restore_data() {
   local conf="$SERVICES_DIR/$name/service.conf"
   [[ -f "$conf" ]] || return 0
 
+  # Le `|| true` evite que grep sans match (rc=1) + pipefail + set -e ne
+  # tue action_install en plein vol avant run_service_script.
   local restore_flag="" data_dir=""
-  restore_flag="$(grep -E '^RESTORE_ON_INSTALL=' "$conf" | head -n1 | cut -d= -f2- | tr -d '"'"'")"
-  data_dir="$(grep -E '^DATA_DIR=' "$conf" | head -n1 | cut -d= -f2- | tr -d '"'"'")"
+  restore_flag="$(grep -E '^RESTORE_ON_INSTALL=' "$conf" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"'"'" || true)"
+  data_dir="$(grep -E '^DATA_DIR=' "$conf" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"'"'" || true)"
 
   # Remplace $VPS_USER / ${VPS_USER} si present dans la valeur
   data_dir="${data_dir//\$VPS_USER/$VPS_USER}"
