@@ -8,10 +8,6 @@
 #   /etc/certbot/creds/infomaniak/<name>.ini
 #   /etc/certbot/creds/ovh/<name>.ini
 #
-# Et pour la compat avec les certs emis avant le refactor, refresh aussi
-# /etc/letsencrypt/infomaniak.ini depuis /vps/_infra/INFOMANIAK_TOKEN si
-# present (sinon silencieusement skip).
-#
 # Sort toujours 0 : ne pas casser un renew si Infisical est HS, les ini
 # existants devraient encore marcher sauf rotation recente.
 
@@ -19,7 +15,6 @@ set -uo pipefail
 
 PROVIDERS_CONF="/etc/certbot/providers.conf"
 CREDS_DIR="/etc/certbot/creds"
-LEGACY_INI="/etc/letsencrypt/infomaniak.ini"
 
 CLIENT_ID="$(cat /etc/infisical/client-id 2>/dev/null || true)"
 CLIENT_SECRET="$(cat /etc/infisical/client-secret 2>/dev/null || true)"
@@ -110,25 +105,6 @@ if [[ -f "$PROVIDERS_CONF" ]]; then
         ;;
     esac
   done < "$PROVIDERS_CONF"
-fi
-
-# Legacy fallback: maintient /etc/letsencrypt/infomaniak.ini populate pour
-# les services qui n'ont pas encore migre vers DNS_PROVIDER/DNS_TOKEN_NAME.
-# Ordre de lookup :
-#   1. /vps/_infra/INFOMANIAK_TOKEN (ancien emplacement, avant refactor)
-#   2. /vps/certbot/infomaniak/perso (nouveau label par defaut)
-# Si ni l'un ni l'autre, on supprime le fichier ini (evite une ini stale).
-legacy_token="$(fetch "/vps/_infra" "INFOMANIAK_TOKEN")"
-if [[ -z "$legacy_token" ]]; then
-  legacy_token="$(fetch "/vps/certbot/infomaniak" "perso")"
-fi
-if [[ -n "$legacy_token" ]]; then
-  umask 077
-  install -d -m 700 /etc/letsencrypt
-  cat > "$LEGACY_INI" <<EOF
-dns_infomaniak_token = ${legacy_token}
-EOF
-  chmod 600 "$LEGACY_INI"
 fi
 
 exit 0

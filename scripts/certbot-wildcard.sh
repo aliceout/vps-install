@@ -3,13 +3,13 @@
 # en utilisant le plugin DNS du provider choisi.
 #
 # Usage:
-#   certbot-wildcard <apex>                         # legacy : infomaniak + token unique
-#   certbot-wildcard <apex> <provider> <token_name> # ex: certbot-wildcard alice.fr ovh client1
+#   certbot-wildcard <apex> <provider> <token_name>
+#   ex: certbot-wildcard alice.fr ovh client1
+#       certbot-wildcard backlice.dev infomaniak perso
 #
 # Credentials attendus (regeneres par certbot-refresh-creds, pre-hook de
 # certbot.timer) :
-#   /etc/certbot/creds/<provider>/<name>.ini       (nouveau systeme)
-#   /etc/letsencrypt/infomaniak.ini                (legacy, si provider omis)
+#   /etc/certbot/creds/<provider>/<name>.ini
 #
 # Met a jour /etc/certbot/providers.conf (map apex -> provider:name) pour
 # que les renouvellements automatiques sachent refresh les bonnes creds.
@@ -20,8 +20,8 @@ APEX="${1:-}"
 PROVIDER="${2:-}"
 TOKEN_NAME="${3:-}"
 
-if [[ -z "$APEX" ]]; then
-  echo "Usage: $0 <apex> [<provider> <token_name>]" >&2
+if [[ -z "$APEX" || -z "$PROVIDER" || -z "$TOKEN_NAME" ]]; then
+  echo "Usage: $0 <apex> <provider> <token_name>" >&2
   exit 1
 fi
 
@@ -29,7 +29,6 @@ EMAIL_FILE="/etc/letsencrypt/email"
 DOMAINS_FILE="/etc/letsencrypt/domains.ini"
 PROVIDERS_CONF="/etc/certbot/providers.conf"
 CREDS_DIR="/etc/certbot/creds"
-LEGACY_INI="/etc/letsencrypt/infomaniak.ini"
 REFRESH_BIN="/usr/local/sbin/certbot-refresh-creds"
 
 CERTBOT_BIN="/usr/local/bin/certbot"
@@ -62,24 +61,13 @@ update_providers_conf() {
   chmod 644 "$PROVIDERS_CONF"
 }
 
-# Selectionne les credentials selon les args
-if [[ -n "$PROVIDER" && -n "$TOKEN_NAME" ]]; then
-  case "$PROVIDER" in
-    infomaniak) CREDS="$CREDS_DIR/infomaniak/${TOKEN_NAME}.ini" ;;
-    ovh)        CREDS="$CREDS_DIR/ovh/${TOKEN_NAME}.ini" ;;
-    *) echo "Provider inconnu: $PROVIDER (attendu: infomaniak|ovh)" >&2; exit 1 ;;
-  esac
-  update_providers_conf "$APEX" "$PROVIDER" "$TOKEN_NAME"
-  [[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
-elif [[ -z "$PROVIDER" && -z "$TOKEN_NAME" ]]; then
-  # Legacy : /etc/letsencrypt/infomaniak.ini (token unique /vps/_infra/)
-  PROVIDER="infomaniak"
-  CREDS="$LEGACY_INI"
-  [[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
-else
-  echo "Specifier SOIT aucun arg SOIT les deux: <provider> <token_name>" >&2
-  exit 1
-fi
+case "$PROVIDER" in
+  infomaniak) CREDS="$CREDS_DIR/infomaniak/${TOKEN_NAME}.ini" ;;
+  ovh)        CREDS="$CREDS_DIR/ovh/${TOKEN_NAME}.ini" ;;
+  *) echo "Provider inconnu: $PROVIDER (attendu: infomaniak|ovh)" >&2; exit 1 ;;
+esac
+update_providers_conf "$APEX" "$PROVIDER" "$TOKEN_NAME"
+[[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
 
 if [[ ! -s "$CREDS" ]]; then
   echo "Credentials manquants: $CREDS" >&2

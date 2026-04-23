@@ -11,15 +11,13 @@
 #   dns-sync foo.bar.fr ...       # liste explicite
 #
 # Pre-requis:
-#   - /etc/certbot/creds/infomaniak/<name>.ini (nouveau) OU
-#   - /etc/letsencrypt/infomaniak.ini (legacy)
+#   - /etc/certbot/creds/infomaniak/<name>.ini (genere par certbot-refresh-creds)
 #   - jq, curl
 
 set -uo pipefail
 
 LOG="/var/log/dns-sync.log"
 PROVIDERS_CONF="/etc/certbot/providers.conf"
-LEGACY_INI="/etc/letsencrypt/infomaniak.ini"
 CREDS_DIR="/etc/certbot/creds"
 API_INFOMANIAK="https://api.infomaniak.com"
 TTL=3600
@@ -48,23 +46,16 @@ load_providers_conf() {
 
 load_providers_conf
 
-# Retourne le token Infomaniak pour un apex (map + fallback legacy).
-# Echoue silencieusement si introuvable.
+# Retourne le token Infomaniak pour un apex. Echoue si l'apex n'est pas
+# declare dans providers.conf avec provider=infomaniak.
 infomaniak_token_for_apex() {
   local apex="$1" name ini
+  [[ "${APEX_PROVIDER[$apex]:-}" == "infomaniak" ]] || return 1
   name="${APEX_TOKEN_NAME[$apex]:-}"
-  if [[ "${APEX_PROVIDER[$apex]:-}" == "infomaniak" && -n "$name" ]]; then
-    ini="$CREDS_DIR/infomaniak/${name}.ini"
-    [[ -s "$ini" ]] || return 1
-    grep -E '^dns_infomaniak_token' "$ini" | awk -F= '{print $2}' | tr -d ' '
-    return 0
-  fi
-  # Fallback legacy
-  if [[ -s "$LEGACY_INI" ]]; then
-    grep -E '^dns_infomaniak_token' "$LEGACY_INI" | awk -F= '{print $2}' | tr -d ' '
-    return 0
-  fi
-  return 1
+  [[ -n "$name" ]] || return 1
+  ini="$CREDS_DIR/infomaniak/${name}.ini"
+  [[ -s "$ini" ]] || return 1
+  grep -E '^dns_infomaniak_token' "$ini" | awk -F= '{print $2}' | tr -d ' '
 }
 
 declare -a DOMAINS=()

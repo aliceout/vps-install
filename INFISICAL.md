@@ -16,9 +16,6 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         CROWDSEC_ENROLL_KEY    # optionnel
         GITHUB_SSH_PRIVKEY     # optionnel - cle SSH GitHub
         GITLAB_SSH_PRIVKEY     # optionnel - cle SSH GitLab
-        # --- legacy, sera supprime apres migration ---
-        CERTBOT_EMAIL          # (deplacer vers /vps/certbot/CERTBOT_EMAIL)
-        INFOMANIAK_TOKEN       # (deplacer vers /vps/certbot/infomaniak/perso)
 
       certbot/                 # Let's Encrypt + DNS multi-provider
         CERTBOT_EMAIL
@@ -86,15 +83,6 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 | `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - enrollment CrowdSec. Absent = standalone sans dashboard |
 | `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitHub prives |
 | `GITLAB_SSH_PRIVKEY` | secret | idem | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitLab prives |
-
-### Legacy (a migrer vers `/vps/certbot/`)
-
-Encore supportes pour backward compat, disparaitront a terme :
-
-| Cle | Nouvelle location |
-|-----|-------------------|
-| `CERTBOT_EMAIL` | `/vps/certbot/CERTBOT_EMAIL` |
-| `INFOMANIAK_TOKEN` | `/vps/certbot/infomaniak/perso` |
 
 ## `/vps/certbot/` - Let's Encrypt + DNS providers
 
@@ -165,8 +153,6 @@ Chaque repo branche a un sous-dossier `/services/webhooks/<slug>/`. Le receiver 
 | `WORKFLOW` | `Docker build` | **optionnel**. GitHub: filtre `workflow_run.name`. GitLab: filtre `object_attributes.name` des Pipeline Hook |
 | `BRANCH` | `main` | **optionnel**. Filtre sur la branche, ignore les runs des feature branches |
 
-Alias legacy : `SECRET` (sans prefix) est encore lu en fallback si `WEBHOOK_SECRET` absent.
-
 Voir `services/webhooks/README.md` pour le flow complet.
 
 ## `/services/<service-avec-vhost>/`
@@ -184,7 +170,7 @@ Pour TOUT service expose via nginx, on met au minimum ces 4 cles :
 
 Ces cles sont referencees dans le `nginx.conf` du service via `__ADRESS__` / `__DOMAIN__` / `__PORT__`. `scripts/service.sh` substitue au moment du `services install <nom>`.
 
-Si `DNS_PROVIDER` et `DNS_TOKEN_NAME` sont absents, `certbot-wildcard` fallback sur le legacy `/etc/letsencrypt/infomaniak.ini` (genere depuis `/vps/_infra/INFOMANIAK_TOKEN`). Permet de migrer progressivement.
+**Obligatoire** : sans `DNS_PROVIDER` + `DNS_TOKEN_NAME`, `ensure_cert` refuse d'emettre un cert (le service est deploye sans SSL). Les 2 cles doivent pointer sur un label existant sous `/vps/certbot/<provider>/`.
 
 ### Secrets applicatifs
 

@@ -3,8 +3,8 @@
 # en utilisant le plugin DNS du provider choisi.
 #
 # Usage:
-#   certbot-request <domain> [<domain>...]                         # legacy infomaniak
-#   certbot-request --provider <p> --token <name> <domain> [...]   # multi-provider
+#   certbot-request --provider <p> --token <name> <domain> [<domain>...]
+#   ex: certbot-request --provider ovh --token client1 bar.alice.fr
 
 set -euo pipefail
 
@@ -21,35 +21,25 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ${#DOMAINS[@]} -eq 0 ]]; then
-  echo "Usage: $0 [--provider <p> --token <n>] <domain> [<domain>...]" >&2
+if [[ -z "$PROVIDER" || -z "$TOKEN_NAME" || ${#DOMAINS[@]} -eq 0 ]]; then
+  echo "Usage: $0 --provider <p> --token <n> <domain> [<domain>...]" >&2
   exit 1
 fi
 
 EMAIL_FILE="/etc/letsencrypt/email"
 CREDS_DIR="/etc/certbot/creds"
-LEGACY_INI="/etc/letsencrypt/infomaniak.ini"
 REFRESH_BIN="/usr/local/sbin/certbot-refresh-creds"
 
 CERTBOT_BIN="/usr/local/bin/certbot"
 [[ -x "$CERTBOT_BIN" ]] || CERTBOT_BIN="$(command -v certbot || true)"
 [[ -n "$CERTBOT_BIN" ]] || { echo "certbot introuvable" >&2; exit 1; }
 
-if [[ -n "$PROVIDER" && -n "$TOKEN_NAME" ]]; then
-  case "$PROVIDER" in
-    infomaniak) CREDS="$CREDS_DIR/infomaniak/${TOKEN_NAME}.ini" ;;
-    ovh)        CREDS="$CREDS_DIR/ovh/${TOKEN_NAME}.ini" ;;
-    *) echo "Provider inconnu: $PROVIDER" >&2; exit 1 ;;
-  esac
-  [[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
-elif [[ -z "$PROVIDER" && -z "$TOKEN_NAME" ]]; then
-  PROVIDER="infomaniak"
-  CREDS="$LEGACY_INI"
-  [[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
-else
-  echo "Specifier --provider ET --token, ou aucun des deux." >&2
-  exit 1
-fi
+case "$PROVIDER" in
+  infomaniak) CREDS="$CREDS_DIR/infomaniak/${TOKEN_NAME}.ini" ;;
+  ovh)        CREDS="$CREDS_DIR/ovh/${TOKEN_NAME}.ini" ;;
+  *) echo "Provider inconnu: $PROVIDER" >&2; exit 1 ;;
+esac
+[[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
 
 [[ -s "$CREDS" ]] || { echo "Credentials manquants: $CREDS" >&2; exit 1; }
 

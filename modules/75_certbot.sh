@@ -95,8 +95,6 @@ ln -sf /opt/vps-install/scripts/certbot-request.sh        /usr/local/sbin/certbo
 ln -sf /opt/vps-install/scripts/certbot-wildcard.sh       /usr/local/sbin/certbot-wildcard
 ln -sf /opt/vps-install/scripts/certbot-refresh-creds.sh  /usr/local/sbin/certbot-refresh-creds
 ln -sf /opt/vps-install/scripts/dns-sync.sh               /usr/local/sbin/dns-sync
-# Alias legacy : pointe sur dns-sync. Les crons existants continuent de marcher.
-ln -sf /opt/vps-install/scripts/dns-sync.sh               /usr/local/sbin/infomaniak-dns-sync
 
 # Pre-hook certbot renew : regen les ini de creds depuis Infisical avant
 # chaque renewal. Handle la rotation des tokens cote Infisical sans
@@ -119,17 +117,7 @@ cat > /etc/logrotate.d/dns-sync <<'EOF'
     compress
     delaycompress
 }
-# Legacy log file (si ancien infomaniak-dns-sync.log existe encore)
-/var/log/infomaniak-dns-sync.log {
-    weekly
-    rotate 4
-    missingok
-    notifempty
-    compress
-    delaycompress
-}
 EOF
-rm -f /etc/logrotate.d/infomaniak-dns-sync
 
 # Cron: sync auto-heal des records A toutes les heures
 cat > /etc/cron.d/dns-sync <<'EOF'
@@ -138,7 +126,27 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 17 * * * * root /usr/local/sbin/dns-sync >/dev/null 2>&1
 EOF
 chmod 644 /etc/cron.d/dns-sync
+
+# Migration des renewal configs qui referencent encore l'ancien ini legacy.
+# Remplace le chemin par celui du label 'perso' sous /etc/certbot/creds/
+# (label par defaut, bibliographie alignee avec la convention documentee).
+# Si l'user utilise un autre label, il faut editer le renewal.conf a la main.
+if [[ -d /etc/letsencrypt/renewal ]]; then
+  for conf in /etc/letsencrypt/renewal/*.conf; do
+    [[ -f "$conf" ]] || continue
+    if grep -qE 'dns_infomaniak_credentials\s*=\s*/etc/letsencrypt/infomaniak\.ini' "$conf"; then
+      sed -i 's|dns_infomaniak_credentials = /etc/letsencrypt/infomaniak\.ini|dns_infomaniak_credentials = /etc/certbot/creds/infomaniak/perso.ini|g' "$conf"
+      echo "Renewal config migre: $(basename "$conf") -> creds/infomaniak/perso.ini"
+    fi
+  done
+fi
+
+# Cleanup d'anciens artefacts (pre-migration multi-provider)
+rm -f /etc/letsencrypt/infomaniak.ini
 rm -f /etc/cron.d/infomaniak-dns-sync
+rm -f /etc/logrotate.d/infomaniak-dns-sync
+rm -f /usr/local/sbin/infomaniak-dns-sync
+rm -f /etc/infisical/templates/_certbot_legacy.tmpl
 
 # Timer certbot renew
 systemctl enable --now certbot.timer 2>/dev/null || true

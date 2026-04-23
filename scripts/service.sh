@@ -228,21 +228,17 @@ ensure_cert() {
     return 0
   fi
 
-  # certbot-wildcard est idempotent :
-  # - demande le cert wildcard si absent
-  # - skip si present, MAIS ecrit quand meme /etc/nginx/certificat/<apex>.conf
-  # Provider + token_name optionnels : si absents, certbot-wildcard fallback
-  # sur /etc/letsencrypt/infomaniak.ini (legacy).
-  if [[ -n "$provider" && -n "$token_name" ]]; then
-    if ! certbot-wildcard "$apex" "$provider" "$token_name"; then
-      echo "AVERTISSEMENT: cert non obtenu pour $apex ($provider:$token_name). Vhost deploye sans SSL."
-      return 1
-    fi
-  else
-    if ! certbot-wildcard "$apex"; then
-      echo "AVERTISSEMENT: cert non obtenu pour $apex. Vhost deploye sans SSL."
-      return 1
-    fi
+  if [[ -z "$provider" || -z "$token_name" ]]; then
+    echo "AVERTISSEMENT: DNS_PROVIDER et DNS_TOKEN_NAME manquants dans /etc/secrets/, skip cert pour $apex."
+    echo "  Ajoute dans Infisical /services/<name>/ : DNS_PROVIDER=<infomaniak|ovh> + DNS_TOKEN_NAME=<label>"
+    return 1
+  fi
+
+  # certbot-wildcard est idempotent : demande le cert si absent, skip si
+  # present (mais reecrit /etc/nginx/certificat/<apex>.conf dans les deux cas).
+  if ! certbot-wildcard "$apex" "$provider" "$token_name"; then
+    echo "AVERTISSEMENT: cert non obtenu pour $apex ($provider:$token_name). Vhost deploye sans SSL."
+    return 1
   fi
 }
 
@@ -294,10 +290,9 @@ apply_nginx() {
   done < <(extract_domains_from_nginx "$rendered")
 
   # Extrait DOMAIN, DNS_PROVIDER et DNS_TOKEN_NAME depuis l'env file.
-  # DOMAIN : apex du vhost (pour calculer l'apex correct quand FQDN == apex)
-  # DNS_PROVIDER / DNS_TOKEN_NAME : optionnels, choisissent quel plugin DNS
-  # utiliser (nouveau systeme multi-provider). Absents -> fallback sur le
-  # token legacy /vps/_infra/INFOMANIAK_TOKEN.
+  # DOMAIN : apex du vhost (pour calculer l'apex correct quand FQDN == apex).
+  # DNS_PROVIDER / DNS_TOKEN_NAME : requis pour obtenir un cert. Pointent sur
+  # /vps/certbot/<provider>/<name> dans Infisical.
   local apex_from_env="" dns_provider="" dns_token_name=""
   if [[ -f "$env_file" ]]; then
     apex_from_env="$(grep -E '^DOMAIN=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"

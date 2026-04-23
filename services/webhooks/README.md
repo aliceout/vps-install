@@ -26,7 +26,7 @@ Chaque repo branche (GitHub ou GitLab) a son propre sous-dossier :
 | Cle | Exemple | Role |
 |-----|---------|------|
 | `REPO` | `aliceout/Work-resume` (GH) / `riana/projet` (GL) | slug, doit matcher ce que la forge envoie dans le payload |
-| `WEBHOOK_SECRET` | `Attach8-Catfight-...` | **GitHub**: HMAC (`openssl rand -hex 32`, a mettre dans Settings > Webhooks > Secret). **GitLab**: token en clair (Settings > Webhooks > Secret token). Alias legacy accepte : `SECRET` |
+| `WEBHOOK_SECRET` | `Attach8-Catfight-...` | **GitHub**: HMAC (`openssl rand -hex 32`, a mettre dans Settings > Webhooks > Secret). **GitLab**: token en clair (Settings > Webhooks > Secret token) |
 | `SCRIPT` | `work.sh` | nom du fichier dans `/var/lib/services/webhooks/hooks/` a executer |
 | `PROVIDER` | `github` ou `gitlab` | **optionnel** (default `github`). Branche l'auth + l'extraction du slug |
 | `WORKFLOW` | `Docker build` | **optionnel**. Filtre sur un workflow/pipeline precis pour eviter de redeployer a chaque CI (lint, test, etc.). GitHub: matche `workflow_run.name`. GitLab: matche `object_attributes.name` des Pipeline Hook |

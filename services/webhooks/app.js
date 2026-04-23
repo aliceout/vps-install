@@ -56,16 +56,13 @@ function loadDeployConfig() {
       console.warn(`Skip ${f}: ${e.message}`);
       continue;
     }
-    const { REPO, SECRET, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH, PROVIDER } = cfg;
-    // WEBHOOK_SECRET est le nom canonique; SECRET reste accepte en fallback
-    // pour la compat avec les hooks cables avant le rename.
-    const secret = WEBHOOK_SECRET || SECRET;
-    if (!REPO || !secret || !SCRIPT) {
+    const { REPO, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH, PROVIDER } = cfg;
+    if (!REPO || !WEBHOOK_SECRET || !SCRIPT) {
       console.warn(`Skip ${f}: REPO / WEBHOOK_SECRET / SCRIPT manquants`);
       continue;
     }
     map[REPO] = {
-      secret,
+      secret: WEBHOOK_SECRET,
       script: SCRIPT,
       provider: (PROVIDER || "github").toLowerCase(),  // github | gitlab
       workflow: WORKFLOW || null,  // github: filtre sur workflow_run.name
