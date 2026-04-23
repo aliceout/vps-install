@@ -112,10 +112,16 @@ if [[ -f "$PROVIDERS_CONF" ]]; then
   done < "$PROVIDERS_CONF"
 fi
 
-# Legacy fallback: refresh /etc/letsencrypt/infomaniak.ini depuis l'ancien
-# chemin /vps/_infra/INFOMANIAK_TOKEN. Disparaitra une fois la migration
-# complete.
+# Legacy fallback: maintient /etc/letsencrypt/infomaniak.ini populate pour
+# les services qui n'ont pas encore migre vers DNS_PROVIDER/DNS_TOKEN_NAME.
+# Ordre de lookup :
+#   1. /vps/_infra/INFOMANIAK_TOKEN (ancien emplacement, avant refactor)
+#   2. /vps/certbot/infomaniak/perso (nouveau label par defaut)
+# Si ni l'un ni l'autre, on supprime le fichier ini (evite une ini stale).
 legacy_token="$(fetch "/vps/_infra" "INFOMANIAK_TOKEN")"
+if [[ -z "$legacy_token" ]]; then
+  legacy_token="$(fetch "/vps/certbot/infomaniak" "perso")"
+fi
 if [[ -n "$legacy_token" ]]; then
   umask 077
   install -d -m 700 /etc/letsencrypt

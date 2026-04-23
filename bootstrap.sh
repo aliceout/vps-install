@@ -181,9 +181,10 @@ fetch_infra_secret() {
 INFRA_KEYS=(
   VPS_USER VPS_USER_PASSWORD
   SSH_PORT SSH_PUBKEY
-  CERTBOT_EMAIL INFOMANIAK_TOKEN
   CROWDSEC_ENROLL_KEY GITHUB_SSH_PRIVKEY GITLAB_SSH_PRIVKEY
 )
+# CERTBOT_EMAIL + INFOMANIAK_TOKEN ont ete deplaces vers /vps/certbot/ (lu
+# par 75_certbot.sh / certbot-refresh-creds). Ici on ne les exige plus.
 
 got_any=0
 for k in "${INFRA_KEYS[@]}"; do
@@ -200,7 +201,7 @@ if [[ "$got_any" -eq 0 ]]; then
 fi
 
 # Validation : variables obligatoires
-REQUIRED=(VPS_USER VPS_USER_PASSWORD SSH_PORT SSH_PUBKEY CERTBOT_EMAIL)
+REQUIRED=(VPS_USER VPS_USER_PASSWORD SSH_PORT SSH_PUBKEY)
 missing=()
 for v in "${REQUIRED[@]}"; do
   if [[ -z "${!v:-}" ]]; then
