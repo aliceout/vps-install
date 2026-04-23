@@ -298,27 +298,11 @@ for svc in "${CORE_SERVICES[@]}"; do
   fi
 done
 
-# Services optionnels (tout sauf core et templates) : yes/no par service
-for dir in "$ROOT_DIR/services/"*/; do
-  svc="$(basename "$dir")"
-  # Skip templates et core
-  case "$svc" in _*) continue ;; esac
-  skip=0
-  for c in "${CORE_SERVICES[@]}"; do
-    if [[ "$svc" == "$c" ]]; then
-      skip=1
-      break
-    fi
-  done
-  if [[ "$skip" -eq 1 ]]; then
-    continue
-  fi
-
-  if ask_yes_no "Installer le service '$svc' ?" "no"; then
-    bash /opt/vps-install/scripts/service.sh install "$svc" || \
-      say_warn "Install de $svc echouee, continue quand meme."
-  fi
-done
+# Services optionnels : menu interactif (q pour quitter = poursuivre vers
+# le reboot). Plus pratique qu'un prompt yes/no par service, on voit ce qui
+# est deja installe et on pilote install/update/remove sans quitter.
+say_info "Menu services (q pour quitter et finir le bootstrap)"
+bash /opt/vps-install/scripts/service.sh || true
 
 # Supprime les users par defaut du provider (debian, ubuntu, ...) AVANT
 # le reboot pour pas laisser de compte sudo non-utilise trainer.
