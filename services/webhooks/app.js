@@ -3,7 +3,7 @@
 //
 // Sources :
 //  - process.env.HOOKS_ENV_DIR (default /etc/secrets/webhooks/) :
-//    un .env par hook, chacun contenant REPO, SECRET, SCRIPT.
+//    un .env par hook, chacun contenant REPO, WEBHOOK_SECRET, SCRIPT.
 //  - process.env.HOOKS_DIR : ou trouver les scripts shell.
 //  - process.env.LOG_DIR   : ou logger l'execution.
 //
@@ -56,13 +56,16 @@ function loadDeployConfig() {
       console.warn(`Skip ${f}: ${e.message}`);
       continue;
     }
-    const { REPO, SECRET, SCRIPT, WORKFLOW, BRANCH } = cfg;
-    if (!REPO || !SECRET || !SCRIPT) {
-      console.warn(`Skip ${f}: REPO / SECRET / SCRIPT manquants`);
+    const { REPO, SECRET, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH } = cfg;
+    // WEBHOOK_SECRET est le nom canonique; SECRET reste accepte en fallback
+    // pour la compat avec les hooks cables avant le rename.
+    const secret = WEBHOOK_SECRET || SECRET;
+    if (!REPO || !secret || !SCRIPT) {
+      console.warn(`Skip ${f}: REPO / WEBHOOK_SECRET / SCRIPT manquants`);
       continue;
     }
     map[REPO] = {
-      secret: SECRET,
+      secret,
       script: SCRIPT,
       workflow: WORKFLOW || null,  // filtre optionnel sur workflow_run.name
       branch:   BRANCH   || null,  // filtre optionnel sur workflow_run.head_branch

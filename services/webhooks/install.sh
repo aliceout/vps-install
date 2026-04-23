@@ -197,7 +197,7 @@ EOF
     echo
     echo "Webhooks service demarre."
     echo "Pour ajouter un repo : cree un sous-dossier dans Infisical sous"
-    echo "  ${INFISICAL_PATH}/<nom>/ avec REPO, SECRET, SCRIPT, puis"
+    echo "  ${INFISICAL_PATH}/<nom>/ avec REPO, WEBHOOK_SECRET, SCRIPT, puis"
     echo "  services update webhooks pour reenregistrer les templates."
     ;;
 
