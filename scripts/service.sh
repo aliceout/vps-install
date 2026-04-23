@@ -303,9 +303,14 @@ apply_nginx() {
   if [[ ${#domains[@]} -eq 0 ]]; then
     echo "AVERTISSEMENT: aucun server_name valide dans $vhost_src apres templating (manque ADRESS dans Infisical ?), skip DNS/cert."
   else
+    # Ordre important : ensure_cert AVANT ensure_dns.
+    # ensure_cert ecrit /etc/certbot/providers.conf (apex -> provider:token) et
+    # regen les ini. dns-sync lit ce fichier pour choisir le bon token. Faire
+    # l'inverse -> sur un premier install dns-sync ne trouve pas d'entree pour
+    # l'apex et skip.
     for d in "${domains[@]}"; do
-      ensure_dns  "$d" || true
       ensure_cert "$d" "$apex_from_env" "$dns_provider" "$dns_token_name" || true
+      ensure_dns  "$d" || true
     done
   fi
 
