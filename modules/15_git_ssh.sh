@@ -113,11 +113,15 @@ rm -f "$KH_TMP"
 chown "$VPS_USER:$VPS_USER" "$SSH_DIR/known_hosts"
 chmod 644 "$SSH_DIR/known_hosts"
 
-# Tests affiches (uniquement les providers configures)
+# Tests affiches (uniquement les providers configures).
+# `[[ ]] && cmd` est un piege sous set -e : si la condition est fausse,
+# l'expression retourne 1 et tue le script. On passe par un if explicite.
 for pair in "${PROVIDER_LIST[@]}"; do
   pair="$(echo "$pair" | xargs)"
   name="${pair% *}"
   host="${pair#* }"
   key_var="${name}_SSH_PRIVKEY"
-  [[ -n "${!key_var:-}" ]] && echo "Test : sudo -u $VPS_USER ssh -T git@${host}"
+  if [[ -n "${!key_var:-}" ]]; then
+    echo "Test : sudo -u $VPS_USER ssh -T git@${host}"
+  fi
 done
