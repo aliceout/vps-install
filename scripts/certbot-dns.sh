@@ -1,94 +1,37 @@
 #!/usr/bin/env bash
+# Renouvellement en masse des certs Let's Encrypt.
+#
+# On delegue a `certbot renew` : chaque cert emis precedemment a enregistre
+# son plugin + son credentials path dans /etc/letsencrypt/renewal/<name>.conf,
+# donc renew sait deja quel provider DNS utiliser par cert. Le pre-hook
+# /etc/letsencrypt/renewal-hooks/pre/refresh-creds regenere les ini files
+# depuis Infisical avant chaque tentative (rotation de token transparente).
+#
+# Lance manuellement ou via le cron de 70_cron_updates.sh (en plus de
+# certbot.timer).
+
 set -euo pipefail
 
-CREDENTIALS="/etc/letsencrypt/infomaniak.ini"
-EMAIL_FILE="/etc/letsencrypt/email"
-EMAIL="certbot.swan624@slmail.me"
-if [[ -s "$EMAIL_FILE" ]]; then
-  EMAIL="$(head -n1 "$EMAIL_FILE" | tr -d ' \t\r\n')"
-fi
 CERTBOT_BIN="/usr/local/bin/certbot"
-if [[ ! -x "$CERTBOT_BIN" ]]; then
-  CERTBOT_BIN="$(command -v certbot || true)"
-fi
-if [[ -z "${CERTBOT_BIN:-}" ]]; then
-  echo "certbot introuvable"
-  exit 1
-fi
-
-if [[ ! -f "$CREDENTIALS" ]]; then
-  echo "Fichier credentials manquant: $CREDENTIALS"
-  exit 1
-fi
-TOKEN_VALUE="$(grep -E '^dns_infomaniak_token' "$CREDENTIALS" | awk -F= '{print $2}' | tr -d ' ')"
-if [[ -z "$TOKEN_VALUE" || "$TOKEN_VALUE" == "CHANGEME" ]]; then
-  echo "Token Infomaniak manquant dans $CREDENTIALS"
-  exit 1
-fi
-
-DOMAINS_FILE="/etc/letsencrypt/domains.ini"
-if [[ ! -f "$DOMAINS_FILE" ]]; then
-  echo "Fichier domains manquant: $DOMAINS_FILE"
-  exit 1
-fi
-
-mapfile -t DOMAINS < <(grep -Ev '^\s*(#|$)' "$DOMAINS_FILE")
-if [[ ${#DOMAINS[@]} -eq 0 ]]; then
-  echo "Aucun domaine dans $DOMAINS_FILE"
-  exit 1
-fi
+[[ -x "$CERTBOT_BIN" ]] || CERTBOT_BIN="$(command -v certbot || true)"
+[[ -n "$CERTBOT_BIN" ]] || { echo "certbot introuvable" >&2; exit 1; }
 
 LOG_DIR="/var/log/cron"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/certbot-dns-$(date +%F).log"
 
-OK_LIST=()
-ERR_LIST=()
+{
+  echo ""
+  echo "=========================================="
+  echo "certbot renew: $(date)"
+  echo "=========================================="
 
-log(){ echo "$1" | tee -a "$LOG_FILE"; }
+  "$CERTBOT_BIN" renew --non-interactive 2>&1
+  rc=$?
 
-log ""
-log "Start $(date)"
-log "------------------------------------------"
-log ""
+  echo ""
+  echo "certbot renew exit $rc ($(date))"
+  echo "=========================================="
+} | tee -a "$LOG_FILE"
 
-for DOMAIN in "${DOMAINS[@]}"; do
-  log "Domain: $DOMAIN"
-
-  set +e
-  sudo "$CERTBOT_BIN" certonly \
-    -vv \
-    --authenticator dns-infomaniak \
-    --dns-infomaniak-credentials "$CREDENTIALS" \
-    --dns-infomaniak-propagation-seconds 180 \
-    -d "$DOMAIN" -d "*.$DOMAIN" \
-    --preferred-challenges dns \
-    --agree-tos --non-interactive \
-    --email "$EMAIL" \
-    --keep-until-expiring --expand 2>&1 | tee -a "$LOG_FILE"
-  rc=${PIPESTATUS[0]}
-  set -e
-
-  if [ $rc -eq 0 ]; then
-    log "OK: $DOMAIN"
-    OK_LIST+=("$DOMAIN")
-  else
-    log "FAILED: $DOMAIN (exit $rc)"
-    [ -f /var/log/letsencrypt/letsencrypt.log ] && {
-      log "-- tail /var/log/letsencrypt/letsencrypt.log --"
-      tail -n 80 /var/log/letsencrypt/letsencrypt.log | sed 's/^/    /' | tee -a "$LOG_FILE"
-    }
-    ERR_LIST+=("$DOMAIN")
-  fi
-  log ""
-done
-
-log "Summary:"
-log "Success: ${#OK_LIST[@]}"; for d in "${OK_LIST[@]}"; do log "  - $d"; done
-log ""
-log "Failed: ${#ERR_LIST[@]}";  for d in "${ERR_LIST[@]}"; do log "  - $d"; done
-log ""
-log "Done at $(date)"
-log "==========================================="
-
-exit $([ ${#ERR_LIST[@]} -gt 0 ] && echo 1 || echo 0)
+exit "${PIPESTATUS[0]}"

@@ -211,6 +211,8 @@ maybe_restore_data() {
 ensure_cert() {
   local fqdn="$1"
   local apex="${2:-}"
+  local provider="${3:-}"
+  local token_name="${4:-}"
   [[ -n "$fqdn" ]] || return 0
 
   # Apex : soit fourni par le caller (lu depuis DOMAIN dans /etc/secrets/), soit
@@ -229,21 +231,31 @@ ensure_cert() {
   # certbot-wildcard est idempotent :
   # - demande le cert wildcard si absent
   # - skip si present, MAIS ecrit quand meme /etc/nginx/certificat/<apex>.conf
-  #   (indispensable pour les vhosts qui l'incluent)
-  if ! certbot-wildcard "$apex"; then
-    echo "AVERTISSEMENT: cert non obtenu pour $apex. Vhost deploye sans SSL operationnel."
-    return 1
+  # Provider + token_name optionnels : si absents, certbot-wildcard fallback
+  # sur /etc/letsencrypt/infomaniak.ini (legacy).
+  if [[ -n "$provider" && -n "$token_name" ]]; then
+    if ! certbot-wildcard "$apex" "$provider" "$token_name"; then
+      echo "AVERTISSEMENT: cert non obtenu pour $apex ($provider:$token_name). Vhost deploye sans SSL."
+      return 1
+    fi
+  else
+    if ! certbot-wildcard "$apex"; then
+      echo "AVERTISSEMENT: cert non obtenu pour $apex. Vhost deploye sans SSL."
+      return 1
+    fi
   fi
 }
 
 ensure_dns() {
   local fqdn="$1"
   [[ -n "$fqdn" ]] || return 0
-  if ! command -v infomaniak-dns-sync >/dev/null 2>&1; then
+  # dns-sync gere le choix du provider/token en lisant /etc/certbot/providers.conf
+  # automatiquement. Pas besoin de passer provider/token ici.
+  if ! command -v dns-sync >/dev/null 2>&1; then
     return 0
   fi
-  echo "Sync record DNS A chez Infomaniak pour $fqdn..."
-  infomaniak-dns-sync "$fqdn" || echo "AVERTISSEMENT: DNS sync echoue pour $fqdn (le service sera injoignable le temps que tu corriges)."
+  echo "Sync record DNS A pour $fqdn..."
+  dns-sync "$fqdn" || echo "AVERTISSEMENT: DNS sync echoue pour $fqdn (le service sera injoignable le temps que tu corriges)."
 }
 
 apply_nginx() {
@@ -281,11 +293,16 @@ apply_nginx() {
     [[ -n "$d" && "$d" != *__*__* ]] && domains+=("$d")
   done < <(extract_domains_from_nginx "$rendered")
 
-  # Extrait DOMAIN depuis l'env file pour le passer a ensure_cert
-  # (sinon ensure_cert calcule mal l'apex quand le FQDN est deja l'apex)
-  local apex_from_env=""
+  # Extrait DOMAIN, DNS_PROVIDER et DNS_TOKEN_NAME depuis l'env file.
+  # DOMAIN : apex du vhost (pour calculer l'apex correct quand FQDN == apex)
+  # DNS_PROVIDER / DNS_TOKEN_NAME : optionnels, choisissent quel plugin DNS
+  # utiliser (nouveau systeme multi-provider). Absents -> fallback sur le
+  # token legacy /vps/_infra/INFOMANIAK_TOKEN.
+  local apex_from_env="" dns_provider="" dns_token_name=""
   if [[ -f "$env_file" ]]; then
-    apex_from_env="$(grep -E '^DOMAIN=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'")"
+    apex_from_env="$(grep -E '^DOMAIN=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"
+    dns_provider="$(grep -E '^DNS_PROVIDER=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"
+    dns_token_name="$(grep -E '^DNS_TOKEN_NAME=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"
   fi
 
   if [[ ${#domains[@]} -eq 0 ]]; then
@@ -293,7 +310,7 @@ apply_nginx() {
   else
     for d in "${domains[@]}"; do
       ensure_dns  "$d" || true
-      ensure_cert "$d" "$apex_from_env" || true
+      ensure_cert "$d" "$apex_from_env" "$dns_provider" "$dns_token_name" || true
     done
   fi
 
