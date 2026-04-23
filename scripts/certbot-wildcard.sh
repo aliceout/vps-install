@@ -4,7 +4,7 @@
 #
 # Usage:
 #   certbot-wildcard <apex>                         # legacy : infomaniak + token unique
-#   certbot-wildcard <apex> <provider> <token_name> # ex: certbot-wildcard alice.fr ovh CLIENT1
+#   certbot-wildcard <apex> <provider> <token_name> # ex: certbot-wildcard alice.fr ovh client1
 #
 # Credentials attendus (regeneres par certbot-refresh-creds, pre-hook de
 # certbot.timer) :
