@@ -182,7 +182,7 @@ INFRA_KEYS=(
   VPS_USER VPS_USER_PASSWORD
   SSH_PORT SSH_PUBKEY
   CERTBOT_EMAIL INFOMANIAK_TOKEN
-  CROWDSEC_ENROLL_KEY GITHUB_SSH_PRIVKEY
+  CROWDSEC_ENROLL_KEY GITHUB_SSH_PRIVKEY GITLAB_SSH_PRIVKEY
 )
 
 got_any=0
@@ -240,7 +240,7 @@ say_info "Config: user=${VPS_USER} | ssh_port=${SSH_PORT} | web=${WEB_ENABLED} |
 
 # --- Deroulement des modules ---
 run_module "10_user_ssh.sh"
-run_module "15_github_ssh.sh"
+run_module "15_git_ssh.sh"
 run_module "20_packages.sh"
 run_module "25_zram.sh"
 run_module "28_sysctl.sh"

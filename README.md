@@ -4,7 +4,7 @@ Bootstrap d'un VPS pour services web exposes, avec secrets centralises dans Infi
 
 ## Principe
 
-Le bootstrap ne te demande **qu'un seul credential** : les identifiants Machine Identity d'Infisical. Tout le reste (utilisateur, port SSH, cle publique, email Let's Encrypt, token Infomaniak, ...) est tire depuis Infisical sous le chemin `/vps/_infra/`.
+Le bootstrap ne te demande **qu'un seul credential** : les identifiants Machine Identity d'Infisical. Tout le reste (utilisateur, port SSH, cle publique, email Let's Encrypt, tokens DNS Infomaniak/OVH, ...) est tire depuis Infisical sous les chemins `/vps/_infra/`, `/vps/certbot/`, etc.
 
 Cela permet de :
 - Reinstaller le VPS en 15 minutes sans notes perdues
@@ -50,8 +50,8 @@ Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises auto
 - **Nginx** reverse proxy + includes TLS (optionnel)
 - **Zsh + oh-my-zsh + powerlevel10k** (config p10k + zshrc avec alias, pfetch banner, `histo`, `tools`, alias `services`)
 - **Outils CLI** : lsd, bat, zoxide, fzf, btop, htop, ncdu, glances, lnav, ctop, lazydocker, pfetch, lolcat
-- **Cron** : apt update/upgrade, refresh CrowdSec hub, sync DNS Infomaniak (auto-heal records A sur IP publique)
-- **Certbot** : DNS Infomaniak via token synce depuis Infisical, renouvellement automatique
+- **Cron** : apt update/upgrade, refresh CrowdSec hub, sync DNS (auto-heal records A sur IP publique)
+- **Certbot multi-provider** : DNS Infomaniak + OVH, plusieurs tokens par provider (pour heberger des services de clients differents), renouvellement automatique avec rotation de token transparente (pre-hook refresh depuis Infisical)
 
 ## Apres le bootstrap : installer des services
 
@@ -72,7 +72,7 @@ Chaque service vit dans `services/<nom>/` (voir `services/README.md` pour la str
 
 A l'install, `service.sh` :
 1. Sync les secrets du service depuis Infisical (template agent)
-2. Demande un cert Let's Encrypt pour le domaine (DNS Infomaniak)
+2. Demande un cert Let's Encrypt pour le domaine via le provider DNS declare (`DNS_PROVIDER` / `DNS_TOKEN_NAME` dans le secrets path du service)
 3. Deploie le vhost nginx
 4. Delegue au `install.sh` du service pour le lancement
 
@@ -84,7 +84,7 @@ install.sh               one-liner (clone + lance bootstrap.sh)
 modules/                 etapes numerotees (00 -> 99)
   00_preflight.sh        apt base + ca-certificates
   10_user_ssh.sh         user, sudo, SSH durci
-  15_github_ssh.sh       cle SSH GitHub depuis Infisical (optionnel)
+  15_git_ssh.sh          cles SSH multi-forges (GitHub, GitLab) depuis Infisical
   20_packages.sh         outils CLI (lsd, bat, btop, pfetch, ...)
   25_zram.sh             swap compresse
   28_sysctl.sh           kernel hardening
@@ -96,7 +96,7 @@ modules/                 etapes numerotees (00 -> 99)
   50_nginx.sh            reverse proxy (optionnel)
   60_zsh.sh              zsh + oh-my-zsh + p10k + deploiement .zshrc/.p10k.zsh
   70_cron_updates.sh     cron apt + blocklists
-  75_certbot.sh          certbot + token Infomaniak via agent (optionnel)
+  75_certbot.sh          certbot + plugins Infomaniak/OVH + pre-hook refresh creds (optionnel)
   99_summary.sh          recap post-install
 nginx/                   templates vhost + includes globaux
 config/
@@ -105,10 +105,11 @@ config/
   zsh/p10k.zsh           config Powerlevel10k deployee chez VPS_USER
 scripts/
   service.sh               helper install/update/remove services
-  certbot-request.sh       requete cert single-domain (Let's Encrypt DNS Infomaniak)
-  certbot-wildcard.sh      requete cert wildcard apex + *.apex
-  certbot-dns.sh           renouvellement cron (wildcards)
-  infomaniak-dns-sync.sh   sync auto des records A sur IP publique
+  certbot-request.sh       cert single-domain (multi-provider: --provider, --token)
+  certbot-wildcard.sh      cert wildcard apex + *.apex (<apex> [<provider> <name>])
+  certbot-dns.sh           renouvellement cron (wrapper certbot renew)
+  certbot-refresh-creds.sh pre-hook certbot renew : regen ini creds depuis Infisical
+  dns-sync.sh              sync auto records A sur IP publique (Infomaniak)
 services/                services heberges sur le VPS (un dossier par service)
   README.md              structure d'un service
   _template_docker/      squelette docker-compose

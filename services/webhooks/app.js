@@ -56,7 +56,7 @@ function loadDeployConfig() {
       console.warn(`Skip ${f}: ${e.message}`);
       continue;
     }
-    const { REPO, SECRET, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH } = cfg;
+    const { REPO, SECRET, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH, PROVIDER } = cfg;
     // WEBHOOK_SECRET est le nom canonique; SECRET reste accepte en fallback
     // pour la compat avec les hooks cables avant le rename.
     const secret = WEBHOOK_SECRET || SECRET;
@@ -67,23 +67,39 @@ function loadDeployConfig() {
     map[REPO] = {
       secret,
       script: SCRIPT,
-      workflow: WORKFLOW || null,  // filtre optionnel sur workflow_run.name
-      branch:   BRANCH   || null,  // filtre optionnel sur workflow_run.head_branch
+      provider: (PROVIDER || "github").toLowerCase(),  // github | gitlab
+      workflow: WORKFLOW || null,  // github: filtre sur workflow_run.name
+      branch:   BRANCH   || null,  // github: filtre sur workflow_run.head_branch
       source: f,
     };
   }
   return map;
 }
 
-// --- HMAC verify -------------------------------------------------------------
+// --- Auth verify (GitHub HMAC / GitLab plain token) -------------------------
 
-function verifySignature(req, body, secret) {
+function verifyGithubSignature(req, body, secret) {
   const signature = req.headers["x-hub-signature-256"];
   if (!signature) return false;
   const hmac   = crypto.createHmac("sha256", secret);
   const digest = `sha256=${hmac.update(body).digest("hex")}`;
   try {
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+  } catch {
+    return false;
+  }
+}
+
+function verifyGitlabToken(req, secret) {
+  // GitLab envoie le secret en clair dans X-Gitlab-Token et attend une
+  // comparaison stricte. Pas de HMAC, mais timing-safe quand meme.
+  const token = req.headers["x-gitlab-token"];
+  if (!token) return false;
+  try {
+    const a = Buffer.from(token);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
   } catch {
     return false;
   }
@@ -101,7 +117,15 @@ const server = http.createServer((req, res) => {
   req.on("data", chunk => { body += chunk; });
 
   req.on("end", () => {
-    const event = req.headers["x-github-event"];
+    // Detection du provider par headers (GitLab envoie x-gitlab-event,
+    // GitHub envoie x-github-event). Si aucun, on rejette.
+    const githubEvent = req.headers["x-github-event"];
+    const gitlabEvent = req.headers["x-gitlab-event"];
+    const incomingProvider = githubEvent ? "github" : (gitlabEvent ? "gitlab" : null);
+    if (!incomingProvider) {
+      res.writeHead(400);
+      return res.end("Missing X-GitHub-Event or X-Gitlab-Event");
+    }
 
     let data;
     try { data = JSON.parse(body); }
@@ -110,8 +134,9 @@ const server = http.createServer((req, res) => {
       return res.end("Invalid JSON");
     }
 
-    if (event === "ping") {
-      console.log("ping from", data.repository?.full_name || "?");
+    // Ping events : early-return sans auth (pour le test de config)
+    if (incomingProvider === "github" && githubEvent === "ping") {
+      console.log("github ping from", data.repository?.full_name || "?");
       res.writeHead(200);
       return res.end("pong");
     }
@@ -119,30 +144,49 @@ const server = http.createServer((req, res) => {
     // Re-charge a chaque requete : pas besoin de restart si on ajoute un hook
     const DEPLOY = loadDeployConfig();
 
-    const repo = data.repository?.full_name;
+    // Extraction du slug repo selon le provider
+    //   GitHub : data.repository.full_name   (ex: "aliceout/Work-resume")
+    //   GitLab : data.project.path_with_namespace (ex: "riana/mon-projet")
+    const repo = incomingProvider === "gitlab"
+      ? data.project?.path_with_namespace
+      : data.repository?.full_name;
+
     if (!repo || !DEPLOY[repo]) {
       console.warn(`Repo non autorise: ${repo}`);
       res.writeHead(400);
       return res.end("Unknown repo");
     }
 
-    const { secret, script, workflow, branch } = DEPLOY[repo];
+    const { secret, script, provider: configProvider, workflow, branch } = DEPLOY[repo];
 
-    if (!verifySignature(req, body, secret)) {
-      console.warn(`Signature invalide pour ${repo}`);
-      res.writeHead(401);
-      return res.end("Invalid signature");
+    // Sanity : si la config dit "github" mais on recoit un event GitLab
+    // (ou inverse), refuse. Protege contre un mis-cable de webhook cote
+    // forge (secret + URL d'un autre provider).
+    if (configProvider !== incomingProvider) {
+      console.warn(`Mismatch provider pour ${repo}: config=${configProvider} vs event=${incomingProvider}`);
+      res.writeHead(400);
+      return res.end("Provider mismatch");
     }
 
-    // Filtre workflow_run :
-    //   - action=completed + conclusion=success (sinon : build en cours,
-    //     echoue, cancel, etc -> pas de deploy)
-    //   - optionnellement le nom du workflow (WORKFLOW= dans le env file)
-    //     pour ne matcher qu'un CI precis (eviter les lint/test/scan qui
-    //     passent aussi)
-    //   - optionnellement la branche (BRANCH=) pour ignorer les runs sur
-    //     feature branches / PRs
-    if (event === "workflow_run") {
+    // Auth selon le provider
+    let authOK = false;
+    if (incomingProvider === "github") {
+      authOK = verifyGithubSignature(req, body, secret);
+    } else if (incomingProvider === "gitlab") {
+      authOK = verifyGitlabToken(req, secret);
+    }
+    if (!authOK) {
+      console.warn(`Auth invalide pour ${repo} (${incomingProvider})`);
+      res.writeHead(401);
+      return res.end("Invalid auth");
+    }
+
+    // Filtre CI (workflow_run GitHub / Pipeline Hook GitLab) :
+    //   Ne deploie que sur build reussi (completed + success). Optionnel :
+    //   filtre sur nom du workflow (WORKFLOW=) et branche (BRANCH=) pour
+    //   ne pas declencher sur chaque CI qui passe (lint, test, etc.) ou
+    //   sur chaque feature branch.
+    if (incomingProvider === "github" && githubEvent === "workflow_run") {
       const action     = data.action;
       const conclusion = data.workflow_run?.conclusion;
       const wfName     = data.workflow_run?.name;
@@ -165,6 +209,29 @@ const server = http.createServer((req, res) => {
       }
     }
 
+    if (incomingProvider === "gitlab" && gitlabEvent === "Pipeline Hook") {
+      // GitLab Pipeline Hook : data.object_attributes.status, ref, name
+      const status   = data.object_attributes?.status;
+      const plName   = data.object_attributes?.name || data.object_attributes?.pipeline_name;
+      const plBranch = data.object_attributes?.ref;
+
+      if (status !== "success") {
+        console.log(`${repo}: pipeline ignored (status=${status})`);
+        res.writeHead(200);
+        return res.end("Ignored: pipeline not success");
+      }
+      if (workflow && plName && plName !== workflow) {
+        console.log(`${repo}: pipeline '${plName}' != WORKFLOW='${workflow}', ignored`);
+        res.writeHead(200);
+        return res.end(`Ignored: pipeline '${plName}'`);
+      }
+      if (branch && plBranch !== branch) {
+        console.log(`${repo}: pipeline branch '${plBranch}' != BRANCH='${branch}', ignored`);
+        res.writeHead(200);
+        return res.end(`Ignored: branch '${plBranch}'`);
+      }
+    }
+
     const scriptPath = path.join(HOOKS_DIR, script);
     if (!fs.existsSync(scriptPath)) {
       console.error(`Script introuvable: ${scriptPath}`);
@@ -172,7 +239,8 @@ const server = http.createServer((req, res) => {
       return res.end("Hook script missing");
     }
 
-    console.log(`${repo} OK (event=${event}) -> ${script}`);
+    const eventTag = githubEvent || gitlabEvent || "?";
+    console.log(`${repo} OK (provider=${incomingProvider}, event=${eventTag}) -> ${script}`);
     res.writeHead(200);
     res.end("Deploy started");
 

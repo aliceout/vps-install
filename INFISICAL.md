@@ -6,63 +6,116 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
 
 ```
 <project>/
-  <environment>/           ex: prod, staging, ...
+  <environment>/               ex: prod, staging, ...
     vps/
-      _infra/              # bootstrap (charge au demarrage par bootstrap.sh)
+      _infra/                  # bootstrap (charge au demarrage par bootstrap.sh)
         VPS_USER
         VPS_USER_PASSWORD
         SSH_PORT
         SSH_PUBKEY
+        CROWDSEC_ENROLL_KEY    # optionnel
+        GITHUB_SSH_PRIVKEY     # optionnel - cle SSH GitHub
+        GITLAB_SSH_PRIVKEY     # optionnel - cle SSH GitLab
+        # --- legacy, sera supprime apres migration ---
+        CERTBOT_EMAIL          # (deplacer vers /vps/certbot/CERTBOT_EMAIL)
+        INFOMANIAK_TOKEN       # (deplacer vers /vps/certbot/infomaniak/perso)
+
+      certbot/                 # Let's Encrypt + DNS multi-provider
         CERTBOT_EMAIL
-        INFOMANIAK_TOKEN
-        CROWDSEC_ENROLL_KEY  # optionnel
-        GITHUB_SSH_PRIVKEY   # optionnel
-      telegram/            # Notifications Telegram (lu par notify-telegram)
+        infomaniak/
+          perso                # token Infomaniak (label libre, minuscule)
+          alice                # ... autre client
+        ovh/
+          client1/             # sous-dossier par client OVH (4 valeurs)
+            APPLICATION_KEY
+            APPLICATION_SECRET
+            CONSUMER_KEY
+            ENDPOINT           # ovh-eu | ovh-ca | ovh-us
+
+      telegram/                # Notifications Telegram
         TELEGRAM_BOT_TOKEN
-        TELEGRAM_CHAT_ID     # chat par defaut (fallback)
-        TELEGRAM_CHAT_ID_AUDIT    # canal par sujet
-        TELEGRAM_CHAT_ID_BACKUP   # ...
-        TELEGRAM_CHAT_ID_CERTBOT  # ...
+        TELEGRAM_CHAT_ID            # chat par defaut (fallback)
+        TELEGRAM_CHAT_ID_AUDIT      # canal par sujet
+        TELEGRAM_CHAT_ID_BACKUP     # ...
+        TELEGRAM_CHAT_ID_CERTBOT    # ...
+
     services/
-      backup/              # Sauvegarde restic push ephemere vers home
-        HOME_SSH_HOST
-        HOME_SSH_PORT
-        HOME_SSH_USER
-        HOME_SSH_PRIVKEY
-        RESTIC_REPOSITORY
-        RESTIC_PASSWORD
-        BACKUP_PATHS       # optionnel (defaut: /home/$VPS_USER/data)
-      pdf/                 # Stirling PDF (stateless, pas de data)
-        ADRESS, DOMAIN
-      work/                # Work-resume Next.js (stateless, build from git)
-        ADRESS, DOMAIN, APP, BRANCH, DIR, PORT, REPO
-      webhooks/            # GitHub webhooks receiver
-        ADRESS, DOMAIN
-        <repo>/            # un sous-dossier par hook (ex: work/, nodea/, ...)
-          REPO             # owner/name de GitHub
-          SECRET           # HMAC partage avec GitHub
-          SCRIPT           # nom du .sh dans /var/lib/services/webhooks/hooks/
-      <service-avec-data>/ # services stateful (Ghost, Wiki, etc.)
-        ADRESS, DOMAIN
-        ... autres secrets/config du service ...
+      backup/                  # Sauvegarde restic push ephemere vers home
+        HOME_SSH_HOST, HOME_SSH_PORT, HOME_SSH_USER, HOME_SSH_PRIVKEY
+        RESTIC_REPOSITORY, RESTIC_PASSWORD
+        BACKUP_PATHS           # optionnel (defaut: /home/$VPS_USER/data)
+      pdf/                     # Stirling PDF
+        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+      work/                    # Work-resume Next.js
+        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+        APP, BRANCH, DIR, PORT, REPO
+      korai/                   # Korai (Docker multi-containers, deploy via webhook)
+        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME, PORT
+        INFISICAL_API_URL, INFISICAL_PROJECT_ID,
+        INFISICAL_CLIENT_ID, INFISICAL_CLIENT_SECRET, INFISICAL_ENV
+      webhooks/                # Webhooks receiver (GitHub + GitLab)
+        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+        <repo-slug>/           # un sous-dossier par hook (ex: work, korai, riana-projet)
+          REPO                 # owner/name (GitHub) ou namespace/name (GitLab)
+          WEBHOOK_SECRET       # token d'auth (HMAC cote GitHub, plain cote GitLab)
+          SCRIPT               # nom du .sh dans /var/lib/services/webhooks/hooks/
+          PROVIDER             # github | gitlab (default github)
+          WORKFLOW             # optionnel, filtre sur nom CI
+          BRANCH               # optionnel, filtre sur branche
+      <service-avec-data>/     # services stateful (Ghost, Wiki, etc.)
+        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+        ... autres secrets applicatifs ...
 ```
 
 Les `/` dans le path Infisical sont litteraux. L'environnement (`prod`, `staging`, etc.) est choisi au prompt du bootstrap et persiste dans `/etc/infisical/environment`.
 
+**Convention de nommage :**
+- **Cles de secret** en MAJUSCULES (`APPLICATION_KEY`, `DNS_TOKEN_NAME`, `WEBHOOK_SECRET`)
+- **Labels** (noms de token, de client) en minuscules (`perso`, `alice`, `client1`) - pour distinguer visuellement label vs cle
+
 ## `/vps/_infra/` - bootstrap
 
-Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles marquees **optionnel** peuvent etre absentes : le bootstrap continue sans l'integration correspondante.
+Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles marquees **optionnel** peuvent etre absentes.
 
 | Cle | Type | Exemple | Utilise par | Role |
 |-----|------|---------|-------------|------|
 | `VPS_USER` | string | `alice` | `10_user_ssh.sh` | nom du user sudo a creer |
 | `VPS_USER_PASSWORD` | secret | `...` | `10_user_ssh.sh` | mdp sudo du user |
-| `SSH_PORT` | int | `45675` | `10_user_ssh.sh`, `30_ufw_crowdsec.sh` | port SSH custom (UFW allow + sshd_config) |
-| `SSH_PUBKEY` | string | `ssh-ed25519 AAAA...` | `10_user_ssh.sh` | cle(s) publique(s) pour authorized_keys, plusieurs separees par `\n` |
-| `CERTBOT_EMAIL` | string | `toi@exemple.fr` | `75_certbot.sh` | email utilise par certbot pour les notifs d'expiration et l'enregistrement compte ACME Let's Encrypt (synce vers `/etc/letsencrypt/email`) |
-| `INFOMANIAK_TOKEN` | secret | `...` | `75_certbot.sh`, `scripts/infomaniak-dns-sync.sh` | token API Infomaniak, synce via l'agent dans `/etc/letsencrypt/infomaniak.ini` pour certbot-dns + DNS auto-sync |
-| `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - cle d'enrollment CrowdSec (obtenue sur https://app.crowdsec.net). Si absente, CrowdSec tourne en standalone sans dashboard. |
-| `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_github_ssh.sh` | **optionnel** - cle SSH privee (ed25519) pour pull de repos GitHub prives. Mettre le contenu complet du fichier `id_ed25519`. La cle publique correspondante doit etre ajoutee sur https://github.com/settings/keys. Si absente, le module skip. |
+| `SSH_PORT` | int | `45675` | `10_user_ssh.sh`, `30_ufw_crowdsec.sh` | port SSH custom |
+| `SSH_PUBKEY` | string | `ssh-ed25519 AAAA...` | `10_user_ssh.sh` | cle(s) publique(s) pour authorized_keys |
+| `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - enrollment CrowdSec. Absent = standalone sans dashboard |
+| `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitHub prives |
+| `GITLAB_SSH_PRIVKEY` | secret | idem | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitLab prives |
+
+### Legacy (a migrer vers `/vps/certbot/`)
+
+Encore supportes pour backward compat, disparaitront a terme :
+
+| Cle | Nouvelle location |
+|-----|-------------------|
+| `CERTBOT_EMAIL` | `/vps/certbot/CERTBOT_EMAIL` |
+| `INFOMANIAK_TOKEN` | `/vps/certbot/infomaniak/perso` |
+
+## `/vps/certbot/` - Let's Encrypt + DNS providers
+
+Permet de gerer des certs et des records DNS chez **plusieurs providers** (et plusieurs comptes chez le meme provider, pour heberger des services de clients differents).
+
+| Cle / Sous-dossier | Role |
+|--------------------|------|
+| `CERTBOT_EMAIL` | email du compte ACME Let's Encrypt |
+| `infomaniak/<label>` | token Infomaniak API. Label libre (`perso`, `alice`, ...), referencable via `DNS_TOKEN_NAME` dans un service |
+| `ovh/<label>/APPLICATION_KEY` | creds OVH (4 secrets par label, dans un sous-dossier dedie) |
+| `ovh/<label>/APPLICATION_SECRET` | |
+| `ovh/<label>/CONSUMER_KEY` | |
+| `ovh/<label>/ENDPOINT` | `ovh-eu` / `ovh-ca` / `ovh-us` |
+
+Generer les creds OVH : https://eu.api.ovh.com/createToken/ avec droits GET/POST/DELETE sur `/domain/zone/*` (ou specifique a un domaine : `/domain/zone/alice.fr/*`).
+
+Chaque service qui a un vhost declare dans sa config (`/services/<name>/`) :
+- `DNS_PROVIDER=infomaniak` (ou `ovh`)
+- `DNS_TOKEN_NAME=perso` (pointe sur le label sous le provider)
+
+Le pre-hook `certbot-refresh-creds` (appele avant chaque `certbot renew`) regenere automatiquement les ini files `/etc/certbot/creds/<provider>/<label>.ini` depuis ces secrets, donc rotation de token transparente.
 
 ## `/vps/telegram/` - Notifications
 
@@ -70,58 +123,68 @@ Toutes les alertes et digests Telegram passent par `notify-telegram`, qui fetch 
 
 | Cle | Type | Exemple | Role |
 |-----|------|---------|------|
-| `TELEGRAM_BOT_TOKEN` | secret | `123456789:AAE-...` | token du bot cree via @BotFather, partage par tous les canaux |
-| `TELEGRAM_CHAT_ID` | string | `123456789` | chat ID par defaut (fallback si un script notifie sans `--target`) |
-| `TELEGRAM_CHAT_ID_<TARGET>` | string | `-1001234567890` | chat ID specifique pour un canal. Ex: `TELEGRAM_CHAT_ID_AUDIT`, `TELEGRAM_CHAT_ID_BACKUP`, `TELEGRAM_CHAT_ID_CERTBOT`. `notify-telegram --target audit` cherche `TELEGRAM_CHAT_ID_AUDIT`, sinon fallback sur `TELEGRAM_CHAT_ID`. |
+| `TELEGRAM_BOT_TOKEN` | secret | `123456789:AAE-...` | bot cree via @BotFather |
+| `TELEGRAM_CHAT_ID` | string | `123456789` | chat par defaut (fallback si `--target` absent) |
+| `TELEGRAM_CHAT_ID_<TARGET>` | string | `-1001234567890` | chat pour un canal specifique. Ex: `AUDIT`, `BACKUP`, `CERTBOT`. `notify-telegram --target audit` cherche `TELEGRAM_CHAT_ID_AUDIT` puis fallback sur `TELEGRAM_CHAT_ID` |
 
-## `/services/backup/` - Sauvegarde vers home server
+## `/services/backup/`
 
-Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.sh`. La cle privee SSH n'atterrit jamais sur disque : elle est piped directement dans `ssh-add` via stdin, vit dans la memoire de `ssh-agent` le temps du run, puis disparait quand l'agent est tue (trap EXIT).
+Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.sh`. La cle privee SSH n'atterrit jamais sur disque : piped dans `ssh-add` via stdin, vit en memoire de `ssh-agent` le temps du run.
 
 | Cle | Type | Exemple | Role |
 |-----|------|---------|------|
-| `HOME_SSH_HOST` | string | `home.mondomaine.fr` | FQDN ou IP publique du home server |
+| `HOME_SSH_HOST` | string | `home.mondomaine.fr` | FQDN ou IP du home server |
 | `HOME_SSH_PORT` | int | `22` | port SSH du home |
-| `HOME_SSH_USER` | string | `backup` | user SFTP-chroot dedie sur le home |
-| `HOME_SSH_PRIVKEY` | secret multiligne | `-----BEGIN OPENSSH PRIVATE KEY-----...` | cle privee ed25519 |
-| `RESTIC_REPOSITORY` | string | `sftp:backup@home.mondomaine.fr:/storage` | URL du repo restic (format SFTP) |
-| `RESTIC_PASSWORD` | secret | `...` | mdp de chiffrement du repo |
-| `BACKUP_PATHS` | string | `/home/choupi/data` | optionnel ; defaut `/home/<VPS_USER>/data` |
+| `HOME_SSH_USER` | string | `backup` | user SFTP-chroot dedie |
+| `HOME_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH...` | cle privee ed25519 |
+| `RESTIC_REPOSITORY` | string | `sftp:backup@home:/storage` | URL du repo restic |
+| `RESTIC_PASSWORD` | secret | `...` | mdp de chiffrement |
+| `BACKUP_PATHS` | string | `/home/choupi/data` | **optionnel**, defaut `/home/<VPS_USER>/data` |
 
-Setup cote home server : voir `services/backup/README.md`.
+## `/services/webhooks/`
 
-## `/services/pdf/` - Stirling PDF
+### Racine : config du vhost
 
-Service ouvert (pas d'auth). Juste les coordonnees de l'expo.
+| Cle | Exemple | Role |
+|-----|---------|------|
+| `ADRESS` | `webhooks.backlice.dev` | FQDN de l'expo |
+| `DOMAIN` | `backlice.dev` | apex cert wildcard |
+| `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
+| `DNS_TOKEN_NAME` | `perso` | label du token sous `/vps/certbot/<provider>/` |
 
-| Cle | Type | Exemple | Role |
-|-----|------|---------|------|
-| `ADRESS` | string | `pdf.backlice.dev` | FQDN expose (nginx `server_name` + record DNS A) |
-| `DOMAIN` | string | `backlice.dev` | apex du cert wildcard |
+### Sous-dossier par hook
 
-## `/services/webhooks/` - GitHub webhooks receiver
+Chaque repo branche a un sous-dossier `/services/webhooks/<slug>/`. Le receiver scanne a chaque requete.
 
-| Cle | Type | Exemple | Role |
-|-----|------|---------|------|
-| `ADRESS` | string | `webhooks.alyss.cc` | FQDN de l'expo |
-| `DOMAIN` | string | `alyss.cc` | apex cert wildcard |
-| `WEBHOOKS_REPOS` | JSON | `[{"repo":"aliceout/Work-resume","secretEnv":"WORK_SECRET","script":"work.sh"}]` | mapping repo -> secret -> script |
-| `<X_SECRET>` | secret | `Attach8-Catfight-...` | HMAC partage avec GitHub, 1 par repo (nomme selon `secretEnv` de WEBHOOKS_REPOS) |
+| Cle | Type | Role |
+|-----|------|------|
+| `REPO` | `aliceout/Work-resume` (GH) ou `riana/projet` (GL) | slug, doit matcher ce que la forge envoie dans le payload |
+| `WEBHOOK_SECRET` | secret | GitHub : HMAC (`openssl rand -hex 32`, mis dans Settings > Webhooks). GitLab : token en clair (mis dans Settings > Webhooks > Secret token) |
+| `SCRIPT` | `work.sh` | fichier dans `/var/lib/services/webhooks/hooks/` execute par le receiver |
+| `PROVIDER` | `github` ou `gitlab` | **optionnel** (default `github`). Branche l'auth et l'extraction du slug |
+| `WORKFLOW` | `Docker build` | **optionnel**. GitHub: filtre `workflow_run.name`. GitLab: filtre `object_attributes.name` des Pipeline Hook |
+| `BRANCH` | `main` | **optionnel**. Filtre sur la branche, ignore les runs des feature branches |
 
-Voir `services/webhooks/README.md` pour l'install et l'ajout de repos.
+Alias legacy : `SECRET` (sans prefix) est encore lu en fallback si `WEBHOOK_SECRET` absent.
 
-## `/services/<nom>/` - autres services tiers
+Voir `services/webhooks/README.md` pour le flow complet.
 
-### Convention commune : `ADRESS` + `DOMAIN`
+## `/services/<service-avec-vhost>/`
 
-Pour TOUT service expose via nginx, on met au minimum ces 2 cles dans son path Infisical :
+### Convention commune
+
+Pour TOUT service expose via nginx, on met au minimum ces 4 cles :
 
 | Cle | Role |
 |-----|------|
-| `ADRESS` | FQDN = `server_name` nginx + record DNS A chez Infomaniak |
-| `DOMAIN` | apex = chemin du cert wildcard `/etc/letsencrypt/live/<apex>/` |
+| `ADRESS` | FQDN = `server_name` nginx + record DNS A |
+| `DOMAIN` | apex du cert wildcard |
+| `DNS_PROVIDER` | `infomaniak` ou `ovh` (choisit le plugin certbot et le backend DNS sync) |
+| `DNS_TOKEN_NAME` | label du token sous `/vps/certbot/<provider>/` |
 
-Ces cles sont referencees dans le `nginx.conf` du service via les placeholders `__ADRESS__` et `__DOMAIN__`. Au moment du `services install <nom>`, `scripts/service.sh` substitue automatiquement.
+Ces cles sont referencees dans le `nginx.conf` du service via `__ADRESS__` / `__DOMAIN__` / `__PORT__`. `scripts/service.sh` substitue au moment du `services install <nom>`.
+
+Si `DNS_PROVIDER` et `DNS_TOKEN_NAME` sont absents, `certbot-wildcard` fallback sur le legacy `/etc/letsencrypt/infomaniak.ini` (genere depuis `/vps/_infra/INFOMANIAK_TOKEN`). Permet de migrer progressivement.
 
 ### Secrets applicatifs
 
@@ -129,20 +192,18 @@ Toute autre cle sous `/services/<nom>/` atterrit aussi dans `/etc/secrets/<nom>.
 ```yaml
 env_file: /etc/secrets/<nom>.env
 ```
-Toutes les cles deviennent alors des variables d'env du conteneur.
 
 ### Template Infisical
 
 Chaque service a un `secrets.tmpl` avec le pattern `listSecrets` → rapatrie tout ce qui est sous `/services/<nom>/`. Donc zero friction pour ajouter une cle : tu ajoutes dans Infisical, l'agent la sync dans `/etc/secrets/<nom>.env`.
 
-Pour chaque service sous `services/<nom>/` dans le repo, cree un path Infisical `/services/<nom>/` avec les secrets dont le service a besoin. Le fichier `services/<nom>/secrets.tmpl` utilise le template agent Infisical pour les rapatrier vers `/etc/secrets/<nom>.env` a l'install.
-
-Convention : declare `INFISICAL_PATH=/services/<nom>` dans `services/<nom>/service.conf` et utilise le pattern recommande dans `secrets.tmpl` (voir `services/README.md`). Toutes les cles sous ce path sont automatiquement syncees sans avoir a les declarer explicitement.
+Convention : declare `INFISICAL_PATH=/services/<nom>` dans `services/<nom>/service.conf` et utilise le pattern recommande dans `secrets.tmpl`.
 
 ## Machine Identity
 
-Cree une Machine Identity (Universal Auth) sur le projet avec la permission **Read** sur tout (ou au minimum sur `/vps/_infra/` + `/services/**`). Note :
+Cree une Machine Identity (Universal Auth) sur le projet avec permission **Read** sur tout (ou minimum sur `/vps/**` + `/services/**`).
 
+Note :
 - Client ID
 - Client Secret
 - Project ID (visible dans l'URL du projet Infisical)
@@ -156,9 +217,15 @@ Le bootstrap te les demande au 1er run et les persiste en `/etc/infisical/{clien
 infisical secrets --env=prod --path=/vps/_infra
 
 # Secrets d'un service (synces en continu par l'agent)
-cat /etc/secrets/<service>.env    # n'existe que si secrets.tmpl est configure
+cat /etc/secrets/<service>.env
 
 # Agent status
 systemctl status infisical-agent
 journalctl -u infisical-agent -n 50
+
+# Providers certbot connus (ecrit par certbot-wildcard)
+cat /etc/certbot/providers.conf
+
+# Creds certbot regenerees par le pre-hook
+ls /etc/certbot/creds/infomaniak/ /etc/certbot/creds/ovh/
 ```
