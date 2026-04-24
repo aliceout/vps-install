@@ -280,6 +280,13 @@ apply_nginx() {
       [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
       local k="${line%%=*}"
       local v="${line#*=}"
+      # Strip les quotes externes (le template Infisical emet KEY='value')
+      if [[ ${#v} -ge 2 ]]; then
+        case "$v" in
+          \'*\') v="${v:1:-1}" ;;
+          \"*\") v="${v:1:-1}" ;;
+        esac
+      fi
       # Protege | et & pour sed
       v="${v//\\/\\\\}"
       v="${v//|/\\|}"
