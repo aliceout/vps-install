@@ -145,6 +145,11 @@ EOF
   chmod 600 "$AGENT_FRAGMENTS_DIR/$name.yaml"
 
   regen_agent_conf
+  # Supprime l'ancien env file avant de restart, pour que wait_for_secret_file
+  # bloque jusqu'a ce que l'agent regenere depuis le template a jour. Sinon, si
+  # le template a change (nouveau format, nouvelles cles), le wait retournerait
+  # immediatement sur le fichier stale.
+  rm -f "$SECRETS_DIR/$name.env"
   systemctl enable --now infisical-agent.service
   systemctl restart infisical-agent.service
 
