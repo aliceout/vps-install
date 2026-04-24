@@ -57,14 +57,19 @@ function loadDeployConfig() {
       continue;
     }
     const { REPO, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH, PROVIDER } = cfg;
-    if (!REPO || !WEBHOOK_SECRET || !SCRIPT) {
-      console.warn(`Skip ${f}: REPO / WEBHOOK_SECRET / SCRIPT manquants`);
+    if (!REPO || !WEBHOOK_SECRET || !SCRIPT || !PROVIDER) {
+      console.warn(`Skip ${f}: REPO / WEBHOOK_SECRET / SCRIPT / PROVIDER manquants`);
+      continue;
+    }
+    const providerLower = PROVIDER.toLowerCase();
+    if (providerLower !== "github" && providerLower !== "gitlab") {
+      console.warn(`Skip ${f}: PROVIDER='${PROVIDER}' inconnu (attendu: github | gitlab)`);
       continue;
     }
     map[REPO] = {
       secret: WEBHOOK_SECRET,
       script: SCRIPT,
-      provider: (PROVIDER || "github").toLowerCase(),  // github | gitlab
+      provider: providerLower,
       workflow: WORKFLOW || null,  // github: filtre sur workflow_run.name
       branch:   BRANCH   || null,  // github: filtre sur workflow_run.head_branch
       source: f,

@@ -28,7 +28,7 @@ Chaque repo branche (GitHub ou GitLab) a son propre sous-dossier :
 | `REPO` | `aliceout/Work-resume` (GH) / `riana/projet` (GL) | slug, doit matcher ce que la forge envoie dans le payload |
 | `WEBHOOK_SECRET` | `Attach8-Catfight-...` | **GitHub**: HMAC (`openssl rand -hex 32`, a mettre dans Settings > Webhooks > Secret). **GitLab**: token en clair (Settings > Webhooks > Secret token) |
 | `SCRIPT` | `work.sh` | nom du fichier dans `/var/lib/services/webhooks/hooks/` a executer |
-| `PROVIDER` | `github` ou `gitlab` | **optionnel** (default `github`). Branche l'auth + l'extraction du slug |
+| `PROVIDER` | `github` ou `gitlab` | **requis**. Branche l'auth + l'extraction du slug. Pas de defaut : chaque hook declare explicitement sa forge |
 | `WORKFLOW` | `Docker build` | **optionnel**. Filtre sur un workflow/pipeline precis pour eviter de redeployer a chaque CI (lint, test, etc.). GitHub: matche `workflow_run.name`. GitLab: matche `object_attributes.name` des Pipeline Hook |
 | `BRANCH` | `main` | **optionnel**. Ignore les runs sur feature branches / PRs |
 
@@ -38,7 +38,7 @@ Chaque repo branche (GitHub ou GitLab) a son propre sous-dossier :
 
 ### Repo GitHub
 
-1. Dans Infisical, cree `/services/webhooks/<nom>/` avec `REPO`, `WEBHOOK_SECRET`, `SCRIPT`, `PROVIDER=github` (optionnel, default).
+1. Dans Infisical, cree `/services/webhooks/<nom>/` avec `REPO`, `WEBHOOK_SECRET`, `SCRIPT`, `PROVIDER=github`.
 2. Dans le repo `vps-install`, cree un `services/<nom>/` avec son `hook.sh` + `install.sh` qui publie le hook.
 3. Commit + push, pull sur le VPS.
 4. `services install <nom>` → installe l'app, publie le hook, trigger `services update webhooks`.
