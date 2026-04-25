@@ -1,7 +1,8 @@
 # 2mains de femmes : site Astro statique + backend formulaire de contact.
-# Variables substituees au runtime depuis l'env du shell qui invoque docker
-# compose (PORT_SITE, PORT_MAIL, SERVICE_NAME source par install.sh / hook.sh
-# depuis /etc/secrets/2mains.env).
+# Variables substituees au runtime depuis /var/lib/services/2mains/runtime.env :
+#   - PORT_SITE, PORT_MAIL, SERVICE_NAME (cloud Infisical + install.sh)
+#   - SMTP_*, MAIL_TO, RATE_LIMIT_PER_HOUR, ALLOWED_ORIGIN (self-hosted Infisical,
+#     fetchees a l'install/update et au webhook deploy).
 
 services:
   site:
@@ -20,7 +21,6 @@ services:
     ports:
       - "127.0.0.1:${PORT_MAIL}:3000"
     env_file:
-      # SMTP_*, MAIL_TO, RATE_LIMIT_PER_HOUR, ALLOWED_ORIGIN viennent du
-      # cloud Infisical via l'agent. Le container Node ignore les cles
-      # qu'il n'utilise pas (PORT_*, ADRESS, DNS_*, etc.).
-      - /etc/secrets/2mains.env
+      # SMTP_*, MAIL_TO, etc. fetched from self-hosted Infisical (env.backlice.dev,
+      # projet 2mains) par install.sh / hook.sh -> ecrit ici.
+      - /var/lib/services/2mains/runtime.env
