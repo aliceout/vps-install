@@ -17,9 +17,21 @@ fi
 # Desactive le cron packagee qui voulait envoyer des mails
 chmod -x /etc/cron.daily/rkhunter 2>/dev/null || true
 
-# Mise a jour initiale de la base de signatures rkhunter
-rkhunter --update --nocolors 2>/dev/null || true
-rkhunter --propupd --nocolors 2>/dev/null || true
+# Le projet rkhunter upstream est abandonne (2022) : les URLs des data files
+# sont mortes -> 'rkhunter --update' echoue toujours. On disable l'auto-update
+# (UPDATE_MIRRORS=0) et on s'appuie sur les data files bundled dans le paquet
+# Debian, qui sont maintenus par le package maintainer. Le scan reste OK.
+if [[ -f /etc/rkhunter.conf ]]; then
+  if grep -qE '^\s*#?\s*UPDATE_MIRRORS=' /etc/rkhunter.conf; then
+    sed -i 's|^\s*#\?\s*UPDATE_MIRRORS=.*|UPDATE_MIRRORS=0|' /etc/rkhunter.conf
+  else
+    echo 'UPDATE_MIRRORS=0' >> /etc/rkhunter.conf
+  fi
+fi
+
+# Initialise la baseline des permissions/hashes des binaires systemes
+# (--propupd ne contacte aucun mirror, juste un snapshot local).
+rkhunter --propupd --nocolors >/dev/null 2>&1 || true
 
 # --- debsecan ----------------------------------------------------------------
 # Le cron packagee envoie un mail si CVE detectee. On prefere un log.
@@ -42,8 +54,8 @@ cat > /etc/cron.d/vps-audit-tools <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Quotidien 05:15 - rkhunter (mise a jour + scan)
-15 5 * * * root /usr/bin/rkhunter --update --nocolors >> /var/log/audit/rkhunter-update.log 2>&1 && /usr/bin/rkhunter --cronjob --report-warnings-only --appendlog --nocolors >> /var/log/audit/rkhunter.log 2>&1
+# Quotidien 05:15 - rkhunter scan (--update skip, mirrors upstream morts)
+15 5 * * * root /usr/bin/rkhunter --cronjob --report-warnings-only --appendlog --nocolors >> /var/log/audit/rkhunter.log 2>&1
 
 # Quotidien 05:30 - debsecan (CVE vs paquets installes, uniquement celles patchables)
 30 5 * * * root /usr/bin/debsecan --format=report --suite ${CODENAME} --only-fixed >> /var/log/audit/debsecan.log 2>&1
