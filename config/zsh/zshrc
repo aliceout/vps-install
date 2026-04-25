@@ -82,6 +82,40 @@ tools() {
   echo "🔤  fzf              → Recherche floue dans fichiers, historique, etc."
   echo "📜  lnav             → Visualiseur de logs avec coloration et navigation"
   echo "🔍  histo <terme>    → Cherche dans l'historique zsh"
+  echo "📡  ports            → Liste les ports utilisés par les services VPS"
+  echo ""
+}
+
+## Ports utilises par les services (auto-decouverts depuis nginx + ss)
+ports() {
+  echo "\n📡  Ports utilisés sur le VPS :\n"
+  printf "  %-22s %-40s %s\n" "Service" "Domaine(s)" "Port(s)"
+  printf "  %-22s %-40s %s\n" "----------------------" "----------------------------------------" "-------"
+
+  # Services VPS : un .conf par service dans /etc/nginx/conf/, port lu via proxy_pass
+  if [[ -d /etc/nginx/conf ]]; then
+    for f in /etc/nginx/conf/*.conf; do
+      [[ -f "$f" ]] || continue
+      local name domains svc_ports
+      name="$(basename "$f" .conf)"
+      domains="$(grep -hE '^\s*server_name' "$f" 2>/dev/null \
+                  | head -n1 | sed -E 's/^\s*server_name\s+//; s/;.*$//' \
+                  | xargs)"
+      svc_ports="$(grep -hoE 'proxy_pass http://127\.0\.0\.1:[0-9]+' "$f" 2>/dev/null \
+                    | grep -oE '[0-9]+$' | sort -u | tr '\n' ',' | sed 's/,$//')"
+      [[ -n "$svc_ports" ]] && printf "  %-22s %-40s %s\n" "$name" "${domains:-?}" "$svc_ports"
+    done
+  fi
+
+  # Ports systeme connus (CrowdSec local API, sshd, etc.) - infos rapides
+  echo ""
+  echo "🔧 Réservés systeme :"
+  printf "  %-22s %-40s %s\n" "crowdsec lapi"   "127.0.0.1 (interne)"  "8080"
+  printf "  %-22s %-40s %s\n" "infisical-agent" "127.0.0.1 (interne)"  "(varie)"
+  printf "  %-22s %-40s %s\n" "sshd"            "0.0.0.0"              "(SSH_PORT)"
+  printf "  %-22s %-40s %s\n" "nginx"           "0.0.0.0"              "80,443"
+  echo ""
+  echo "💡 Sortie live : sudo ss -ltnp"
   echo ""
 }
 
