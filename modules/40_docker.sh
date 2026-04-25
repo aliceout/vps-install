@@ -22,4 +22,21 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 systemctl enable --now docker
 usermod -aG docker "$VPS_USER"
 
+# Auth GHCR : si GHCR_TOKEN est present (Infisical /vps/_infra/), on logue
+# le user VPS sur ghcr.io pour permettre le pull des images privees.
+# Le credential est stocke dans /home/$VPS_USER/.docker/config.json (encoded
+# base64, lisible uniquement par le user).
+if [[ -n "${GHCR_TOKEN:-}" ]]; then
+  echo "Login GHCR pour $VPS_USER..."
+  install -d -m 700 -o "$VPS_USER" -g "$VPS_USER" "/home/$VPS_USER/.docker"
+  if printf '%s' "$GHCR_TOKEN" | runuser -u "$VPS_USER" -- \
+       docker login ghcr.io -u "${GHCR_USER:-aliceout}" --password-stdin >/dev/null; then
+    echo "GHCR auth OK ($VPS_USER peut pull les images privees)."
+  else
+    echo "AVERTISSEMENT: docker login ghcr.io echoue. Verifie GHCR_TOKEN dans /vps/_infra/."
+  fi
+else
+  echo "GHCR_TOKEN absent de /vps/_infra, skip docker login (les images publiques sont OK)."
+fi
+
 echo "Docker OK. (relogin pour que le groupe docker s'applique)"

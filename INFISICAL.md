@@ -16,6 +16,8 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         CROWDSEC_ENROLL_KEY    # optionnel
         GITHUB_SSH_PRIVKEY     # optionnel - cle SSH GitHub
         GITLAB_SSH_PRIVKEY     # optionnel - cle SSH GitLab
+        GHCR_TOKEN             # optionnel - PAT GitHub avec scope read:packages
+        GHCR_USER              # optionnel - username GitHub (default: aliceout)
 
       certbot/                 # Let's Encrypt + DNS multi-provider
         CERTBOT_EMAIL
@@ -83,6 +85,8 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 | `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - enrollment CrowdSec. Absent = standalone sans dashboard |
 | `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitHub prives |
 | `GITLAB_SSH_PRIVKEY` | secret | idem | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitLab prives |
+| `GHCR_TOKEN` | secret | `ghp_...` | `40_docker.sh` | **optionnel** - GitHub PAT (classic) avec scope `read:packages`. Permet a `docker pull ghcr.io/...` de fetch les images privees de GHCR. Sans ca, les images publiques marchent quand meme |
+| `GHCR_USER` | string | `aliceout` | `40_docker.sh` | **optionnel** - username GitHub a passer a `docker login`. Default: `aliceout` |
 
 ## `/vps/certbot/` - Let's Encrypt + DNS providers
 

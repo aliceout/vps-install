@@ -182,6 +182,7 @@ INFRA_KEYS=(
   VPS_USER VPS_USER_PASSWORD
   SSH_PORT SSH_PUBKEY
   CROWDSEC_ENROLL_KEY GITHUB_SSH_PRIVKEY GITLAB_SSH_PRIVKEY
+  GHCR_TOKEN GHCR_USER
 )
 # CERTBOT_EMAIL + INFOMANIAK_TOKEN ont ete deplaces vers /vps/certbot/ (lu
 # par 75_certbot.sh / certbot-refresh-creds). Ici on ne les exige plus.
