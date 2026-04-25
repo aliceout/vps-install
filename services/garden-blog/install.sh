@@ -60,6 +60,7 @@ build_runtime_env() {
 
   umask 077
   {
+    echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
     echo "DATA_DIR=${DATA_DIR}"
     echo "URL=https://${ADRESS}"

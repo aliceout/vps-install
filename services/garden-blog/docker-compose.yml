@@ -8,6 +8,7 @@
 services:
   ghost:
     image: ghost:5-alpine
+    container_name: ${SERVICE_NAME}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${PORT}:2368"
