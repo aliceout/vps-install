@@ -1,57 +1,22 @@
 #!/usr/bin/env bash
-# Deploy Work-resume via pm2.
-# Toute la config vient de /etc/secrets/work.env (synce par l'agent
-# Infisical depuis /services/work/) :
-#   REPO    : ex "aliceout/Work-resume" (slug GitHub)
-#   BRANCH  : ex "master"
-#   APP     : nom pm2 (ex "work")
-#   DIR     : chemin local (ex "/var/www/work")
-#   PORT    : ex "4154"
-#   GIT_URL : optionnel - URL clone explicite (default: git@github.com:$REPO.git)
-set -euo pipefail
+# Webhook hook pour Work-resume. Appele par le webhooks receiver sur
+# workflow_run "Docker build" success.
+#
+# Pas de git pull, pas de build : l'image est buildee par GitHub Actions
+# et publiee sur GHCR (tag latest mouvant). On fait juste pull + up qui
+# recupere la nouvelle image et recrée le container.
+set -Eeuo pipefail
 
+# Source PORT depuis l'env file synce par Infisical agent
+# shellcheck disable=SC1091
 source /etc/secrets/work.env
 
-: "${REPO:?REPO manquant dans /etc/secrets/work.env}"
-: "${BRANCH:?BRANCH manquant}"
-: "${APP:?APP manquant}"
-: "${DIR:?DIR manquant}"
-: "${PORT:?PORT manquant}"
+: "${PORT:?PORT manquant dans /etc/secrets/work.env}"
 
-GIT_URL="${GIT_URL:-git@github.com:${REPO}.git}"
+COMPOSE_DIR="/opt/vps-install/services/work"
+cd "$COMPOSE_DIR"
 
-mkdir -p "$(dirname "$DIR")"
+HOST_PORT="$PORT" SERVICE_NAME="work" docker compose -p work pull
+HOST_PORT="$PORT" SERVICE_NAME="work" docker compose -p work up -d
 
-if [[ ! -d "$DIR/.git" ]]; then
-  echo "[$(date -Iseconds)] Premier run : clone $GIT_URL"
-  git clone --branch "$BRANCH" "$GIT_URL" "$DIR"
-fi
-
-cd "$DIR"
-git fetch origin "$BRANCH"
-git checkout "$BRANCH"
-git reset --hard "origin/$BRANCH"
-
-rm -f yarn.lock
-
-# npm ci si la lock existe et est compatible, sinon fallback npm install
-if [[ -f package-lock.json ]] && npm ci; then
-  :
-else
-  echo "[$(date -Is)] npm ci absent ou KO, fallback sur npm install"
-  rm -f package-lock.json
-  npm install
-fi
-
-npm run build
-
-if pm2 describe "$APP" >/dev/null 2>&1; then
-  pm2 restart "$APP" --update-env
-else
-  PORT="$PORT" NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 \
-    pm2 start npm --name "$APP" -- start
-fi
-
-pm2 save >/dev/null 2>&1 || true
-
-echo "[$(date -Iseconds)] $APP deploye"
+echo "[$(date -Iseconds)] work deploye (image GHCR latest)"

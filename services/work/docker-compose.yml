@@ -1,0 +1,14 @@
+# Work-resume (Next.js CV statique, image officielle aliceout/work-resume).
+# Variables substituees au runtime depuis l'env du shell qui invoque docker
+# compose (HOST_PORT depuis /etc/secrets/work.env, SERVICE_NAME passee
+# explicitement par install.sh / hook.sh).
+
+services:
+  web:
+    image: ghcr.io/aliceout/work-resume:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      # Bind sur localhost uniquement, nginx host fait le reverse proxy TLS.
+      - "127.0.0.1:${HOST_PORT}:3000"

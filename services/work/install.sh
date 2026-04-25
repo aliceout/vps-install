@@ -1,24 +1,36 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
+# Install Work-resume (CV Next.js, image officielle GHCR, sans deploy.sh
+# applicatif - tout est dans l'image, le compose.yml est bundle ici).
+#
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
+#
+# Cles attendues dans Infisical CLOUD sous /services/work/ :
+#   - ADRESS, DOMAIN, PORT
+#   - DNS_PROVIDER, DNS_TOKEN_NAME
+#
+# Le webhook cote receiver attend aussi /services/webhooks/work/ avec
+# REPO=aliceout/work-resume, WEBHOOK_SECRET=<hmac>, SCRIPT=work.sh,
+# PROVIDER=github, WORKFLOW="Docker build", BRANCH=master
+#
+# Aucun secret applicatif au runtime (portfolio statique, tout en JSON
+# baked dans l'image au build CI).
+
+set -euo pipefail
 
 WEBHOOKS_HOOKS_DIR="/var/lib/services/webhooks/hooks"
 HOOK_SRC="$SERVICE_DIR/hook.sh"
 HOOK_DST="$WEBHOOKS_HOOKS_DIR/${SERVICE_NAME}.sh"
+COMPOSE="docker compose -f ${SERVICE_DIR}/docker-compose.yml -p ${SERVICE_NAME}"
 
 : "${VPS_USER:?VPS_USER manquant}"
 
-# Charge la config depuis l'env file (DIR, APP, etc. viennent de la)
 if [[ ! -s "$SECRETS_FILE" ]]; then
-  echo "ERREUR: $SECRETS_FILE absent. Verifie que les cles sont presentes"
-  echo "dans Infisical sous /services/${SERVICE_NAME}/ et que l'agent a sync."
+  echo "ERREUR: $SECRETS_FILE absent. Verifie /services/${SERVICE_NAME}/ dans Infisical."
   exit 1
 fi
 # shellcheck disable=SC1090
 source "$SECRETS_FILE"
-: "${DIR:?DIR manquant dans $SECRETS_FILE}"
-: "${APP:?APP manquant dans $SECRETS_FILE}"
+: "${PORT:?PORT manquant dans $SECRETS_FILE}"
 
 trigger_webhooks_update() {
   if [[ -x /opt/vps-install/scripts/service.sh ]] && \
@@ -30,11 +42,14 @@ trigger_webhooks_update() {
 
 case "$ACTION" in
   install|update)
-    install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 /var/www
-    install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$(dirname "$DIR")"
-    install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$DIR"
+    if getent group docker >/dev/null && ! id -nG "$VPS_USER" | grep -qw docker; then
+      usermod -aG docker "$VPS_USER"
+      echo "$VPS_USER ajoute au groupe docker (effet au prochain login)."
+    fi
 
-    runuser -u "$VPS_USER" -- bash "$HOOK_SRC"
+    cd "$SERVICE_DIR"
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE pull
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE up -d
 
     if [[ -d "$WEBHOOKS_HOOKS_DIR" ]]; then
       install -m 755 -o "$VPS_USER" -g "$VPS_USER" "$HOOK_SRC" "$HOOK_DST"
@@ -43,23 +58,21 @@ case "$ACTION" in
     else
       echo "INFO: webhooks pas encore installe, hook non publie. Lance"
       echo "  services install webhooks  puis  services update ${SERVICE_NAME}"
-      echo "pour rebrancher."
     fi
     ;;
 
   remove)
-    runuser -u "$VPS_USER" -- pm2 delete "$APP" 2>/dev/null || true
-    runuser -u "$VPS_USER" -- pm2 save 2>/dev/null || true
+    cd "$SERVICE_DIR"
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE down 2>/dev/null || true
     rm -f "$HOOK_DST"
     trigger_webhooks_update
-    echo "pm2 stoppe + hook retire de webhooks."
-    echo "Code source preserve dans $DIR (a rm -rf manuel pour purger)."
+    echo "Stack arretee + hook retire."
     ;;
 
   status)
-    runuser -u "$VPS_USER" -- pm2 list 2>/dev/null \
-      | awk -v app="$APP" '$0 ~ app {print}' \
-      || echo "${APP}: pas dans pm2"
+    cd "$SERVICE_DIR"
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE ps 2>/dev/null \
+      || echo "Stack pas demarree."
     ;;
 
   *)
