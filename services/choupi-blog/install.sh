@@ -63,12 +63,13 @@ build_runtime_env() {
     echo "PORT=${PORT}"
     echo "DATA_DIR=${DATA_DIR}"
     echo "URL=https://${ADRESS}"
-    # Fetch flat /choupi-blog du self-hosted
+    # Fetch les secrets app depuis self-hosted. Le projet self-hosted etant
+    # dedie au blog, on tape la racine (pas de sous-dossier).
     infisical export \
       --domain="$INFISICAL_API_URL" \
       --projectId="$INFISICAL_PROJECT_ID" \
       --env="$INFISICAL_ENV" \
-      --path="/${SERVICE_NAME}" \
+      --path="/" \
       --format=dotenv \
       --token="$token"
   } > "$RUNTIME_ENV"
