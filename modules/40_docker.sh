@@ -23,17 +23,29 @@ systemctl enable --now docker
 usermod -aG docker "$VPS_USER"
 
 # Auth GHCR : si GHCR_TOKEN est present (Infisical /vps/_infra/), on logue
-# le user VPS sur ghcr.io pour permettre le pull des images privees.
-# Le credential est stocke dans /home/$VPS_USER/.docker/config.json (encoded
-# base64, lisible uniquement par le user).
+# DEUX users sur ghcr.io :
+#   - $VPS_USER : pour les hooks webhook (qui tournent en VPS_USER via le
+#     receiver) -> credential dans /home/$VPS_USER/.docker/config.json
+#   - root : pour les `services install/update` manuels lances via sudo
+#     -> credential dans /root/.docker/config.json
+# Sans le login root, docker compose pull en root choue avec "unauthorized"
+# sur les images privees.
 if [[ -n "${GHCR_TOKEN:-}" ]]; then
+  GHCR_LOGIN_USER="${GHCR_USER:-aliceout}"
+  echo "Login GHCR pour root..."
+  if printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_LOGIN_USER" --password-stdin >/dev/null; then
+    echo "GHCR auth OK (root peut pull, requis pour 'sudo services install/update')."
+  else
+    echo "AVERTISSEMENT: docker login ghcr.io (root) echoue. Verifie GHCR_TOKEN."
+  fi
+
   echo "Login GHCR pour $VPS_USER..."
   install -d -m 700 -o "$VPS_USER" -g "$VPS_USER" "/home/$VPS_USER/.docker"
   if printf '%s' "$GHCR_TOKEN" | runuser -u "$VPS_USER" -- \
-       docker login ghcr.io -u "${GHCR_USER:-aliceout}" --password-stdin >/dev/null; then
-    echo "GHCR auth OK ($VPS_USER peut pull les images privees)."
+       docker login ghcr.io -u "$GHCR_LOGIN_USER" --password-stdin >/dev/null; then
+    echo "GHCR auth OK ($VPS_USER peut pull, requis pour les hooks webhook)."
   else
-    echo "AVERTISSEMENT: docker login ghcr.io echoue. Verifie GHCR_TOKEN dans /vps/_infra/."
+    echo "AVERTISSEMENT: docker login ghcr.io ($VPS_USER) echoue."
   fi
 else
   echo "GHCR_TOKEN absent de /vps/_infra, skip docker login (les images publiques sont OK)."
