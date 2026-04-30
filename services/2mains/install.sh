@@ -59,7 +59,7 @@ build_runtime_env() {
     --plain --silent 2>/dev/null)"
   [[ -n "$token" ]] || { echo "ERREUR: login Infisical self-hosted echoue"; exit 1; }
 
-  install -d -m 750 -o root -g "$VPS_USER" "$RUNTIME_DIR"
+  install -d -m 700 -o "$VPS_USER" -g "$VPS_USER" "$RUNTIME_DIR"
 
   umask 077
   {
@@ -75,8 +75,10 @@ build_runtime_env() {
       --format=dotenv \
       --token="$token"
   } > "$RUNTIME_ENV"
-  chgrp "$VPS_USER" "$RUNTIME_ENV" || true
-  chmod 640 "$RUNTIME_ENV"
+  # Owner choupi pour que hook.sh (run en VPS_USER au webhook deploy) puisse
+  # reecrire le fichier sans Permission denied.
+  chown "$VPS_USER:$VPS_USER" "$RUNTIME_ENV"
+  chmod 600 "$RUNTIME_ENV"
 
   if ! grep -q '^SMTP_HOST=' "$RUNTIME_ENV"; then
     echo "AVERTISSEMENT: SMTP_HOST absent du self-hosted. Verifie le projet 2mains sur ${INFISICAL_API_URL}."
