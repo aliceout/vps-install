@@ -56,14 +56,14 @@ function loadDeployConfig() {
       console.warn(`Skip ${f}: ${e.message}`);
       continue;
     }
-    const { REPO, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH, PROVIDER } = cfg;
-    if (!REPO || !WEBHOOK_SECRET || !SCRIPT || !PROVIDER) {
-      console.warn(`Skip ${f}: REPO / WEBHOOK_SECRET / SCRIPT / PROVIDER manquants`);
+    const { REPO, WEBHOOK_SECRET, SCRIPT, WORKFLOW, BRANCH, GIT_PROVIDER } = cfg;
+    if (!REPO || !WEBHOOK_SECRET || !SCRIPT || !GIT_PROVIDER) {
+      console.warn(`Skip ${f}: REPO / WEBHOOK_SECRET / SCRIPT / GIT_PROVIDER manquants`);
       continue;
     }
-    const providerLower = PROVIDER.toLowerCase();
+    const providerLower = GIT_PROVIDER.toLowerCase();
     if (providerLower !== "github" && providerLower !== "gitlab") {
-      console.warn(`Skip ${f}: PROVIDER='${PROVIDER}' inconnu (attendu: github | gitlab)`);
+      console.warn(`Skip ${f}: GIT_PROVIDER='${GIT_PROVIDER}' inconnu (attendu: github | gitlab)`);
       continue;
     }
     map[REPO] = {

@@ -58,7 +58,7 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
           REPO                 # owner/name (GitHub) ou namespace/name (GitLab)
           WEBHOOK_SECRET       # token d'auth (HMAC cote GitHub, plain cote GitLab)
           SCRIPT               # nom du .sh dans /var/lib/services/webhooks/hooks/
-          PROVIDER             # github | gitlab (requis, pas de defaut)
+          GIT_PROVIDER         # github | gitlab (requis, pas de defaut)
           WORKFLOW             # optionnel, filtre sur nom CI
           BRANCH               # optionnel, filtre sur branche
       <service-avec-data>/     # services stateful (Ghost, Wiki, etc.)
@@ -153,7 +153,7 @@ Chaque repo branche a un sous-dossier `/services/webhooks/<slug>/`. Le receiver 
 | `REPO` | `aliceout/Work-resume` (GH) ou `riana/projet` (GL) | slug, doit matcher ce que la forge envoie dans le payload |
 | `WEBHOOK_SECRET` | secret | GitHub : HMAC (`openssl rand -hex 32`, mis dans Settings > Webhooks). GitLab : token en clair (mis dans Settings > Webhooks > Secret token) |
 | `SCRIPT` | `work.sh` | fichier dans `/var/lib/services/webhooks/hooks/` execute par le receiver |
-| `PROVIDER` | `github` ou `gitlab` | **requis**. Branche l'auth et l'extraction du slug. Pas de defaut : pour eviter l'ambiguite, chaque hook declare explicitement sa forge |
+| `GIT_PROVIDER` | `github` ou `gitlab` | **requis**. Branche l'auth et l'extraction du slug. Pas de defaut : pour eviter l'ambiguite, chaque hook declare explicitement sa forge |
 | `WORKFLOW` | `Docker build` | **optionnel**. GitHub: filtre `workflow_run.name`. GitLab: filtre `object_attributes.name` des Pipeline Hook |
 | `BRANCH` | `main` | **optionnel**. Filtre sur la branche, ignore les runs des feature branches |
 
