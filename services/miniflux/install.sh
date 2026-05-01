@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Install FreshRSS (image officielle, SQLite, data sur disque host).
+# Install Miniflux (lecteur RSS Go + Postgres, data sur disque).
 #
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
-# Cles attendues dans Infisical CLOUD sous /services/freshrss/ :
+# Cles attendues dans Infisical CLOUD sous /services/miniflux/ :
 #   - ADRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - TZ            (optionnel, default Europe/Paris)
-#   - CRON_MIN      (optionnel, default "*/20" - refresh feeds toutes les 20 min)
-#
-# Pas de secrets app : l'admin se cree au premier acces via l'UI web.
+#   - POSTGRES_USER, POSTGRES_PASSWORD (optionnels, defaults miniflux/<random>)
+#   - POSTGRES_DB (optionnel, default miniflux)
+#   - ADMIN_USERNAME, ADMIN_PASSWORD : admin cree au 1er boot (CREATE_ADMIN=1
+#     idempotent, no-op si l'admin existe deja)
+#   - POLLING_FREQUENCY (optionnel, minutes, default 60)
 
 set -euo pipefail
 
@@ -28,6 +29,9 @@ source "$SECRETS_FILE"
 set +a
 
 : "${PORT:?PORT manquant dans $SECRETS_FILE}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant - genere avec openssl rand -hex 16}"
+: "${ADMIN_USERNAME:?ADMIN_USERNAME manquant}"
+: "${ADMIN_PASSWORD:?ADMIN_PASSWORD manquant - genere avec openssl rand -hex 12}"
 
 case "$ACTION" in
   install|update)
@@ -35,11 +39,9 @@ case "$ACTION" in
       usermod -aG docker "$VPS_USER"
     fi
 
-    # FreshRSS run en www-data (uid 33) dans le container.
-    # Le bind mount doit etre owned 33:33 pour que le container puisse ecrire.
-    install -d -m 755 -o 33 -g 33 "$DATA_DIR"
-    install -d -m 755 -o 33 -g 33 "$DATA_DIR/data"
-    install -d -m 755 -o 33 -g 33 "$DATA_DIR/extensions"
+    # Postgres run en uid 999 (postgres). Bind mount doit etre owned 999:999.
+    install -d -m 755 "$DATA_DIR"
+    install -d -m 700 -o 999 -g 999 "$DATA_DIR/postgres"
 
     cd "$SERVICE_DIR"
     SERVICE_NAME="$SERVICE_NAME" DATA_DIR="$DATA_DIR" $COMPOSE pull
@@ -48,8 +50,8 @@ case "$ACTION" in
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
     echo "URL : https://${ADRESS:-?}/"
-    echo "Setup admin : visite l'URL et complete le wizard de premier lancement."
-    echo "Data : ${DATA_DIR}/data (backup auto via /home/${VPS_USER}/data/)"
+    echo "Login : ${ADMIN_USERNAME} / (mdp dans Infisical)"
+    echo "Data : ${DATA_DIR}/postgres (backup auto via /home/${VPS_USER}/data/)"
     ;;
 
   remove)
