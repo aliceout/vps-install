@@ -20,11 +20,15 @@ En resume, il te faut :
 - les secrets sous `/vps/_infra/` (bootstrap) et `/services/<nom>/` (services)
 - une **Machine Identity** (Universal Auth) avec la permission **Read** sur ce projet : note le **Project ID**, le **Client ID** et le **Client Secret**
 
-## One-liner
+## One-liner (en 3 étapes — review avant exec)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aliceout/vps-install/main/install.sh | sudo bash
+curl -fsSLo install.sh https://raw.githubusercontent.com/aliceout/vps-install/main/install.sh
+less install.sh                # review : verifie que le script ne fait pas n'importe quoi
+sudo bash install.sh
 ```
+
+Pourquoi pas un `curl ... | sudo bash` direct : pas de review possible avant exec, et un MITM peut servir un script different selon le User-Agent (TOCTOU). On télécharge, on lit, on run.
 
 Le script te demandera :
 - Adresse Infisical (default `https://app.infisical.com`)
