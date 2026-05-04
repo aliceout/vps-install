@@ -1,0 +1,72 @@
+# FreeScout - help desk PHP (image tiredofit/freescout) + MariaDB.
+# Variables substituees depuis l'env shell (sourced de /etc/secrets/freescout.env
+# par install.sh). Bind mounts sur disque host.
+
+services:
+  db:
+    image: mariadb:11
+    container_name: ${SERVICE_NAME}-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME:-freescout}
+      MARIADB_USER: ${DB_USER:-freescout}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${DATA_DIR}/db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized || mysqladmin ping -h localhost -u root -p$$MARIADB_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: tiredofit/freescout:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    pull_policy: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${PORT}:80"
+    environment:
+      # UID/GID dans le container (cf. ownership de ${DATA_DIR}/app cote host)
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+
+      # URL publique (genere les liens dans les notifications mail)
+      SITE_URL: https://${ADRESS}/
+      # Important : on est derriere nginx en HTTPS
+      ENABLE_SSL_PROXY: "TRUE"
+
+      # DB
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-freescout}
+      DB_USER: ${DB_USER:-freescout}
+      DB_PASS: ${DB_PASSWORD}
+
+      # Admin cree au 1er boot (idempotent : no-op si l'admin existe deja)
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASS: ${ADMIN_PASSWORD}
+
+      # Laravel : cle de chiffrement, format "base64:<32 bytes en base64>".
+      # Generer une fois avec : echo "base64:$(openssl rand -base64 32)"
+      APP_KEY: ${APP_KEY}
+
+      TIMEZONE: ${TIMEZONE:-Europe/Paris}
+
+      # Mail outbound (notifications systeme : nouveau ticket, reset password...)
+      # Pour la reception des mails utilisateurs -> configure dans l'UI FreeScout
+      # apres install (Mailboxes -> Connection settings IMAP/POP3).
+      MAIL_DRIVER: ${MAIL_DRIVER:-smtp}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-FreeScout}
+    volumes:
+      - ${DATA_DIR}/app:/data
