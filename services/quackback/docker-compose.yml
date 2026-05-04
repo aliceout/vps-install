@@ -31,7 +31,9 @@ services:
       - -c
       - max_connections=200
     volumes:
-      - ${DATA_DIR}/postgres:/var/lib/postgresql/data
+      # Postgres 18+ stocke en sous-dossier versionne (/var/lib/postgresql/18/data)
+      # pour permettre pg_upgrade --link. Mount = parent /var/lib/postgresql.
+      - ${DATA_DIR}/postgres:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
