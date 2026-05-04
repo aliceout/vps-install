@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Webhook hook pour Nodea. Appele par le webhooks receiver sur
 # workflow_run "Docker build" success.
-# Git-pull le repo puis delegue a infra/scripts/deploy.sh (qui fetch
+# Git-pull le repo puis delegue a scripts/deploy.sh (qui fetch
 # l'Infisical self-hosted, genere le .env, docker compose pull + up + seed).
 set -Eeuo pipefail
 
@@ -21,4 +21,4 @@ else
   git clone --branch "$BRANCH" "$REPO_URL" "$DEPLOY_DIR"
 fi
 
-exec bash "$DEPLOY_DIR/infra/scripts/deploy.sh" "$@"
+exec bash "$DEPLOY_DIR/scripts/deploy.sh" "$@"
