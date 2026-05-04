@@ -2,9 +2,8 @@
 # Webhook hook pour 2mains. Appele par le webhooks receiver sur
 # workflow_run "Docker build" success.
 #
-# Git-pull le repo puis exec infra/scripts/deploy.sh (qui fetch les
-# secrets app depuis Infisical self-hosted, genere .env, docker compose
-# pull/up).
+# Git-pull le repo puis exec scripts/deploy.sh (qui fetch les secrets
+# app depuis Infisical self-hosted, genere .env, docker compose pull/up).
 set -Eeuo pipefail
 
 DEPLOY_DIR="/var/www/2mains"
@@ -23,4 +22,4 @@ else
   git clone --branch "$BRANCH" "$REPO_URL" "$DEPLOY_DIR"
 fi
 
-exec bash "$DEPLOY_DIR/infra/scripts/deploy.sh" "$@"
+exec bash "$DEPLOY_DIR/scripts/deploy.sh" "$@"
