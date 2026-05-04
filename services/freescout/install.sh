@@ -90,8 +90,9 @@ build_runtime_env() {
     fi
   done
 
-  # Sanity check format APP_KEY
-  if grep -q '^APP_KEY=' "$RUNTIME_ENV" && ! grep -q '^APP_KEY=base64:' "$RUNTIME_ENV"; then
+  # Sanity check format APP_KEY (accepte quotes simples / doubles autour
+  # de la valeur : infisical export --format=dotenv wrap en "...").
+  if grep -q '^APP_KEY=' "$RUNTIME_ENV" && ! grep -qE "^APP_KEY=[\"']?base64:" "$RUNTIME_ENV"; then
     echo "ERREUR: APP_KEY doit commencer par 'base64:' (Laravel format)."
     echo "        Genere une cle avec : echo \"base64:\$(openssl rand -base64 32)\""
     exit 1
