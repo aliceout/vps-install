@@ -78,6 +78,20 @@ function loadDeployConfig() {
   return map;
 }
 
+// --- Replay protection (dedup X-GitHub-Delivery, TTL 1h) -------------------
+
+const DELIVERY_TTL_MS = 60 * 60 * 1000;
+const seenDeliveries  = new Map(); // deliveryId -> insertion timestamp ms
+
+function isDuplicateDelivery(id) {
+  if (!id) return false;
+  const now = Date.now();
+  for (const [k, ts] of seenDeliveries) if (now - ts > DELIVERY_TTL_MS) seenDeliveries.delete(k);
+  if (seenDeliveries.has(id)) return true;
+  seenDeliveries.set(id, now);
+  return false;
+}
+
 // --- Auth verify (GitHub HMAC / GitLab plain token) -------------------------
 
 function verifyGithubSignature(req, body, secret) {
@@ -181,6 +195,17 @@ const server = http.createServer((req, res) => {
       console.warn(`Auth invalide pour ${repo} (${incomingProvider})`);
       res.writeHead(401);
       return res.end("Invalid auth");
+    }
+
+    // Dedup post-auth : refuse de rejouer un meme X-GitHub-Delivery sur la
+    // fenetre TTL. Pas applicable a GitLab (pas d'equivalent natif).
+    if (incomingProvider === "github") {
+      const deliveryId = req.headers["x-github-delivery"];
+      if (isDuplicateDelivery(deliveryId)) {
+        console.warn(`${repo}: duplicate delivery ${deliveryId}, ignored`);
+        res.writeHead(200);
+        return res.end("Ignored: duplicate delivery");
+      }
     }
 
     // Filtre CI (workflow_run GitHub / Pipeline Hook GitLab) :
