@@ -58,8 +58,8 @@ case "$ACTION" in
     fi
 
     install -d -m 755 "$DATA_DIR"
-    # MariaDB run en uid 999 (mariadb user dans l'image officielle).
-    install -d -m 700 -o 999 -g 999 "$DATA_DIR/db"
+    # linuxserver/mariadb chowne /config au PUID configure (default 1000).
+    install -d -m 700 -o "$PUID" -g "$PGID" "$DATA_DIR/db"
     # tiredofit/freescout chowne /data au PUID configure (default 1000).
     install -d -m 755 -o "$PUID" -g "$PGID" "$DATA_DIR/app"
 

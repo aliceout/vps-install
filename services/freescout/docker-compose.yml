@@ -4,18 +4,23 @@
 
 services:
   db:
-    image: mariadb:11
+    image: lscr.io/linuxserver/mariadb:latest
     container_name: ${SERVICE_NAME}-db
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MARIADB_DATABASE: ${DB_NAME:-freescout}
-      MARIADB_USER: ${DB_USER:-freescout}
-      MARIADB_PASSWORD: ${DB_PASSWORD}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TIMEZONE:-Europe/Paris}
+      # linuxserver expose les memes vars que MySQL officielle (pas MARIADB_*).
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-freescout}
+      MYSQL_USER: ${DB_USER:-freescout}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - ${DATA_DIR}/db:/var/lib/mysql
+      # Image linuxserver : tout dans /config (databases/, log/, custom.cnf...)
+      - ${DATA_DIR}/db:/config
     healthcheck:
-      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized || mysqladmin ping -h localhost -u root -p$$MARIADB_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 10
