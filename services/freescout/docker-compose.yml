@@ -1,6 +1,9 @@
-# FreeScout - help desk PHP (image tiredofit/freescout) + MariaDB.
-# Variables substituees depuis l'env shell (sourced de /etc/secrets/freescout.env
-# par install.sh). Bind mounts sur disque host.
+# FreeScout - help desk PHP (image tiredofit/freescout) + MariaDB linuxserver.
+# Variables substituees depuis /var/lib/services/freescout/runtime.env :
+#   - SERVICE_NAME, PORT, ADRESS, DATA_DIR  (cloud Infisical /services/freescout/)
+#   - DB_*, APP_KEY, ADMIN_*, MAIL_*        (self-hosted Infisical /freescout/)
+#   - PUID, PGID, TIMEZONE                  (self-hosted, optionnels)
+# Bind mounts sur disque host.
 
 services:
   db:
