@@ -61,17 +61,24 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${AUTH_PORT}:3000"
+    volumes:
+      # Persistance de la SQLite tinyauth.db (cookies key auto-generee +
+      # sessions). Sans, chaque restart invalide toutes les sessions.
+      - ${DATA_DIR}/tinyauth:/app/data
     environment:
-      # Cle de signature des cookies de session (32 chars min)
-      SECRET: ${TINYAUTH_SECRET}
-      # Liste des users : "alice:$$2a$$10$$xxxxx" (separes par virgule pour
-      # plusieurs users). Le hash bcrypt se genere avec :
-      #   docker run --rm ghcr.io/steveiliop56/tinyauth:latest user hash <password>
-      USERS: ${TINYAUTH_USERS}
-      # URL publique de l'app proteget (utilise pour les redirects)
-      APP_URL: https://${ADRESS}
-      # Cookie attache au domaine racine pour partage potentiel futur
-      COOKIE_SECURE: "true"
+      # URL publique de l'app proteget (v5+ : TINYAUTH_APPURL, etait APP_URL)
+      TINYAUTH_APPURL: https://${ADRESS}
+
+      # Liste des users : "alice:$$2a$$10$$xxxxx" (plusieurs separes par virgule)
+      # Hash bcrypt genere avec :
+      #   docker run --rm ghcr.io/steveiliop56/tinyauth:latest user create -u <user> -p <pass>
+      TINYAUTH_AUTH_USERS: ${TINYAUTH_USERS}
+
+      # SQLite de persistance (cookies key + sessions)
+      TINYAUTH_DATABASE_PATH: /app/data/tinyauth.db
+
+      # Cookie HTTPS-only (on est derriere nginx en HTTPS)
+      TINYAUTH_AUTH_SECURECOOKIE: "true"
     logging:
       driver: json-file
       options:

@@ -15,10 +15,12 @@
 #   - DATA_DIR                    (ex: /media/pi/media/transmission)
 #   - OPENVPN_PROVIDER, OPENVPN_CONFIG
 #   - OPENVPN_USERNAME, OPENVPN_PASSWORD
-#   - TINYAUTH_SECRET             (openssl rand -hex 32)
 #   - TINYAUTH_USERS              (format: user:bcrypt-hash, plusieurs separes par virgule)
 #                                 generation : docker run --rm ghcr.io/steveiliop56/tinyauth:latest \
-#                                              user hash <password>
+#                                              user create -u <user> -p <password>
+#                                 (tinyauth v5+ : la cle de cookie est auto-generee
+#                                  et persistee dans /app/data/tinyauth.db, donc
+#                                  pas de SECRET a fournir)
 
 set -euo pipefail
 
@@ -78,7 +80,7 @@ build_runtime_env() {
   chmod 640 "$RUNTIME_ENV"
 
   for k in DATA_DIR OPENVPN_PROVIDER OPENVPN_CONFIG OPENVPN_USERNAME OPENVPN_PASSWORD \
-           TINYAUTH_SECRET TINYAUTH_USERS; do
+           TINYAUTH_USERS; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent du self-hosted. Verifie /${SERVICE_NAME}/ sur ${INFISICAL_API_URL}."
     fi
