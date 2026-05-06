@@ -39,7 +39,7 @@ Si ton framework veut un vrai fichier (pas un symlink), remplace la ligne `ln -s
 
 ## Secrets Infisical attendus
 
-A declarer sous `/vps/mon-app/` :
+A declarer sous `/services/mon-app/` :
 - `DATABASE_URL`
 - `JWT_SECRET`
 - `API_KEY`

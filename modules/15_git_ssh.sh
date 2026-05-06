@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Deploie les cles SSH des forges git (GitHub, GitLab) pour $VPS_USER
-# depuis Infisical (/vps/<PROVIDER>_SSH_PRIVKEY).
+# depuis Infisical (/infra/vps/<PROVIDER>_SSH_PRIVKEY).
 #
 # Providers supportes (pour en ajouter : edit PROVIDERS ci-dessous + ajoute
 # la cle <NAME>_SSH_PRIVKEY dans INFRA_KEYS de bootstrap.sh) :
@@ -86,7 +86,7 @@ for pair in "${PROVIDER_LIST[@]}"; do
   fi
 
   configured_any=1
-  echo "Deploie cle SSH ${host} (source: /vps/${key_var})"
+  echo "Deploie cle SSH ${host} (source: /infra/vps/${key_var})"
   install -m 600 -o "$VPS_USER" -g "$VPS_USER" /dev/stdin "$key_path" <<< "$privkey"
 
   ssh-keyscan -t ed25519,rsa "$host" 2>/dev/null >> "$KH_TMP" || true
@@ -99,7 +99,7 @@ for pair in "${PROVIDER_LIST[@]}"; do
 done
 
 if [[ "$configured_any" -eq 0 ]]; then
-  echo "Aucune cle SSH git configuree (ni GITHUB_SSH_PRIVKEY ni GITLAB_SSH_PRIVKEY dans /vps), skip."
+  echo "Aucune cle SSH git configuree (ni GITHUB_SSH_PRIVKEY ni GITLAB_SSH_PRIVKEY dans /infra/vps), skip."
   # On ecrit quand meme un fragment vide pour effacer l'ancien contenu.
   : > "$GIT_CONFIG_FRAGMENT"
 else

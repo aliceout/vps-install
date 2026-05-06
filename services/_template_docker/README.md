@@ -17,7 +17,7 @@ Puis :
 
 ## Secrets Infisical attendus
 
-A declarer dans Infisical Cloud sous `/vps/mon-service/` :
+A declarer dans Infisical Cloud sous `/services/mon-service/` :
 - `EXEMPLE_SECRET`
 - `AUTRE_SECRET`
 

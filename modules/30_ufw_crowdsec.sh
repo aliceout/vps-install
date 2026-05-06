@@ -86,7 +86,7 @@ if [[ -n "${CROWDSEC_ENROLL_KEY:-}" ]]; then
     echo "AVERTISSEMENT: enrollment echoue (cle invalide ou deja utilisee). Tu peux le faire a la main: cscli console enroll <cle>"
   }
 else
-  echo "Pas de CROWDSEC_ENROLL_KEY dans /vps, CrowdSec tourne en standalone."
+  echo "Pas de CROWDSEC_ENROLL_KEY dans /infra/vps, CrowdSec tourne en standalone."
   echo "Pour enroller plus tard: cscli console enroll <cle> (cle dispo sur https://app.crowdsec.net)"
 fi
 

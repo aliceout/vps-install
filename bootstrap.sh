@@ -139,7 +139,7 @@ else
   done
 fi
 
-INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/vps}"
+INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/infra/vps}"
 
 # INFISICAL_PATH_INFRA reste local au bootstrap (les modules utilisent /etc/infisical/*
 # pour leurs propres lookups).

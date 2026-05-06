@@ -54,7 +54,7 @@ Pour activer :
 
 1. Cree un compte sur https://app.crowdsec.net
 2. Ajoute une "Security Engine" dans la console → recupere la cle d'enrollment
-3. Mets-la dans Infisical sous `/vps/CROWDSEC_ENROLL_KEY`
+3. Mets-la dans Infisical sous `/infra/vps/CROWDSEC_ENROLL_KEY`
 4. Relance le bootstrap OU fais a la main : `sudo cscli console enroll <cle>`
 5. Valide la machine depuis la console web
 

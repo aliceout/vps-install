@@ -7,16 +7,17 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
 ```
 <project>/
   <environment>/               ex: prod, staging, ...
-    vps/                       # bootstrap (charge au demarrage par bootstrap.sh)
-      VPS_USER
-      VPS_USER_PASSWORD
-      SSH_PORT
-      SSH_PUBKEY
-      CROWDSEC_ENROLL_KEY      # optionnel
-      GITHUB_SSH_PRIVKEY       # optionnel - cle SSH GitHub
-      GITLAB_SSH_PRIVKEY       # optionnel - cle SSH GitLab
-      GHCR_TOKEN               # optionnel - PAT GitHub avec scope read:packages
-      GHCR_USER                # optionnel - username GitHub (default: aliceout)
+    infra/
+      vps/                     # bootstrap (charge au demarrage par bootstrap.sh)
+        VPS_USER
+        VPS_USER_PASSWORD
+        SSH_PORT
+        SSH_PUBKEY
+        CROWDSEC_ENROLL_KEY    # optionnel
+        GITHUB_SSH_PRIVKEY     # optionnel - cle SSH GitHub
+        GITLAB_SSH_PRIVKEY     # optionnel - cle SSH GitLab
+        GHCR_TOKEN             # optionnel - PAT GitHub avec scope read:packages
+        GHCR_USER              # optionnel - username GitHub (default: aliceout)
 
     certbot/                   # Let's Encrypt + DNS multi-provider
       CERTBOT_EMAIL
@@ -71,7 +72,7 @@ Les `/` dans le path Infisical sont litteraux. L'environnement (`prod`, `staging
 - **Cles de secret** en MAJUSCULES (`APPLICATION_KEY`, `DNS_TOKEN_NAME`, `WEBHOOK_SECRET`)
 - **Labels** (noms de token, de client) en minuscules (`perso`, `alice`, `client1`) - pour distinguer visuellement label vs cle
 
-## `/vps/` - bootstrap
+## `/infra/vps/` - bootstrap
 
 Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles marquees **optionnel** peuvent etre absentes.
 
@@ -190,7 +191,7 @@ Convention : declare `INFISICAL_PATH=/services/<nom>` dans `services/<nom>/servi
 
 ## Machine Identity
 
-Cree une Machine Identity (Universal Auth) sur le projet avec permission **Read** sur tout (ou minimum sur `/vps/**` + `/services/**`).
+Cree une Machine Identity (Universal Auth) sur le projet avec permission **Read** sur tout (ou minimum sur `/infra/**` + `/certbot/**` + `/telegram/**` + `/services/**`).
 
 Note :
 - Client ID
@@ -203,7 +204,7 @@ Le bootstrap te les demande au 1er run et les persiste en `/etc/infisical/{clien
 
 ```bash
 # Secrets infra (lus une fois, pas persistes sur disque)
-infisical secrets --env=prod --path=/vps
+infisical secrets --env=prod --path=/infra/vps
 
 # Secrets d'un service (synces en continu par l'agent)
 cat /etc/secrets/<service>.env
