@@ -268,6 +268,20 @@ apply_nginx() {
     return 0
   fi
 
+  # Re-sync les includes nginx depuis le repo (idempotent) : 50_nginx.sh ne
+  # tourne qu'au bootstrap initial, donc sans ce sync les modifs de
+  # nginx/include/*.conf et nginx/conf/common.conf restent invisibles
+  # sur le VPS. Couvre le cas typique : ajout d'une directive http (ex
+  # limit_req_zone) qui doit etre vue avant que le vhost qui la reference
+  # soit charge.
+  if [[ -d "$ROOT_DIR/nginx/include" ]]; then
+    install -d /etc/nginx/include
+    cp -a "$ROOT_DIR/nginx/include/." /etc/nginx/include/
+  fi
+  if [[ -f "$ROOT_DIR/nginx/conf/common.conf" && -d /etc/nginx/conf.d ]]; then
+    cp -a "$ROOT_DIR/nginx/conf/common.conf" /etc/nginx/conf.d/common.conf
+  fi
+
   # Rendu du vhost : substitue __KEY__ par la valeur depuis /etc/secrets/<name>.env
   # (synce par l'agent Infisical depuis /services/<name>/).
   local rendered
