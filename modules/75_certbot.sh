@@ -12,6 +12,16 @@ apt-get install -y python3-venv python3-pip git
 
 apt-get remove -y python3-certbot-dns-infomaniak python3-certbot-dns-ovh certbot 2>/dev/null || true
 
+# Detection d'un venv casse : apres une maj Debian (ex 12 -> 13), les liens
+# internes du venv pointent vers une version de Python qui n'existe plus,
+# donc pip et certbot crashent au demarrage. On nuke + recree dans ce cas.
+if [[ -x /opt/certbot-venv/bin/python ]] && \
+   ! /opt/certbot-venv/bin/python -c 'import pip' 2>/dev/null; then
+  echo "Venv /opt/certbot-venv casse (pip introuvable, probable post-upgrade Python)."
+  echo "Recreation a partir de zero..."
+  rm -rf /opt/certbot-venv
+fi
+
 if [[ ! -x /opt/certbot-venv/bin/certbot ]]; then
   python3 -m venv /opt/certbot-venv
 fi
