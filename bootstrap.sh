@@ -158,18 +158,22 @@ export INFISICAL_ADDRESS INFISICAL_ENV INFISICAL_PROJECT_ID
 export INFISICAL_CLIENT_ID INFISICAL_CLIENT_SECRET
 
 say_info "Authentification Infisical..."
+INFISICAL_AUTH_ERR="$(mktemp)"
 INFISICAL_ACCESS_TOKEN="$(
   infisical login \
     --method=universal-auth \
     --domain="$INFISICAL_ADDRESS" \
     --client-id="$INFISICAL_CLIENT_ID" \
     --client-secret="$INFISICAL_CLIENT_SECRET" \
-    --plain </dev/null 2>/dev/null
+    --plain </dev/null 2>"$INFISICAL_AUTH_ERR" || true
 )"
 if [[ -z "$INFISICAL_ACCESS_TOKEN" ]]; then
-  say_err "ERREUR: login Infisical echoue"
+  say_err "ERREUR: login Infisical echoue. Sortie du CLI :"
+  cat "$INFISICAL_AUTH_ERR" >&2
+  rm -f "$INFISICAL_AUTH_ERR"
   exit 1
 fi
+rm -f "$INFISICAL_AUTH_ERR"
 export INFISICAL_TOKEN="$INFISICAL_ACCESS_TOKEN"
 
 # Helper : liste les sous-dossiers de /infra/, exclut 'shared'.
