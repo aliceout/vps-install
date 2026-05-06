@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
-# Install Transmission via OpenVPN (haugene/transmission-openvpn).
-# Service home server uniquement : data sur disque externe, secrets sensibles
-# (creds VPN + RPC) dans Infisical self-hosted.
+# Install Transmission via OpenVPN (haugene/transmission-openvpn) +
+# tinyauth (form-based auth devant le webUI).
+# Service home server uniquement.
 #
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/torrent/ :
-#   - ADRESS, DOMAIN, PORT
+#   - ADRESS, DOMAIN, PORT, AUTH_PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
-#     (creds vers self-hosted env.backlice.dev pour fetch les secrets app)
+#     (creds vers self-hosted)
 #
 # Cles attendues dans Infisical SELF-HOSTED sous projet torrent, racine flat :
-#   - DATA_DIR                                 (ex: /media/pi/media/transmission)
+#   - DATA_DIR                    (ex: /media/pi/media/transmission)
 #   - OPENVPN_PROVIDER, OPENVPN_CONFIG
 #   - OPENVPN_USERNAME, OPENVPN_PASSWORD
-#   - TRANSMISSION_RPC_USERNAME, TRANSMISSION_RPC_PASSWORD
-#   - TRANSMISSION_PEER_PORT                   (optionnel, default 51413)
-#   - TRANSMISSION_WEB_UI                      (optionnel, default transmission-web-control)
-#   - LOCAL_NETWORK                            (optionnel, default 192.168.1.0/24)
-#   - PUID, PGID                               (optionnels, defaults 1000)
-#   - TIMEZONE                                 (optionnel, default Europe/Paris)
+#   - TINYAUTH_SECRET             (openssl rand -hex 32)
+#   - TINYAUTH_USERS              (format: user:bcrypt-hash, plusieurs separes par virgule)
+#                                 generation : docker run --rm ghcr.io/steveiliop56/tinyauth:latest \
+#                                              user hash <password>
 
 set -euo pipefail
 
@@ -40,6 +38,7 @@ source "$SECRETS_FILE"
 build_runtime_env() {
   : "${ADRESS:?ADRESS manquant}"
   : "${PORT:?PORT manquant}"
+  : "${AUTH_PORT:?AUTH_PORT manquant (port pour tinyauth, ex 9092)}"
   : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
   : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
   : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"
@@ -66,6 +65,7 @@ build_runtime_env() {
   {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
+    echo "AUTH_PORT=${AUTH_PORT}"
     echo "ADRESS=${ADRESS}"
     infisical export \
       --domain="$INFISICAL_API_URL" \
@@ -79,7 +79,7 @@ build_runtime_env() {
   chmod 640 "$RUNTIME_ENV"
 
   for k in DATA_DIR OPENVPN_PROVIDER OPENVPN_CONFIG OPENVPN_USERNAME OPENVPN_PASSWORD \
-           TRANSMISSION_RPC_USERNAME TRANSMISSION_RPC_PASSWORD; do
+           TINYAUTH_SECRET TINYAUTH_USERS; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent du self-hosted. Verifie /${SERVICE_NAME}/ sur ${INFISICAL_API_URL}."
     fi
@@ -94,8 +94,6 @@ case "$ACTION" in
 
     build_runtime_env
 
-    # Verifie que DATA_DIR existe (le user doit l'avoir cree manuellement,
-    # vu que c'est un path arbitraire, potentiellement sur un disque externe)
     DATA_DIR_VALUE="$(grep -E '^DATA_DIR=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
     if [[ -z "$DATA_DIR_VALUE" ]]; then
       echo "ERREUR: DATA_DIR vide dans le runtime.env. Set-le cote Infisical self-hosted."
@@ -113,8 +111,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADRESS}/"
-    echo "Auth : RPC username/password (cf Infisical self-hosted)"
+    echo "URL : https://${ADRESS}/  (login form via tinyauth)"
     echo "Data : ${DATA_DIR_VALUE}"
     echo
     echo "Verif VPN actif :"
@@ -126,7 +123,7 @@ case "$ACTION" in
     cd "$SERVICE_DIR"
     $COMPOSE down 2>/dev/null || true
     rm -f "$RUNTIME_ENV"
-    echo "Stack arretee. Data preservee dans le DATA_DIR Infisical (rm -rf manuel pour purger)."
+    echo "Stack arretee. Data preservee dans le DATA_DIR Infisical."
     ;;
 
   status)

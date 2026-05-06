@@ -1,13 +1,18 @@
-# Transmission via OpenVPN (haugene/transmission-openvpn).
+# Transmission via OpenVPN (haugene/transmission-openvpn) + tinyauth
+# (auth form-based devant le webUI car Transmission RPC = HTTP Basic, mauvais
+# avec les password managers).
+#
 # Variables substituees depuis /var/lib/services/torrent/runtime.env :
-#   - SERVICE_NAME, PORT     (cloud Infisical /services/torrent/)
-#   - DATA_DIR               (self-hosted, path local arbitraire)
-#   - OPENVPN_*              (self-hosted)
-#   - TRANSMISSION_RPC_*     (self-hosted)
-#   - TRANSMISSION_PEER_PORT (self-hosted, optionnel)
-#   - PUID, PGID             (self-hosted, defaults 1000)
-#   - TIMEZONE               (self-hosted, default Europe/Paris)
-#   - LOCAL_NETWORK          (self-hosted, ex: 192.168.1.0/24)
+#   - SERVICE_NAME, PORT, AUTH_PORT, ADRESS  (cloud Infisical /services/torrent/)
+#   - DATA_DIR, OPENVPN_*                    (self-hosted)
+#   - TINYAUTH_USERS, TINYAUTH_SECRET        (self-hosted)
+#
+# Constantes hardcodees ici (pas dans Infisical) :
+#   - PUID/PGID 1000 (uid pi sur ce host)
+#   - TZ Europe/Paris
+#   - LOCAL_NETWORK 192.168.1.0/24 (LAN du home)
+#   - TRANSMISSION_WEB_UI transmission-web-control
+#   - TRANSMISSION_PEER_PORT 51413 (default upstream)
 
 services:
   transmission:
@@ -21,41 +26,54 @@ services:
     volumes:
       - ${DATA_DIR}:/data
     environment:
-      # OpenVPN (compte fournisseur)
       OPENVPN_PROVIDER: ${OPENVPN_PROVIDER}
       OPENVPN_CONFIG: ${OPENVPN_CONFIG}
       OPENVPN_USERNAME: ${OPENVPN_USERNAME}
       OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
 
-      # Kill switch : si le VPN tombe, le container ne route plus rien
-      # vers Internet (evite le leak de l'IP reelle).
+      # Kill switch : si le VPN tombe, blocage total (evite leak IP)
       DROP_DEFAULT_ROUTE: "yes"
 
-      # Bypass VPN pour le LAN (necessaire pour atteindre le container
-      # depuis nginx host)
-      LOCAL_NETWORK: ${LOCAL_NETWORK:-192.168.1.0/24}
+      # Bypass VPN pour le LAN
+      LOCAL_NETWORK: "192.168.1.0/24"
 
-      # Transmission RPC (web UI auth)
-      TRANSMISSION_WEB_UI: ${TRANSMISSION_WEB_UI:-transmission-web-control}
-      TRANSMISSION_RPC_AUTHENTICATION_REQUIRED: "true"
-      TRANSMISSION_RPC_USERNAME: ${TRANSMISSION_RPC_USERNAME}
-      TRANSMISSION_RPC_PASSWORD: ${TRANSMISSION_RPC_PASSWORD}
+      # RPC : auth desactivee (gere par tinyauth en amont)
+      TRANSMISSION_WEB_UI: "transmission-web-control"
+      TRANSMISSION_RPC_AUTHENTICATION_REQUIRED: "false"
+      # Whitelist large : la securite est cote nginx + tinyauth
+      TRANSMISSION_RPC_HOST_WHITELIST: "*"
+      TRANSMISSION_RPC_WHITELIST_ENABLED: "false"
 
-      # Port fixe pour les connexions peers entrantes (a forwarder cote
-      # provider VPN si tu veux du seeding optimise).
-      TRANSMISSION_PEER_PORT: ${TRANSMISSION_PEER_PORT:-51413}
-
-      # Logs vers stdout (journald) au lieu d'un fichier interne au container
+      TRANSMISSION_PEER_PORT: "51413"
       LOG_TO_STDOUT: "true"
-
-      # Ownership des fichiers downloades cote host
-      PUID: ${PUID:-1000}
-      PGID: ${PGID:-1000}
-
-      # Timezone (logs lisibles)
-      TZ: ${TIMEZONE:-Europe/Paris}
+      PUID: "1000"
+      PGID: "1000"
+      TZ: "Europe/Paris"
     logging:
       driver: json-file
       options:
         max-size: "10m"
+        max-file: "3"
+
+  tinyauth:
+    image: ghcr.io/steveiliop56/tinyauth:latest
+    container_name: ${SERVICE_NAME}-auth
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${AUTH_PORT}:3000"
+    environment:
+      # Cle de signature des cookies de session (32 chars min)
+      SECRET: ${TINYAUTH_SECRET}
+      # Liste des users : "alice:$$2a$$10$$xxxxx" (separes par virgule pour
+      # plusieurs users). Le hash bcrypt se genere avec :
+      #   docker run --rm ghcr.io/steveiliop56/tinyauth:latest user hash <password>
+      USERS: ${TINYAUTH_USERS}
+      # URL publique de l'app proteget (utilise pour les redirects)
+      APP_URL: https://${ADRESS}
+      # Cookie attache au domaine racine pour partage potentiel futur
+      COOKIE_SECURE: "true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
         max-file: "3"
