@@ -164,7 +164,7 @@ INFISICAL_ACCESS_TOKEN="$(
     --domain="$INFISICAL_ADDRESS" \
     --client-id="$INFISICAL_CLIENT_ID" \
     --client-secret="$INFISICAL_CLIENT_SECRET" \
-    --plain --silent 2>/dev/null
+    --plain </dev/null 2>/dev/null
 )"
 if [[ -z "$INFISICAL_ACCESS_TOKEN" ]]; then
   say_err "ERREUR: login Infisical echoue"
