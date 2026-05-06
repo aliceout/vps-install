@@ -1,0 +1,61 @@
+# Transmission via OpenVPN (haugene/transmission-openvpn).
+# Variables substituees depuis /var/lib/services/torrent/runtime.env :
+#   - SERVICE_NAME, PORT     (cloud Infisical /services/torrent/)
+#   - DATA_DIR               (self-hosted, path local arbitraire)
+#   - OPENVPN_*              (self-hosted)
+#   - TRANSMISSION_RPC_*     (self-hosted)
+#   - TRANSMISSION_PEER_PORT (self-hosted, optionnel)
+#   - PUID, PGID             (self-hosted, defaults 1000)
+#   - TIMEZONE               (self-hosted, default Europe/Paris)
+#   - LOCAL_NETWORK          (self-hosted, ex: 192.168.1.0/24)
+
+services:
+  transmission:
+    image: haugene/transmission-openvpn:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "127.0.0.1:${PORT}:9091"
+    volumes:
+      - ${DATA_DIR}:/data
+    environment:
+      # OpenVPN (compte fournisseur)
+      OPENVPN_PROVIDER: ${OPENVPN_PROVIDER}
+      OPENVPN_CONFIG: ${OPENVPN_CONFIG}
+      OPENVPN_USERNAME: ${OPENVPN_USERNAME}
+      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
+
+      # Kill switch : si le VPN tombe, le container ne route plus rien
+      # vers Internet (evite le leak de l'IP reelle).
+      DROP_DEFAULT_ROUTE: "yes"
+
+      # Bypass VPN pour le LAN (necessaire pour atteindre le container
+      # depuis nginx host)
+      LOCAL_NETWORK: ${LOCAL_NETWORK:-192.168.1.0/24}
+
+      # Transmission RPC (web UI auth)
+      TRANSMISSION_WEB_UI: ${TRANSMISSION_WEB_UI:-transmission-web-control}
+      TRANSMISSION_RPC_AUTHENTICATION_REQUIRED: "true"
+      TRANSMISSION_RPC_USERNAME: ${TRANSMISSION_RPC_USERNAME}
+      TRANSMISSION_RPC_PASSWORD: ${TRANSMISSION_RPC_PASSWORD}
+
+      # Port fixe pour les connexions peers entrantes (a forwarder cote
+      # provider VPN si tu veux du seeding optimise).
+      TRANSMISSION_PEER_PORT: ${TRANSMISSION_PEER_PORT:-51413}
+
+      # Logs vers stdout (journald) au lieu d'un fichier interne au container
+      LOG_TO_STDOUT: "true"
+
+      # Ownership des fichiers downloades cote host
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+
+      # Timezone (logs lisibles)
+      TZ: ${TIMEZONE:-Europe/Paris}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
