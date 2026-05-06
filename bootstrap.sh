@@ -86,6 +86,18 @@ export -f read_tty read_secret_tty ask_yes_no
 # --- Preflight apt (ca-certificates, curl, etc.) avant d'installer le CLI ---
 run_module() {
   local m="$1"
+  local mname="${m%.sh}"
+  if [[ -n "${SKIP_MODULES:-}" ]]; then
+    local IFS=','
+    for s in $SKIP_MODULES; do
+      s="${s// /}"
+      [[ -z "$s" ]] && continue
+      if [[ "$mname" == "$s" || "$m" == "$s" ]]; then
+        say_warn "Skip module $m (SKIP_MODULES)"
+        return 0
+      fi
+    done
+  fi
   say_module "$m"
   # shellcheck disable=SC1090
   source "$ROOT_DIR/modules/$m"
@@ -171,6 +183,38 @@ export HOST_TYPE
 
 INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/infra/$HOST_TYPE}"
 
+# --- Install mode (fresh | existing) ---
+# fresh    : lance tous les modules (defaut sur un host neuf)
+# existing : skip 10_user_ssh.sh (utile sur un host deja configure - evite
+#            de toucher au user existant, port SSH, authorized_keys, et de
+#            couper la session SSH en cours).
+INSTALL_MODE_FILE="/etc/infisical/install-mode"
+if [[ -n "${INSTALL_MODE:-}" ]]; then
+  say_info "Install mode force par env: $INSTALL_MODE"
+elif [[ -s "$INSTALL_MODE_FILE" ]]; then
+  INSTALL_MODE="$(cat "$INSTALL_MODE_FILE")"
+  say_ok "Install mode lu depuis $INSTALL_MODE_FILE: $INSTALL_MODE"
+else
+  if ask_yes_no "Le user et SSH sont-ils deja configures sur cette machine ?" "no"; then
+    INSTALL_MODE="existing"
+  else
+    INSTALL_MODE="fresh"
+  fi
+fi
+case "$INSTALL_MODE" in
+  fresh|existing) ;;
+  *) say_err "INSTALL_MODE invalide: '$INSTALL_MODE' (attendu: fresh|existing)"; exit 1 ;;
+esac
+printf '%s' "$INSTALL_MODE" > "$INSTALL_MODE_FILE"
+chmod 644 "$INSTALL_MODE_FILE"
+export INSTALL_MODE
+
+if [[ "$INSTALL_MODE" == "existing" ]]; then
+  SKIP_MODULES="${SKIP_MODULES:+${SKIP_MODULES},}10_user_ssh"
+  say_warn "Mode existing : skip 10_user_ssh.sh."
+fi
+export SKIP_MODULES="${SKIP_MODULES:-}"
+
 # INFISICAL_PATH_INFRA reste local au bootstrap (les modules utilisent /etc/infisical/*
 # pour leurs propres lookups).
 export INFISICAL_ADDRESS INFISICAL_ENV INFISICAL_PROJECT_ID
@@ -235,8 +279,14 @@ if [[ "$got_any" -eq 0 ]]; then
   exit 1
 fi
 
-# Validation : variables obligatoires
-REQUIRED=(VPS_USER VPS_USER_PASSWORD SSH_PORT SSH_PUBKEY)
+# Validation : variables obligatoires.
+# En mode 'existing', VPS_USER_PASSWORD et SSH_PUBKEY ne sont pas requis
+# (10_user_ssh.sh est skip), mais VPS_USER doit exister sur le systeme.
+if [[ "$INSTALL_MODE" == "existing" ]]; then
+  REQUIRED=(VPS_USER SSH_PORT)
+else
+  REQUIRED=(VPS_USER VPS_USER_PASSWORD SSH_PORT SSH_PUBKEY)
+fi
 missing=()
 for v in "${REQUIRED[@]}"; do
   if [[ -z "${!v:-}" ]]; then
@@ -244,8 +294,13 @@ for v in "${REQUIRED[@]}"; do
   fi
 done
 if (( ${#missing[@]} > 0 )); then
-  say_err "ERREUR: variables manquantes dans ${INFISICAL_PATH_INFRA}:"
+  say_err "ERREUR: variables manquantes dans ${INFISICAL_PATH_SHARED} ou ${INFISICAL_PATH_INFRA}:"
   printf '  %s\n' "${C_RED}- ${missing[@]}${C_RESET}"
+  exit 1
+fi
+if [[ "$INSTALL_MODE" == "existing" ]] && ! id -u "$VPS_USER" >/dev/null 2>&1; then
+  say_err "ERREUR: INSTALL_MODE=existing mais le user '$VPS_USER' n'existe pas sur ce systeme."
+  say_err "Cree-le manuellement, ou passe en mode fresh."
   exit 1
 fi
 say_ok "Config chargee depuis Infisical."
