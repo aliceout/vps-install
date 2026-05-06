@@ -8,16 +8,18 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
 <project>/
   <environment>/               ex: prod, staging, ...
     infra/
-      vps/                     # bootstrap (charge au demarrage par bootstrap.sh)
-        VPS_USER
-        VPS_USER_PASSWORD
-        SSH_PORT
-        SSH_PUBKEY
-        CROWDSEC_ENROLL_KEY    # optionnel
-        GITHUB_SSH_PRIVKEY     # optionnel - cle SSH GitHub
-        GITLAB_SSH_PRIVKEY     # optionnel - cle SSH GitLab
-        GHCR_TOKEN             # optionnel - PAT GitHub avec scope read:packages
-        GHCR_USER              # optionnel - username GitHub (default: aliceout)
+      shared/                  # cles communes a tous les hosts (vps + server)
+        CROWDSEC_ENROLL_KEY    # optionnel - meme cle d'enrollment partout
+        # ... ajoute ici toute cle identique entre hosts
+      vps/                     # bootstrap du VPS public
+        VPS_USER, VPS_USER_PASSWORD, SSH_PORT, SSH_PUBKEY
+        GITHUB_SSH_PRIVKEY     # optionnel - cle dediee a ce host
+        GITLAB_SSH_PRIVKEY     # optionnel
+        GHCR_TOKEN, GHCR_USER  # optionnel
+      server/                  # bootstrap du home server
+        VPS_USER, SSH_PORT, SSH_PUBKEY
+        GITHUB_SSH_PRIVKEY     # cle distincte (separation des privileges)
+        ...
 
     certbot/                   # Let's Encrypt + DNS multi-provider
       CERTBOT_EMAIL
@@ -75,21 +77,34 @@ Les `/` dans le path Infisical sont litteraux. L'environnement (`prod`, `staging
 - **Cles de secret** en MAJUSCULES (`APPLICATION_KEY`, `DNS_TOKEN_NAME`, `WEBHOOK_SECRET`)
 - **Labels** (noms de token, de client) en minuscules (`perso`, `alice`, `client1`) - pour distinguer visuellement label vs cle
 
-## `/infra/vps/` - bootstrap
+## `/infra/{shared,vps,server}/` - bootstrap
 
-Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles marquees **optionnel** peuvent etre absentes.
+Au tout debut de `bootstrap.sh`, **avant tout module**. Bootstrap fetch d'abord `/infra/shared/` (priorite basse), puis `/infra/$HOST_TYPE/` (host-specific override). En cas de collision sur une cle, le host-specific gagne.
 
-| Cle | Type | Exemple | Utilise par | Role |
-|-----|------|---------|-------------|------|
-| `VPS_USER` | string | `alice` | `10_user_ssh.sh` | nom du user sudo a creer |
-| `VPS_USER_PASSWORD` | secret | `...` | `10_user_ssh.sh` | mdp sudo du user |
-| `SSH_PORT` | int | `45675` | `10_user_ssh.sh`, `30_ufw_crowdsec.sh` | port SSH custom |
-| `SSH_PUBKEY` | string | `ssh-ed25519 AAAA...` | `10_user_ssh.sh` | cle(s) publique(s) pour authorized_keys |
-| `CROWDSEC_ENROLL_KEY` | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - enrollment CrowdSec. Absent = standalone sans dashboard |
-| `GITHUB_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitHub prives |
-| `GITLAB_SSH_PRIVKEY` | secret | idem | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull de repos GitLab prives |
-| `GHCR_TOKEN` | secret | `ghp_...` | `40_docker.sh` | **optionnel** - GitHub PAT (classic) avec scope `read:packages`. Permet a `docker pull ghcr.io/...` de fetch les images privees de GHCR. Sans ca, les images publiques marchent quand meme |
-| `GHCR_USER` | string | `aliceout` | `40_docker.sh` | **optionnel** - username GitHub a passer a `docker login`. Default: `aliceout` |
+`HOST_TYPE` est determine soit par `/etc/infisical/host-type` (persiste au 1er run), soit par env (`HOST_TYPE=server bash bootstrap.sh`), soit prompte. Valeurs : `vps` ou `server`.
+
+Les cles marquees **optionnel** peuvent etre absentes.
+
+| Cle | Where | Type | Exemple | Utilise par | Role |
+|-----|-------|------|---------|-------------|------|
+| `VPS_USER` | host-specific | string | `alice` | `10_user_ssh.sh` | nom du user sudo a creer |
+| `VPS_USER_PASSWORD` | host-specific | secret | `...` | `10_user_ssh.sh` | mdp sudo du user |
+| `SSH_PORT` | host-specific | int | `45675` | `10_user_ssh.sh`, `30_ufw_crowdsec.sh` | port SSH custom |
+| `SSH_PUBKEY` | host-specific | string | `ssh-ed25519 AAAA...` | `10_user_ssh.sh` | cle(s) publique(s) pour authorized_keys |
+| `CROWDSEC_ENROLL_KEY` | shared (typique) | secret | `abcdef1234...` | `30_ufw_crowdsec.sh` | **optionnel** - meme cle pour tous les hosts (single CrowdSec instance) |
+| `GITHUB_SSH_PRIVKEY` | host-specific | secret | `-----BEGIN OPENSSH PRIVATE KEY-----\n...` | `15_git_ssh.sh` | **optionnel** - cle SSH pour pull repos GitHub prives. **Une cle par host** (separation des privileges) |
+| `GITLAB_SSH_PRIVKEY` | host-specific | secret | idem | `15_git_ssh.sh` | **optionnel** |
+| `GHCR_TOKEN` | host-specific | secret | `ghp_...` | `40_docker.sh` | **optionnel** - PAT GitHub. Une par host pour traçage |
+| `GHCR_USER` | host-specific | string | `aliceout` | `40_docker.sh` | **optionnel** - username GitHub. Default: `aliceout` |
+
+### Mode d'install : `fresh` vs `existing`
+
+Au 1er run, bootstrap demande aussi `Le user et SSH sont-ils deja configures sur cette machine ?`. Persistance dans `/etc/infisical/install-mode`. Override : `INSTALL_MODE=existing bash bootstrap.sh`.
+
+- **fresh** (defaut sur VPS neuf) : tous les modules tournent, dont `10_user_ssh.sh` qui cree le user, change le port SSH, deploie `authorized_keys`.
+- **existing** (host deja configure) : skip uniquement `10_user_ssh.sh`. Le user doit deja exister sur le systeme (sanity check au boot). `VPS_USER_PASSWORD` et `SSH_PUBKEY` deviennent optionnels cote Infisical.
+
+Mecanique generique : `SKIP_MODULES="10_user_ssh,xxx" bash bootstrap.sh` skip n'importe quel module par prefix de nom.
 
 ## `/certbot/` - Let's Encrypt + DNS providers
 
@@ -136,13 +151,15 @@ Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.s
 | `RESTIC_PASSWORD` | secret | `...` | mdp de chiffrement |
 | `BACKUP_PATHS` | string | `/home/choupi/data` | **optionnel**, defaut `/home/<VPS_USER>/data` |
 
-## `/services/webhooks/`
+## `/services/webhooks/<host_type>/`
 
-### Racine : config du vhost
+Le receiver webhooks tourne potentiellement sur plusieurs hosts (`vps` et `server`) avec une `ADRESS` distincte par host. La config est donc scopee par host_type : `/services/webhooks/vps/` pour le VPS, `/services/webhooks/server/` pour le home server. Le `service.conf` du webhooks utilise `INFISICAL_PATH="/services/webhooks/${HOST_TYPE}"`.
+
+### `/services/webhooks/<host_type>/` : config du vhost
 
 | Cle | Exemple | Role |
 |-----|---------|------|
-| `ADRESS` | `webhooks.backlice.dev` | FQDN de l'expo |
+| `ADRESS` | `webhooks.backlice.dev` (vps) / `hooks.lan.tld` (server) | FQDN de l'expo |
 | `DOMAIN` | `backlice.dev` | apex cert wildcard |
 | `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
 | `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
@@ -150,6 +167,8 @@ Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.s
 ### Sous-dossier `hook/` par service deployee via webhook
 
 Chaque service qui se redeploit via webhook met sa config webhook sous `/services/<nom>/hook/` (et non plus dans `/services/webhooks/<slug>/`). Le receiver scanne `/services/*/hook/` a `services install/update webhooks` pour generer un sink `/etc/secrets/webhooks/<nom>.env` par service-avec-hook.
+
+**Filtre par host** : seuls les services dont le hook script `<svc>.sh` est publie localement dans `/var/lib/services/webhooks/hooks/` sont pris en compte. Donc le VPS ne genere que les sinks pour ses propres services (`2mains`, `nodea`, `korai`, `work`...) et le server ne genere que les siens, meme si l'arborescence Infisical `/services/*` contient les hooks de tous les hosts.
 
 | Cle | Type | Role |
 |-----|------|------|

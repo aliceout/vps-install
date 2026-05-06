@@ -4,7 +4,9 @@ Bootstrap d'un VPS pour services web exposes, avec secrets centralises dans Infi
 
 ## Principe
 
-Le bootstrap ne te demande **qu'un seul credential** : les identifiants Machine Identity d'Infisical. Tout le reste (utilisateur, port SSH, cle publique, email Let's Encrypt, tokens DNS Infomaniak/OVH, ...) est tire depuis Infisical sous les chemins `/infra/vps/`, `/certbot/`, etc.
+Le bootstrap ne te demande **qu'un seul credential** : les identifiants Machine Identity d'Infisical. Tout le reste (utilisateur, port SSH, cle publique, email Let's Encrypt, tokens DNS Infomaniak/OVH, ...) est tire depuis Infisical sous les chemins `/infra/<host_type>/`, `/infra/shared/`, `/certbot/`, etc.
+
+Multi-hosts dans un seul projet Infisical : au 1er run, le bootstrap demande `vps` ou `server` (persiste dans `/etc/infisical/host-type`), et fetch `/infra/shared/` + `/infra/$HOST_TYPE/` (le 2eme override le 1er sur les cles communes). Sur un host deja configure (user/SSH en place), tu reponds `existing` au prompt mode pour skipper `10_user_ssh.sh`.
 
 Cela permet de :
 - Reinstaller le VPS en 15 minutes sans notes perdues
@@ -17,7 +19,7 @@ Structure complete des secrets, paths et cles : voir [`INFISICAL.md`](INFISICAL.
 
 En resume, il te faut :
 - un projet Infisical avec un environnement (`prod`)
-- les secrets sous `/infra/vps/` (bootstrap) et `/services/<nom>/` (services)
+- les secrets sous `/infra/{shared,vps,server}/` (bootstrap, voir `INFISICAL.md` pour le split) et `/services/<nom>/` (services)
 - une **Machine Identity** (Universal Auth) avec la permission **Read** sur ce projet : note le **Project ID**, le **Client ID** et le **Client Secret**
 
 ## One-liner (en 3 étapes — review avant exec)
@@ -36,7 +38,11 @@ Le script te demandera :
 - Project ID
 - Client ID
 - Client Secret
+- **Type d'host** : `vps` ou `server` (determine `/infra/$HOST_TYPE/` cote Infisical)
+- **User et SSH deja configures ?** : oui = skip `10_user_ssh.sh` (mode `existing`), non = fresh install
 - Questions yes/no pour activer features (web / docker / node)
+
+Override en non-interactif : `HOST_TYPE=server INSTALL_MODE=existing bash bootstrap.sh`. Les valeurs sont persistees dans `/etc/infisical/host-type` et `/etc/infisical/install-mode`, donc les re-runs ne re-promptent pas.
 
 Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises automatiquement si tu relances le bootstrap.
 
