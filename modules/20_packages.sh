@@ -22,7 +22,9 @@ apt-get update -y
 apt-get install -y docker-ctop
 
 echo "Installation lazydocker (script officiel)"
-curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
+# DIR=/usr/local/bin : sinon le script installe dans $HOME/.local/bin/, qui
+# en root devient /root/.local/bin/lazydocker (invisible pour le VPS_USER).
+DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
 
 # pfetch : petit banner system info (pas dans les repos Debian)
 if [[ ! -x /usr/local/bin/pfetch ]]; then
