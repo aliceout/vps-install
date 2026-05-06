@@ -153,9 +153,49 @@ fi
 
 INFISICAL_PATH_SHARED="/infra/shared"
 
-# --- Host type detection (vps | server) ---
-# 1er run : prompte. Persiste dans /etc/infisical/host-type. Override via
-# env HOST_TYPE=<vps|server>. Re-runs : lit le fichier persiste.
+# --- Auth Infisical (en avance, pour pouvoir lister les sous-dossiers /infra/) ---
+export INFISICAL_ADDRESS INFISICAL_ENV INFISICAL_PROJECT_ID
+export INFISICAL_CLIENT_ID INFISICAL_CLIENT_SECRET
+
+say_info "Authentification Infisical..."
+INFISICAL_ACCESS_TOKEN="$(
+  infisical login \
+    --method=universal-auth \
+    --domain="$INFISICAL_ADDRESS" \
+    --client-id="$INFISICAL_CLIENT_ID" \
+    --client-secret="$INFISICAL_CLIENT_SECRET" \
+    --plain --silent 2>/dev/null
+)"
+if [[ -z "$INFISICAL_ACCESS_TOKEN" ]]; then
+  say_err "ERREUR: login Infisical echoue"
+  exit 1
+fi
+export INFISICAL_TOKEN="$INFISICAL_ACCESS_TOKEN"
+
+# Helper : liste les sous-dossiers de /infra/, exclut 'shared'.
+list_infra_hosts() {
+  infisical secrets folders get \
+    --domain="$INFISICAL_ADDRESS" \
+    --projectId="$INFISICAL_PROJECT_ID" \
+    --env="$INFISICAL_ENV" \
+    --path="/infra" \
+    --token="$INFISICAL_TOKEN" 2>/dev/null \
+    | awk '
+        /^│/ && !/FOLDER NAME/ {
+          n = split($0, parts, "│")
+          if (n >= 2) {
+            name = parts[2]
+            gsub(/^[ \t]+|[ \t]+$/, "", name)
+            if (name != "" && name != "shared") print name
+          }
+        }' \
+    | sort -u
+}
+
+# --- Host type detection ---
+# 1er run : liste les sous-dossiers /infra/* (hors shared) et prompte.
+# Persiste dans /etc/infisical/host-type. Override via env HOST_TYPE.
+# Re-runs : lit le fichier persiste.
 HOST_TYPE_FILE="/etc/infisical/host-type"
 if [[ -n "${HOST_TYPE:-}" ]]; then
   say_info "Host type force par env: $HOST_TYPE"
@@ -163,19 +203,29 @@ elif [[ -s "$HOST_TYPE_FILE" ]]; then
   HOST_TYPE="$(cat "$HOST_TYPE_FILE")"
   say_ok "Host type lu depuis $HOST_TYPE_FILE: $HOST_TYPE"
 else
+  AVAILABLE_HOSTS="$(list_infra_hosts)"
+  if [[ -n "$AVAILABLE_HOSTS" ]]; then
+    say_info "Hosts existants dans /infra/ (hors 'shared'):"
+    while IFS= read -r h; do
+      [[ -n "$h" ]] && printf '  - %s\n' "$h"
+    done <<< "$AVAILABLE_HOSTS"
+  else
+    say_warn "Aucun sous-dossier dans /infra/ (a part 'shared'). Tu vas en creer un."
+  fi
   HOST_TYPE=""
   while [[ -z "$HOST_TYPE" ]]; do
-    read_tty "Type d'host (vps|server): " HOST_TYPE
-    case "$HOST_TYPE" in
-      vps|server) ;;
-      *) say_warn "Reponds 'vps' ou 'server'."; HOST_TYPE="" ;;
-    esac
+    read_tty "Type d'host: " HOST_TYPE
+    HOST_TYPE="$(printf '%s' "$HOST_TYPE" | tr -d ' \t\n\r')"
+    if [[ "$HOST_TYPE" == "shared" ]]; then
+      say_warn "'shared' est reserve aux cles communes, choisis un autre nom."
+      HOST_TYPE=""
+    fi
   done
 fi
-case "$HOST_TYPE" in
-  vps|server) ;;
-  *) say_err "HOST_TYPE invalide: '$HOST_TYPE' (attendu: vps|server)"; exit 1 ;;
-esac
+if [[ -z "$HOST_TYPE" || "$HOST_TYPE" == "shared" ]]; then
+  say_err "HOST_TYPE invalide: '$HOST_TYPE' (vide ou 'shared' reserve)"
+  exit 1
+fi
 install -d -m 755 /etc/infisical
 printf '%s' "$HOST_TYPE" > "$HOST_TYPE_FILE"
 chmod 644 "$HOST_TYPE_FILE"
@@ -217,24 +267,6 @@ export SKIP_MODULES="${SKIP_MODULES:-}"
 
 # INFISICAL_PATH_INFRA reste local au bootstrap (les modules utilisent /etc/infisical/*
 # pour leurs propres lookups).
-export INFISICAL_ADDRESS INFISICAL_ENV INFISICAL_PROJECT_ID
-export INFISICAL_CLIENT_ID INFISICAL_CLIENT_SECRET
-
-# --- Auth + fetch config depuis Infisical ---
-say_info "Authentification Infisical..."
-INFISICAL_ACCESS_TOKEN="$(
-  infisical login \
-    --method=universal-auth \
-    --domain="$INFISICAL_ADDRESS" \
-    --client-id="$INFISICAL_CLIENT_ID" \
-    --client-secret="$INFISICAL_CLIENT_SECRET" \
-    --plain --silent 2>/dev/null
-)"
-if [[ -z "$INFISICAL_ACCESS_TOKEN" ]]; then
-  say_err "ERREUR: login Infisical echoue"
-  exit 1
-fi
-export INFISICAL_TOKEN="$INFISICAL_ACCESS_TOKEN"
 
 say_info "Recuperation config depuis ${INFISICAL_ADDRESS} (${INFISICAL_ENV}: ${INFISICAL_PATH_SHARED} + ${INFISICAL_PATH_INFRA})..."
 
