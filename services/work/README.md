@@ -6,7 +6,7 @@ Site Next.js [aliceout/Work-resume](https://github.com/aliceout/Work-resume), de
 
 - Service `webhooks` installe (`services install webhooks`)
 - Cle SSH GitHub deployee (`/infra/vps/GITHUB_SSH_PRIVKEY`) pour pull le repo prive
-- Subfolder Infisical `/services/webhooks/work/` cree avec :
+- Subfolder Infisical `/services/work/hook/` cree avec :
   - `REPO`   = `aliceout/Work-resume`
   - `SECRET` = HMAC partage avec GitHub (`openssl rand -hex 32`)
   - `SCRIPT` = `work.sh`

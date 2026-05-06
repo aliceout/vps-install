@@ -8,7 +8,7 @@
 #   - ADRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #
-# Le webhook cote receiver attend aussi /services/webhooks/work/ avec
+# Le webhook cote receiver attend aussi /services/work/hook/ avec
 # REPO=aliceout/work-resume, WEBHOOK_SECRET=<hmac>, SCRIPT=work.sh,
 # PROVIDER=github, WORKFLOW="Docker build", BRANCH=master
 #

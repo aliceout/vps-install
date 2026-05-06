@@ -19,7 +19,7 @@
 # et consommes par deploy.sh (dans le repo Nodea) qui fetch les vraies cles
 # app (COOKIE_SECRET, POSTGRES_PASSWORD, SMTP_*, etc.) depuis le self-hosted.
 #
-# Le webhook cote receiver attend aussi /services/webhooks/nodea/ avec
+# Le webhook cote receiver attend aussi /services/nodea/hook/ avec
 # REPO=aliceout/Nodea, WEBHOOK_SECRET=<hmac>, SCRIPT=nodea.sh,
 # PROVIDER=github, WORKFLOW="Docker build", BRANCH=main
 set -euo pipefail

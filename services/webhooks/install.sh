@@ -72,30 +72,43 @@ EOF
       polling-interval: 60s
 EOF
 
-  # Un template + sink par sous-dossier (work, nodea, ...)
-  local subfolders
-  subfolders="$(list_subfolders "$INFISICAL_PATH")"
+  # Un template + sink par service ayant un sous-dossier 'hook/'.
+  # Ex: /services/2mains/hook/ -> /etc/secrets/webhooks/2mains.env
+  # Le receiver lit toujours HOOKS_ENV_DIR/<slug>.env, donc le naming
+  # cote disque est inchange.
+  local services hook_subs
+  services="$(list_subfolders "/services")"
 
-  if [[ -z "$subfolders" ]]; then
-    echo "AVERTISSEMENT: aucun sous-dossier sous ${INFISICAL_PATH}, le webhook server n'aura aucun repo configure."
+  if [[ -z "$services" ]]; then
+    echo "AVERTISSEMENT: aucun service sous /services/, le webhook server n'aura aucun repo configure."
   else
-    while IFS= read -r sub; do
-      [[ -z "$sub" ]] && continue
-      cat > /etc/infisical/templates/_${SERVICE_NAME}_${sub}.tmpl <<EOF
-{{- with listSecrets "${pid}" "${env}" "${INFISICAL_PATH}/${sub}" }}
+    local hook_count=0
+    while IFS= read -r svc; do
+      [[ -z "$svc" || "$svc" == "${SERVICE_NAME}" ]] && continue
+      # Test si ce service a un sous-dossier 'hook'.
+      hook_subs="$(list_subfolders "/services/${svc}" 2>/dev/null)"
+      grep -qx 'hook' <<< "$hook_subs" || continue
+
+      cat > /etc/infisical/templates/_${SERVICE_NAME}_${svc}.tmpl <<EOF
+{{- with listSecrets "${pid}" "${env}" "/services/${svc}/hook" }}
 {{- range . }}
 {{ .Key }}={{ .Value }}
 {{- end }}
 {{- end }}
 EOF
       cat >> /etc/infisical/agent.d/_${SERVICE_NAME}.yaml <<EOF
-  - source-path: /etc/infisical/templates/_${SERVICE_NAME}_${sub}.tmpl
-    destination-path: ${HOOKS_ENV_DIR}/${sub}.env
+  - source-path: /etc/infisical/templates/_${SERVICE_NAME}_${svc}.tmpl
+    destination-path: ${HOOKS_ENV_DIR}/${svc}.env
     config:
       polling-interval: 60s
 EOF
-      echo "  + sous-dossier '${sub}' -> ${HOOKS_ENV_DIR}/${sub}.env"
-    done <<< "$subfolders"
+      echo "  + service '${svc}' (avec hook) -> ${HOOKS_ENV_DIR}/${svc}.env"
+      hook_count=$((hook_count + 1))
+    done <<< "$services"
+
+    if [[ "$hook_count" -eq 0 ]]; then
+      echo "AVERTISSEMENT: aucun service avec /services/<nom>/hook/, le webhook server n'aura aucun repo configure."
+    fi
   fi
 
   chmod 600 /etc/infisical/agent.d/_${SERVICE_NAME}.yaml
@@ -196,8 +209,8 @@ EOF
 
     echo
     echo "Webhooks service demarre."
-    echo "Pour ajouter un repo : cree un sous-dossier dans Infisical sous"
-    echo "  ${INFISICAL_PATH}/<nom>/ avec REPO, WEBHOOK_SECRET, SCRIPT, puis"
+    echo "Pour brancher un repo : cree /services/<nom>/hook/ dans Infisical avec"
+    echo "  REPO, WEBHOOK_SECRET, SCRIPT, GIT_PROVIDER, puis"
     echo "  services update webhooks pour reenregistrer les templates."
     ;;
 

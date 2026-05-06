@@ -43,27 +43,30 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         HOME_SSH_HOST, HOME_SSH_PORT, HOME_SSH_USER, HOME_SSH_PRIVKEY
         RESTIC_REPOSITORY, RESTIC_PASSWORD
         BACKUP_PATHS           # optionnel (defaut: /home/$VPS_USER/data)
+      webhooks/                # Webhooks receiver (GitHub + GitLab) - vhost only
+        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
       pdf/                     # Stirling PDF
         ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
-      work/                    # Work-resume Next.js
+      work/                    # Work-resume Next.js (deploy via webhook)
         ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
         APP, BRANCH, DIR, PORT, REPO
+        hook/                  # config webhook pour ce service
+          REPO                 # owner/name (GH) ou namespace/name (GL)
+          WEBHOOK_SECRET       # HMAC GitHub / token GitLab
+          SCRIPT               # nom du .sh dans /var/lib/services/webhooks/hooks/
+          GIT_PROVIDER         # github | gitlab
+          WORKFLOW             # optionnel, filtre sur nom CI
+          BRANCH               # optionnel, filtre sur branche
       korai/                   # Korai (Docker multi-containers, deploy via webhook)
         ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME, PORT
         INFISICAL_API_URL, INFISICAL_PROJECT_ID,
         INFISICAL_CLIENT_ID, INFISICAL_CLIENT_SECRET, INFISICAL_ENV
-      webhooks/                # Webhooks receiver (GitHub + GitLab)
-        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
-        <repo-slug>/           # un sous-dossier par hook (ex: work, korai, riana-projet)
-          REPO                 # owner/name (GitHub) ou namespace/name (GitLab)
-          WEBHOOK_SECRET       # token d'auth (HMAC cote GitHub, plain cote GitLab)
-          SCRIPT               # nom du .sh dans /var/lib/services/webhooks/hooks/
-          GIT_PROVIDER         # github | gitlab (requis, pas de defaut)
-          WORKFLOW             # optionnel, filtre sur nom CI
-          BRANCH               # optionnel, filtre sur branche
+        hook/                  # config webhook (idem)
+          REPO, WEBHOOK_SECRET, SCRIPT, GIT_PROVIDER, ...
       <service-avec-data>/     # services stateful (Ghost, Wiki, etc.)
         ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
         ... autres secrets applicatifs ...
+        hook/                  # optionnel, si le service a un repo branche
 ```
 
 Les `/` dans le path Infisical sont litteraux. L'environnement (`prod`, `staging`, etc.) est choisi au prompt du bootstrap et persiste dans `/etc/infisical/environment`.
@@ -144,9 +147,9 @@ Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.s
 | `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
 | `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
 
-### Sous-dossier par hook
+### Sous-dossier `hook/` par service deployee via webhook
 
-Chaque repo branche a un sous-dossier `/services/webhooks/<slug>/`. Le receiver scanne a chaque requete.
+Chaque service qui se redeploit via webhook met sa config webhook sous `/services/<nom>/hook/` (et non plus dans `/services/webhooks/<slug>/`). Le receiver scanne `/services/*/hook/` a `services install/update webhooks` pour generer un sink `/etc/secrets/webhooks/<nom>.env` par service-avec-hook.
 
 | Cle | Type | Role |
 |-----|------|------|

@@ -19,7 +19,7 @@
 # cloud du VPS (/etc/infisical/*) parce qu'ils ne sont que sources + ecrits
 # dans /home/$VPS_USER/.config/infisical/korai.env, jamais re-exportes.
 #
-# Le hook GitHub cote webhooks attend aussi /services/webhooks/korai/ avec
+# Le hook GitHub cote webhooks attend aussi /services/korai/hook/ avec
 # REPO=aliceout/Korai, SECRET=<hmac GitHub>, SCRIPT=korai.sh
 set -euo pipefail
 

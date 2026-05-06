@@ -23,7 +23,7 @@
 #   - SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM
 #   - MAIL_TO, RATE_LIMIT_PER_HOUR, ALLOWED_ORIGIN
 #
-# Le webhook cote receiver attend /services/webhooks/2mains/ avec
+# Le webhook cote receiver attend /services/2mains/hook/ avec
 # REPO=aliceout/2mains, WEBHOOK_SECRET, SCRIPT=2mains.sh, GIT_PROVIDER=github,
 # WORKFLOW="Docker build", BRANCH=main.
 

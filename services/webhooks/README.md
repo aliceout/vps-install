@@ -19,9 +19,9 @@ Auth selon la forge :
 | `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
 | `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
 
-### `/services/webhooks/<repo>/` (un sous-dossier par webhook)
+### `/services/<nom>/hook/` (un sous-dossier `hook/` par service-avec-deploy)
 
-Chaque repo branche (GitHub ou GitLab) a son propre sous-dossier :
+Chaque service deployee via webhook met sa config webhook chez lui sous `hook/` (et **non plus** dans `/services/webhooks/<slug>/`). Le receiver scanne `/services/*/hook/` a `services install/update webhooks`.
 
 | Cle | Exemple | Role |
 |-----|---------|------|
@@ -38,7 +38,7 @@ Chaque repo branche (GitHub ou GitLab) a son propre sous-dossier :
 
 ### Repo GitHub
 
-1. Dans Infisical, cree `/services/webhooks/<nom>/` avec `REPO`, `WEBHOOK_SECRET`, `SCRIPT`, `GIT_PROVIDER=github`.
+1. Dans Infisical, cree `/services/<nom>/hook/` avec `REPO`, `WEBHOOK_SECRET`, `SCRIPT`, `GIT_PROVIDER=github`.
 2. Dans le repo `vps-install`, cree un `services/<nom>/` avec son `hook.sh` + `install.sh` qui publie le hook.
 3. Commit + push, pull sur le VPS.
 4. `services install <nom>` → installe l'app, publie le hook, trigger `services update webhooks`.
@@ -46,7 +46,7 @@ Chaque repo branche (GitHub ou GitLab) a son propre sous-dossier :
 
 ### Repo GitLab
 
-1. Dans Infisical, cree `/services/webhooks/<nom>/` avec `REPO` (format `namespace/name`), `WEBHOOK_SECRET`, `SCRIPT`, **`GIT_PROVIDER=gitlab`**.
+1. Dans Infisical, cree `/services/<nom>/hook/` avec `REPO` (format `namespace/name`), `WEBHOOK_SECRET`, `SCRIPT`, **`GIT_PROVIDER=gitlab`**.
 2. Meme logique cote `services/<nom>/` dans vps-install.
 3. Sur GitLab, Settings > Webhooks > Add : URL `https://<ADRESS>/webhooks`, Secret token = la valeur de `WEBHOOK_SECRET`, Trigger = Push events / Pipeline events (et **activer Enable SSL verification**).
 
@@ -60,17 +60,17 @@ Ca :
 - Deploie `app.js` dans `/var/lib/services/webhooks/`
 - Cree `/var/lib/services/webhooks/{hooks,log}/`
 - Installe `/etc/systemd/system/webhooks.service` avec hardening (ProtectSystem, ReadWritePaths sur `/var/www`, `/home/<user>`, etc.)
-- Genere les templates Infisical (un par sous-dossier sous `/services/webhooks/`) → `/etc/secrets/webhooks.env` (main) + `/etc/secrets/webhooks/<repo>.env` (un par hook)
+- Genere les templates Infisical (un par service ayant `/services/<nom>/hook/`) → `/etc/secrets/webhooks.env` (main) + `/etc/secrets/webhooks/<nom>.env` (un par hook)
 - Reverse proxy nginx `https://<ADRESS>/webhooks` → `127.0.0.1:8070`
 - Cert wildcard `*.<DOMAIN>` (skip si deja present)
 
-## Update apres ajout d'un sous-dossier Infisical
+## Update apres ajout d'un nouveau hook
 
 ```bash
 services update webhooks
 ```
 
-Rescanne les sous-dossiers sous `/services/webhooks/` et (re)genere les templates agent.
+Rescanne `/services/*/hook/` et (re)genere les templates agent.
 
 ## Debug
 
