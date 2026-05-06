@@ -139,7 +139,37 @@ else
   done
 fi
 
-INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/infra/vps}"
+INFISICAL_PATH_SHARED="/infra/shared"
+
+# --- Host type detection (vps | server) ---
+# 1er run : prompte. Persiste dans /etc/infisical/host-type. Override via
+# env HOST_TYPE=<vps|server>. Re-runs : lit le fichier persiste.
+HOST_TYPE_FILE="/etc/infisical/host-type"
+if [[ -n "${HOST_TYPE:-}" ]]; then
+  say_info "Host type force par env: $HOST_TYPE"
+elif [[ -s "$HOST_TYPE_FILE" ]]; then
+  HOST_TYPE="$(cat "$HOST_TYPE_FILE")"
+  say_ok "Host type lu depuis $HOST_TYPE_FILE: $HOST_TYPE"
+else
+  HOST_TYPE=""
+  while [[ -z "$HOST_TYPE" ]]; do
+    read_tty "Type d'host (vps|server): " HOST_TYPE
+    case "$HOST_TYPE" in
+      vps|server) ;;
+      *) say_warn "Reponds 'vps' ou 'server'."; HOST_TYPE="" ;;
+    esac
+  done
+fi
+case "$HOST_TYPE" in
+  vps|server) ;;
+  *) say_err "HOST_TYPE invalide: '$HOST_TYPE' (attendu: vps|server)"; exit 1 ;;
+esac
+install -d -m 755 /etc/infisical
+printf '%s' "$HOST_TYPE" > "$HOST_TYPE_FILE"
+chmod 644 "$HOST_TYPE_FILE"
+export HOST_TYPE
+
+INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/infra/$HOST_TYPE}"
 
 # INFISICAL_PATH_INFRA reste local au bootstrap (les modules utilisent /etc/infisical/*
 # pour leurs propres lookups).
@@ -162,18 +192,18 @@ if [[ -z "$INFISICAL_ACCESS_TOKEN" ]]; then
 fi
 export INFISICAL_TOKEN="$INFISICAL_ACCESS_TOKEN"
 
-say_info "Recuperation config depuis ${INFISICAL_ADDRESS} (${INFISICAL_ENV}${INFISICAL_PATH_INFRA})..."
+say_info "Recuperation config depuis ${INFISICAL_ADDRESS} (${INFISICAL_ENV}: ${INFISICAL_PATH_SHARED} + ${INFISICAL_PATH_INFRA})..."
 
 # `infisical export --format=dotenv` encode les newlines en '\n' litteral,
 # que bash source ne decode pas. On fetch chaque cle individuellement avec
 # --plain pour preserver les valeurs multiligne (SSH keys, certs, etc.).
-fetch_infra_secret() {
-  local k="$1"
+fetch_secret() {
+  local k="$1" path="$2"
   infisical secrets get "$k" \
     --domain="$INFISICAL_ADDRESS" \
     --projectId="$INFISICAL_PROJECT_ID" \
     --env="$INFISICAL_ENV" \
-    --path="$INFISICAL_PATH_INFRA" \
+    --path="$path" \
     --token="$INFISICAL_TOKEN" \
     --plain 2>/dev/null || true
 }
@@ -189,15 +219,19 @@ INFRA_KEYS=(
 
 got_any=0
 for k in "${INFRA_KEYS[@]}"; do
-  v="$(fetch_infra_secret "$k")"
-  if [[ -n "$v" ]]; then
-    export "$k=$v"
-    got_any=1
-  fi
+  # Fetch shared d'abord (priorite basse), puis host-specific (override
+  # si la cle existe aussi dans /infra/<host>/).
+  for path in "$INFISICAL_PATH_SHARED" "$INFISICAL_PATH_INFRA"; do
+    v="$(fetch_secret "$k" "$path")"
+    if [[ -n "$v" ]]; then
+      export "$k=$v"
+      got_any=1
+    fi
+  done
 done
 
 if [[ "$got_any" -eq 0 ]]; then
-  say_err "ERREUR: aucun secret recupere sous ${INFISICAL_PATH_INFRA}"
+  say_err "ERREUR: aucun secret recupere sous ${INFISICAL_PATH_SHARED} ni ${INFISICAL_PATH_INFRA}"
   exit 1
 fi
 
