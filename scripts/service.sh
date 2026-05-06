@@ -21,7 +21,10 @@ export VPS_USER
 # HOST_TYPE (vps|server) : ecrit par bootstrap.sh dans /etc/infisical/host-type.
 # Utilise par les service.conf qui ont besoin de scoper leur INFISICAL_PATH par
 # host (ex: webhooks dont l'ADRESS differe entre vps et server).
-if [[ -z "${HOST_TYPE:-}" && -s /etc/infisical/host-type ]]; then
+# Toujours initialise (eventuellement vide) pour ne pas casser le source d'un
+# service.conf qui le reference sous set -u.
+HOST_TYPE="${HOST_TYPE:-}"
+if [[ -z "$HOST_TYPE" && -s /etc/infisical/host-type ]]; then
   HOST_TYPE="$(cat /etc/infisical/host-type)"
 fi
 export HOST_TYPE

@@ -13,6 +13,16 @@ INFISICAL_PATH="/services/${SERVICE_NAME}"
 
 : "${VPS_USER:?VPS_USER manquant}"
 
+# HOST_TYPE est obligatoire pour ce service : INFISICAL_PATH le reference dans
+# service.conf (/services/webhooks/${HOST_TYPE}). Sans, le path serait vide
+# et l'agent fetch /services/webhooks/ (= probablement vide ou stale).
+if [[ -z "${HOST_TYPE:-}" ]]; then
+  echo "ERREUR: HOST_TYPE non defini." >&2
+  echo "  Lance le bootstrap (qui prompte vps|server) ou cree le fichier a la main:" >&2
+  echo "    sudo bash -c 'echo vps > /etc/infisical/host-type && chmod 644 /etc/infisical/host-type'" >&2
+  exit 1
+fi
+
 # --- Helpers Infisical -------------------------------------------------------
 
 infi_login() {
