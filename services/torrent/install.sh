@@ -50,7 +50,6 @@ build_runtime_env() {
   token="$(infisical login \
     --method=universal-auth \
     --domain="$INFISICAL_API_URL" \
-    --projectId="$INFISICAL_PROJECT_ID" \
     --client-id="$INFISICAL_CLIENT_ID" \
     --client-secret="$INFISICAL_CLIENT_SECRET" \
     --plain </dev/null 2>/dev/null)"
