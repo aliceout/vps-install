@@ -18,6 +18,14 @@ if [[ -z "${VPS_USER:-}" && -s /etc/infisical/vps-user ]]; then
 fi
 export VPS_USER
 
+# HOST_TYPE (vps|server) : ecrit par bootstrap.sh dans /etc/infisical/host-type.
+# Utilise par les service.conf qui ont besoin de scoper leur INFISICAL_PATH par
+# host (ex: webhooks dont l'ADRESS differe entre vps et server).
+if [[ -z "${HOST_TYPE:-}" && -s /etc/infisical/host-type ]]; then
+  HOST_TYPE="$(cat /etc/infisical/host-type)"
+fi
+export HOST_TYPE
+
 if [[ $EUID -ne 0 ]]; then
   echo "Lance-moi en root: sudo bash $0"
   exit 1

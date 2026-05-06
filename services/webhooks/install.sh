@@ -72,10 +72,15 @@ EOF
       polling-interval: 60s
 EOF
 
-  # Un template + sink par service ayant un sous-dossier 'hook/'.
-  # Ex: /services/2mains/hook/ -> /etc/secrets/webhooks/2mains.env
-  # Le receiver lit toujours HOOKS_ENV_DIR/<slug>.env, donc le naming
-  # cote disque est inchange.
+  # Un template + sink par service ayant un sous-dossier 'hook/' Infisical
+  # ET dont le script de deploiement <svc>.sh est publie localement dans
+  # HOOKS_DIR. Le 2eme critere = filtre par host : sur le VPS, seuls les
+  # services installes en local ont leur hook.sh publie ici. Sur le server,
+  # idem. Donc chaque receiver template uniquement ses propres hooks, meme
+  # si /services/* contient les hooks de tous les hosts.
+  #
+  # Ex: /services/2mains/hook/ + /var/lib/services/webhooks/hooks/2mains.sh
+  #     -> /etc/secrets/webhooks/2mains.env
   local services hook_subs
   services="$(list_subfolders "/services")"
 
@@ -85,7 +90,12 @@ EOF
     local hook_count=0
     while IFS= read -r svc; do
       [[ -z "$svc" || "$svc" == "${SERVICE_NAME}" ]] && continue
-      # Test si ce service a un sous-dossier 'hook'.
+
+      # Filtre #1 : le hook script doit etre publie localement (= ce host
+      # heberge le service). Si absent, on n'est pas concerne.
+      [[ -f "$HOOKS_DIR/${svc}.sh" ]] || continue
+
+      # Filtre #2 : le service doit avoir un sous-dossier 'hook/' cote Infisical.
       hook_subs="$(list_subfolders "/services/${svc}" 2>/dev/null)"
       grep -qx 'hook' <<< "$hook_subs" || continue
 
@@ -102,12 +112,13 @@ EOF
     config:
       polling-interval: 60s
 EOF
-      echo "  + service '${svc}' (avec hook) -> ${HOOKS_ENV_DIR}/${svc}.env"
+      echo "  + service '${svc}' (hook local + Infisical) -> ${HOOKS_ENV_DIR}/${svc}.env"
       hook_count=$((hook_count + 1))
     done <<< "$services"
 
     if [[ "$hook_count" -eq 0 ]]; then
-      echo "AVERTISSEMENT: aucun service avec /services/<nom>/hook/, le webhook server n'aura aucun repo configure."
+      echo "AVERTISSEMENT: aucun service avec hook publie + /services/<nom>/hook/ Infisical."
+      echo "  Hooks publies dans ${HOOKS_DIR}: $(ls "$HOOKS_DIR"/*.sh 2>/dev/null | wc -l)"
     fi
   fi
 
