@@ -8,7 +8,7 @@
 #   - ADRESS                  (ex: nodea.app) - FQDN du vhost
 #   - PORT                    (ex: 8061) - port host du container web
 #   - DNS_PROVIDER            infomaniak | ovh
-#   - DNS_TOKEN_NAME          label sous /vps/certbot/<provider>/
+#   - DNS_TOKEN_NAME          label sous /certbot/<provider>/
 #   - INFISICAL_API_URL       (ex: https://env.backlice.dev) - Infisical self-hosted
 #   - INFISICAL_PROJECT_ID    - project id cote self-hosted (projet Nodea)
 #   - INFISICAL_CLIENT_ID     - machine identity cote self-hosted

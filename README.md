@@ -4,7 +4,7 @@ Bootstrap d'un VPS pour services web exposes, avec secrets centralises dans Infi
 
 ## Principe
 
-Le bootstrap ne te demande **qu'un seul credential** : les identifiants Machine Identity d'Infisical. Tout le reste (utilisateur, port SSH, cle publique, email Let's Encrypt, tokens DNS Infomaniak/OVH, ...) est tire depuis Infisical sous les chemins `/vps/_infra/`, `/vps/certbot/`, etc.
+Le bootstrap ne te demande **qu'un seul credential** : les identifiants Machine Identity d'Infisical. Tout le reste (utilisateur, port SSH, cle publique, email Let's Encrypt, tokens DNS Infomaniak/OVH, ...) est tire depuis Infisical sous les chemins `/vps/`, `/certbot/`, etc.
 
 Cela permet de :
 - Reinstaller le VPS en 15 minutes sans notes perdues
@@ -17,7 +17,7 @@ Structure complete des secrets, paths et cles : voir [`INFISICAL.md`](INFISICAL.
 
 En resume, il te faut :
 - un projet Infisical avec un environnement (`prod`)
-- les secrets sous `/vps/_infra/` (bootstrap) et `/services/<nom>/` (services)
+- les secrets sous `/vps/` (bootstrap) et `/services/<nom>/` (services)
 - une **Machine Identity** (Universal Auth) avec la permission **Read** sur ce projet : note le **Project ID**, le **Client ID** et le **Client Secret**
 
 ## One-liner (en 3 étapes — review avant exec)
@@ -140,5 +140,5 @@ systemctl status infisical-agent
 journalctl -u infisical-agent -n 100
 
 # Fetch manuel
-infisical secrets --env=prod --path=/vps/_infra
+infisical secrets --env=prod --path=/vps
 ```

@@ -56,14 +56,14 @@ EOF
 write_ovh() {
   local name="$1"
   local key_val secret_val consumer_val endpoint_val
-  key_val="$(fetch "/vps/certbot/ovh/${name}" APPLICATION_KEY)"
-  secret_val="$(fetch "/vps/certbot/ovh/${name}" APPLICATION_SECRET)"
-  consumer_val="$(fetch "/vps/certbot/ovh/${name}" CONSUMER_KEY)"
-  endpoint_val="$(fetch "/vps/certbot/ovh/${name}" ENDPOINT)"
+  key_val="$(fetch "/certbot/ovh/${name}" APPLICATION_KEY)"
+  secret_val="$(fetch "/certbot/ovh/${name}" APPLICATION_SECRET)"
+  consumer_val="$(fetch "/certbot/ovh/${name}" CONSUMER_KEY)"
+  endpoint_val="$(fetch "/certbot/ovh/${name}" ENDPOINT)"
   endpoint_val="${endpoint_val:-ovh-eu}"
 
   if [[ -z "$key_val" || -z "$secret_val" || -z "$consumer_val" ]]; then
-    echo "Creds OVH incomplets sous /vps/certbot/ovh/${name}, skip." >&2
+    echo "Creds OVH incomplets sous /certbot/ovh/${name}, skip." >&2
     return 0
   fi
 
@@ -94,7 +94,7 @@ if [[ -f "$PROVIDERS_CONF" ]]; then
 
     case "$provider" in
       infomaniak)
-        token_value="$(fetch "/vps/certbot/infomaniak" "$name")"
+        token_value="$(fetch "/certbot/infomaniak" "$name")"
         write_infomaniak "$name" "$token_value"
         ;;
       ovh)

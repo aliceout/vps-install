@@ -21,7 +21,7 @@ Shell source-able. Variables reconnues par `service.sh` :
 | Variable | Requis | Description |
 |----------|--------|-------------|
 | `TYPE` | oui | `docker-compose` \| `git-pm2` \| `native` |
-| `INFISICAL_PATH` | si `secrets.tmpl` | chemin Infisical des secrets (ex: `/vps/syncthing`) |
+| `INFISICAL_PATH` | si `secrets.tmpl` | chemin Infisical des secrets (ex: `/services/syncthing`) |
 | `DESCRIPTION` | non | texte libre |
 
 Toute autre variable est disponible dans `install.sh` via `source service.conf`.

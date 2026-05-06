@@ -54,7 +54,7 @@ Pour activer :
 
 1. Cree un compte sur https://app.crowdsec.net
 2. Ajoute une "Security Engine" dans la console → recupere la cle d'enrollment
-3. Mets-la dans Infisical sous `/vps/_infra/CROWDSEC_ENROLL_KEY`
+3. Mets-la dans Infisical sous `/vps/CROWDSEC_ENROLL_KEY`
 4. Relance le bootstrap OU fais a la main : `sudo cscli console enroll <cle>`
 5. Valide la machine depuis la console web
 
@@ -215,7 +215,7 @@ Un bot Telegram perso envoie chaque jour a 08:00 un recap de ce que les outils d
      | jq '.result[-5:] | .[] | .channel_post.chat | {id, title}'
    ```
    Tu y verras les derniers canaux/chats qui ont parle au bot, avec leur `id` (les ids de canaux sont negatifs, `-100xxxxxxxx`).
-4. Mets dans Infisical sous `/vps/telegram/` :
+4. Mets dans Infisical sous `/telegram/` :
    - `TELEGRAM_BOT_TOKEN` (le meme pour tout le monde)
    - `TELEGRAM_CHAT_ID_AUDIT` (le chat id du canal audit)
    - `TELEGRAM_CHAT_ID_BACKUP`, `TELEGRAM_CHAT_ID_CERTBOT`, etc. selon les canaux que tu veux

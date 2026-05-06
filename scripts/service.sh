@@ -304,7 +304,7 @@ apply_nginx() {
   # Extrait DOMAIN, DNS_PROVIDER et DNS_TOKEN_NAME depuis l'env file.
   # DOMAIN : apex du vhost (pour calculer l'apex correct quand FQDN == apex).
   # DNS_PROVIDER / DNS_TOKEN_NAME : requis pour obtenir un cert. Pointent sur
-  # /vps/certbot/<provider>/<name> dans Infisical.
+  # /certbot/<provider>/<name> dans Infisical.
   local apex_from_env="" dns_provider="" dns_token_name=""
   if [[ -f "$env_file" ]]; then
     apex_from_env="$(grep -E '^DOMAIN=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"

@@ -139,7 +139,7 @@ else
   done
 fi
 
-INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/vps/_infra}"
+INFISICAL_PATH_INFRA="${INFISICAL_PATH_INFRA:-/vps}"
 
 # INFISICAL_PATH_INFRA reste local au bootstrap (les modules utilisent /etc/infisical/*
 # pour leurs propres lookups).
@@ -184,7 +184,7 @@ INFRA_KEYS=(
   CROWDSEC_ENROLL_KEY GITHUB_SSH_PRIVKEY GITLAB_SSH_PRIVKEY
   GHCR_TOKEN GHCR_USER
 )
-# CERTBOT_EMAIL + INFOMANIAK_TOKEN ont ete deplaces vers /vps/certbot/ (lu
+# CERTBOT_EMAIL + INFOMANIAK_TOKEN ont ete deplaces vers /certbot/ (lu
 # par 75_certbot.sh / certbot-refresh-creds). Ici on ne les exige plus.
 
 got_any=0

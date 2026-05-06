@@ -17,7 +17,7 @@ Auth selon la forge :
 | `ADRESS` | `webhooks.backlice.dev` | FQDN public |
 | `DOMAIN` | `backlice.dev` | apex cert wildcard |
 | `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
-| `DNS_TOKEN_NAME` | `perso` | label du token sous `/vps/certbot/<provider>/` |
+| `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
 
 ### `/services/webhooks/<repo>/` (un sous-dossier par webhook)
 

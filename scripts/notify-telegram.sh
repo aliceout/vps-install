@@ -6,7 +6,7 @@
 #   notify-telegram --target audit "Message text"
 #   echo "Message" | notify-telegram --target backup
 #
-# Secrets lus a chaque run depuis Infisical (/vps/_infra/) :
+# Secrets lus a chaque run depuis Infisical (/telegram/) :
 #   - TELEGRAM_BOT_TOKEN            (le bot, partage)
 #   - TELEGRAM_CHAT_ID              (fallback)
 #   - TELEGRAM_CHAT_ID_<TARGET>     (si --target <name> est passe)
@@ -52,7 +52,7 @@ fi
 
 fetch() {
   infisical secrets get "$1" \
-    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path=/vps/telegram \
+    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path=/telegram \
     --token="$TOKEN" --plain 2>/dev/null || true
 }
 

@@ -7,36 +7,35 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
 ```
 <project>/
   <environment>/               ex: prod, staging, ...
-    vps/
-      _infra/                  # bootstrap (charge au demarrage par bootstrap.sh)
-        VPS_USER
-        VPS_USER_PASSWORD
-        SSH_PORT
-        SSH_PUBKEY
-        CROWDSEC_ENROLL_KEY    # optionnel
-        GITHUB_SSH_PRIVKEY     # optionnel - cle SSH GitHub
-        GITLAB_SSH_PRIVKEY     # optionnel - cle SSH GitLab
-        GHCR_TOKEN             # optionnel - PAT GitHub avec scope read:packages
-        GHCR_USER              # optionnel - username GitHub (default: aliceout)
+    vps/                       # bootstrap (charge au demarrage par bootstrap.sh)
+      VPS_USER
+      VPS_USER_PASSWORD
+      SSH_PORT
+      SSH_PUBKEY
+      CROWDSEC_ENROLL_KEY      # optionnel
+      GITHUB_SSH_PRIVKEY       # optionnel - cle SSH GitHub
+      GITLAB_SSH_PRIVKEY       # optionnel - cle SSH GitLab
+      GHCR_TOKEN               # optionnel - PAT GitHub avec scope read:packages
+      GHCR_USER                # optionnel - username GitHub (default: aliceout)
 
-      certbot/                 # Let's Encrypt + DNS multi-provider
-        CERTBOT_EMAIL
-        infomaniak/
-          perso                # token Infomaniak (label libre, minuscule)
-          alice                # ... autre client
-        ovh/
-          client1/             # sous-dossier par client OVH (4 valeurs)
-            APPLICATION_KEY
-            APPLICATION_SECRET
-            CONSUMER_KEY
-            ENDPOINT           # ovh-eu | ovh-ca | ovh-us
+    certbot/                   # Let's Encrypt + DNS multi-provider
+      CERTBOT_EMAIL
+      infomaniak/
+        perso                  # token Infomaniak (label libre, minuscule)
+        alice                  # ... autre client
+      ovh/
+        client1/               # sous-dossier par client OVH (4 valeurs)
+          APPLICATION_KEY
+          APPLICATION_SECRET
+          CONSUMER_KEY
+          ENDPOINT             # ovh-eu | ovh-ca | ovh-us
 
-      telegram/                # Notifications Telegram
-        TELEGRAM_BOT_TOKEN
-        TELEGRAM_CHAT_ID            # chat par defaut (fallback)
-        TELEGRAM_CHAT_ID_AUDIT      # canal par sujet
-        TELEGRAM_CHAT_ID_BACKUP     # ...
-        TELEGRAM_CHAT_ID_CERTBOT    # ...
+    telegram/                  # Notifications Telegram
+      TELEGRAM_BOT_TOKEN
+      TELEGRAM_CHAT_ID              # chat par defaut (fallback)
+      TELEGRAM_CHAT_ID_AUDIT        # canal par sujet
+      TELEGRAM_CHAT_ID_BACKUP       # ...
+      TELEGRAM_CHAT_ID_CERTBOT      # ...
 
     services/
       backup/                  # Sauvegarde restic push ephemere vers home
@@ -72,7 +71,7 @@ Les `/` dans le path Infisical sont litteraux. L'environnement (`prod`, `staging
 - **Cles de secret** en MAJUSCULES (`APPLICATION_KEY`, `DNS_TOKEN_NAME`, `WEBHOOK_SECRET`)
 - **Labels** (noms de token, de client) en minuscules (`perso`, `alice`, `client1`) - pour distinguer visuellement label vs cle
 
-## `/vps/_infra/` - bootstrap
+## `/vps/` - bootstrap
 
 Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles marquees **optionnel** peuvent etre absentes.
 
@@ -88,7 +87,7 @@ Lu une seule fois au tout debut de `bootstrap.sh`, avant tout module. Les cles m
 | `GHCR_TOKEN` | secret | `ghp_...` | `40_docker.sh` | **optionnel** - GitHub PAT (classic) avec scope `read:packages`. Permet a `docker pull ghcr.io/...` de fetch les images privees de GHCR. Sans ca, les images publiques marchent quand meme |
 | `GHCR_USER` | string | `aliceout` | `40_docker.sh` | **optionnel** - username GitHub a passer a `docker login`. Default: `aliceout` |
 
-## `/vps/certbot/` - Let's Encrypt + DNS providers
+## `/certbot/` - Let's Encrypt + DNS providers
 
 Permet de gerer des certs et des records DNS chez **plusieurs providers** (et plusieurs comptes chez le meme provider, pour heberger des services de clients differents).
 
@@ -109,7 +108,7 @@ Chaque service qui a un vhost declare dans sa config (`/services/<name>/`) :
 
 Le pre-hook `certbot-refresh-creds` (appele avant chaque `certbot renew`) regenere automatiquement les ini files `/etc/certbot/creds/<provider>/<label>.ini` depuis ces secrets, donc rotation de token transparente.
 
-## `/vps/telegram/` - Notifications
+## `/telegram/` - Notifications
 
 Toutes les alertes et digests Telegram passent par `notify-telegram`, qui fetch ces cles a chaque run.
 
@@ -142,7 +141,7 @@ Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.s
 | `ADRESS` | `webhooks.backlice.dev` | FQDN de l'expo |
 | `DOMAIN` | `backlice.dev` | apex cert wildcard |
 | `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
-| `DNS_TOKEN_NAME` | `perso` | label du token sous `/vps/certbot/<provider>/` |
+| `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
 
 ### Sous-dossier par hook
 
@@ -170,11 +169,11 @@ Pour TOUT service expose via nginx, on met au minimum ces 4 cles :
 | `ADRESS` | FQDN = `server_name` nginx + record DNS A |
 | `DOMAIN` | apex du cert wildcard |
 | `DNS_PROVIDER` | `infomaniak` ou `ovh` (choisit le plugin certbot et le backend DNS sync) |
-| `DNS_TOKEN_NAME` | label du token sous `/vps/certbot/<provider>/` |
+| `DNS_TOKEN_NAME` | label du token sous `/certbot/<provider>/` |
 
 Ces cles sont referencees dans le `nginx.conf` du service via `__ADRESS__` / `__DOMAIN__` / `__PORT__`. `scripts/service.sh` substitue au moment du `services install <nom>`.
 
-**Obligatoire** : sans `DNS_PROVIDER` + `DNS_TOKEN_NAME`, `ensure_cert` refuse d'emettre un cert (le service est deploye sans SSL). Les 2 cles doivent pointer sur un label existant sous `/vps/certbot/<provider>/`.
+**Obligatoire** : sans `DNS_PROVIDER` + `DNS_TOKEN_NAME`, `ensure_cert` refuse d'emettre un cert (le service est deploye sans SSL). Les 2 cles doivent pointer sur un label existant sous `/certbot/<provider>/`.
 
 ### Secrets applicatifs
 
@@ -204,7 +203,7 @@ Le bootstrap te les demande au 1er run et les persiste en `/etc/infisical/{clien
 
 ```bash
 # Secrets infra (lus une fois, pas persistes sur disque)
-infisical secrets --env=prod --path=/vps/_infra
+infisical secrets --env=prod --path=/vps
 
 # Secrets d'un service (synces en continu par l'agent)
 cat /etc/secrets/<service>.env

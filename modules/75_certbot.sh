@@ -31,7 +31,7 @@ touch /etc/certbot/providers.conf
 chmod 644 /etc/certbot/providers.conf
 
 # Agent template Infisical pour /etc/letsencrypt/email (email du compte
-# ACME Let's Encrypt). Source : /vps/certbot/CERTBOT_EMAIL.
+# ACME Let's Encrypt). Source : /certbot/CERTBOT_EMAIL.
 #
 # Les creds DNS (ini Infomaniak / OVH) ne sont PAS syncees via agent :
 # elles sont regenerees par certbot-refresh-creds au pre-hook de chaque
@@ -42,7 +42,7 @@ install -d -m 700 /etc/infisical/agent.d
 rm -f /etc/infisical/templates/_certbot_legacy.tmpl
 
 cat > /etc/infisical/templates/_certbot_email.tmpl <<EOF
-{{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/vps/certbot" "CERTBOT_EMAIL" }}{{ .Value }}{{- end }}
+{{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/certbot" "CERTBOT_EMAIL" }}{{ .Value }}{{- end }}
 EOF
 
 cat > /etc/infisical/agent.d/_certbot.yaml <<'EOF'
@@ -71,7 +71,7 @@ while [[ ! -s /etc/letsencrypt/email ]] && (( i < 60 )); do
   i=$((i+1))
 done
 if [[ ! -s /etc/letsencrypt/email ]]; then
-  echo "AVERTISSEMENT: /etc/letsencrypt/email non genere. Verifie /vps/certbot/CERTBOT_EMAIL."
+  echo "AVERTISSEMENT: /etc/letsencrypt/email non genere. Verifie /certbot/CERTBOT_EMAIL."
 fi
 chmod 644 /etc/letsencrypt/email 2>/dev/null || true
 

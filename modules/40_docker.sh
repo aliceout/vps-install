@@ -22,7 +22,7 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin do
 systemctl enable --now docker
 usermod -aG docker "$VPS_USER"
 
-# Auth GHCR : si GHCR_TOKEN est present (Infisical /vps/_infra/), on logue
+# Auth GHCR : si GHCR_TOKEN est present (Infisical /vps/), on logue
 # DEUX users sur ghcr.io :
 #   - $VPS_USER : pour les hooks webhook (qui tournent en VPS_USER via le
 #     receiver) -> credential dans /home/$VPS_USER/.docker/config.json
@@ -48,7 +48,7 @@ if [[ -n "${GHCR_TOKEN:-}" ]]; then
     echo "AVERTISSEMENT: docker login ghcr.io ($VPS_USER) echoue."
   fi
 else
-  echo "GHCR_TOKEN absent de /vps/_infra, skip docker login (les images publiques sont OK)."
+  echo "GHCR_TOKEN absent de /vps, skip docker login (les images publiques sont OK)."
 fi
 
 echo "Docker OK. (relogin pour que le groupe docker s'applique)"
