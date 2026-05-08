@@ -6,7 +6,8 @@
 #
 # Cles attendues dans Infisical CLOUD sous /services/carnet/ :
 #   - ADRESS, DOMAIN
-#   - PORT_SITE, PORT_MAIL, PORT_PAYLOAD
+#   - PORT_SITE, PORT_PAYLOAD     (pas de PORT_MAIL : carnet n'a pas de
+#                                  backend mail, contrairement a 2mains)
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
 #     (creds vers self-hosted, projet carnet)
@@ -16,8 +17,6 @@
 #   - POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
 #   - PAYLOAD_SECRET, PAYLOAD_PUBLIC_SERVER_URL
 #   - ASTRO_PUBLIC_PAYLOAD_URL
-#   - SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM
-#   - MAIL_TO, RATE_LIMIT_PER_HOUR, ALLOWED_ORIGIN
 #   - (et toute autre cle specifique au repo carnet)
 #
 # Le webhook cote receiver attend /services/carnet/hook/ avec
