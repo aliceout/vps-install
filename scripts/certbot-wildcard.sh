@@ -95,6 +95,10 @@ fi
 echo "Requete cert wildcard pour ${APEX} et *.${APEX} via provider=${PROVIDER}"
 echo "(propagation DNS ~3 min)"
 
+# Capture la sortie de certbot pour pouvoir notifier en cas d'echec.
+CERTBOT_OUT="$(mktemp)"
+trap 'rm -f "$CERTBOT_OUT"' EXIT
+
 case "$PROVIDER" in
   infomaniak)
     "$CERTBOT_BIN" certonly \
@@ -105,7 +109,8 @@ case "$PROVIDER" in
       --preferred-challenges dns \
       --agree-tos --non-interactive \
       --email "$EMAIL" \
-      --keep-until-expiring --expand
+      --keep-until-expiring --expand 2>&1 | tee "$CERTBOT_OUT" || true
+    rc="${PIPESTATUS[0]}"
     ;;
   ovh)
     "$CERTBOT_BIN" certonly \
@@ -116,8 +121,25 @@ case "$PROVIDER" in
       --preferred-challenges dns \
       --agree-tos --non-interactive \
       --email "$EMAIL" \
-      --keep-until-expiring --expand
+      --keep-until-expiring --expand 2>&1 | tee "$CERTBOT_OUT" || true
+    rc="${PIPESTATUS[0]}"
     ;;
 esac
+
+if [[ "$rc" -ne 0 ]]; then
+  if command -v notify-telegram >/dev/null 2>&1; then
+    {
+      echo "❌ Creation cert Let's Encrypt echouee : ${APEX}"
+      echo ""
+      echo "Provider: ${PROVIDER} (token: ${TOKEN_NAME})"
+      echo "Host: $(hostname)"
+      echo "Exit code: $rc"
+      echo ""
+      echo "Sortie :"
+      tail -30 "$CERTBOT_OUT"
+    } | notify-telegram --target certbot || true
+  fi
+  exit "$rc"
+fi
 
 write_nginx_cert_include
