@@ -4,7 +4,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/miniflux/ :
-#   - ADRESS, DOMAIN, PORT
+#   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - POSTGRES_USER, POSTGRES_PASSWORD (optionnels, defaults miniflux/<random>)
 #   - POSTGRES_DB (optionnel, default miniflux)
@@ -49,7 +49,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADRESS:-?}/"
+    echo "URL : https://${ADDRESS:-?}/"
     echo "Login : ${ADMIN_USERNAME} / (mdp dans Infisical)"
     echo "Data : ${DATA_DIR}/postgres (backup auto via /home/${VPS_USER}/data/)"
     ;;

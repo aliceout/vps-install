@@ -4,7 +4,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/2mains/ :
-#   - ADRESS=2mainsdefemmes.org
+#   - ADDRESS=2mainsdefemmes.org
 #   - DOMAIN=2mainsdefemmes.org
 #   - PORT_SITE=8064
 #   - PORT_MAIL=8065
@@ -63,7 +63,7 @@ find_compose_file() {
 
 case "$ACTION" in
   install|update)
-    : "${ADRESS:?ADRESS manquant}"
+    : "${ADDRESS:?ADDRESS manquant}"
     : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
     : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
     : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"

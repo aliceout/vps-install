@@ -5,7 +5,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/carnet/ :
-#   - ADRESS, DOMAIN
+#   - ADDRESS, DOMAIN
 #   - PORT_SITE, PORT_PAYLOAD     (pas de PORT_MAIL : carnet n'a pas de
 #                                  backend mail, contrairement a 2mains)
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
@@ -59,7 +59,7 @@ find_compose_file() {
 
 case "$ACTION" in
   install|update)
-    : "${ADRESS:?ADRESS manquant}"
+    : "${ADDRESS:?ADDRESS manquant}"
     : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
     : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
     : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"

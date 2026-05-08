@@ -5,7 +5,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/jellyfin/ :
-#   - ADRESS, DOMAIN, PORT
+#   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
 #     (creds vers self-hosted)
@@ -33,7 +33,7 @@ fi
 source "$SECRETS_FILE"
 
 build_runtime_env() {
-  : "${ADRESS:?ADRESS manquant}"
+  : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
   : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
   : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
@@ -60,7 +60,7 @@ build_runtime_env() {
   {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
-    echo "ADRESS=${ADRESS}"
+    echo "ADDRESS=${ADDRESS}"
     infisical export \
       --domain="$INFISICAL_API_URL" \
       --projectId="$INFISICAL_PROJECT_ID" \
@@ -109,7 +109,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADRESS}/"
+    echo "URL : https://${ADDRESS}/"
     echo "Auth : login Jellyfin interne (1er user cree au setup wizard)"
     echo "Config : ${CONFIG_VALUE}"
     echo "Media  : ${MEDIA_VALUE}/{series,films/1900,films/2000,docs,series-docs,anims,eros}"

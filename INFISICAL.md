@@ -46,11 +46,11 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
         RESTIC_REPOSITORY, RESTIC_PASSWORD
         BACKUP_PATHS           # optionnel (defaut: /home/$VPS_USER/data)
       webhooks/                # Webhooks receiver (GitHub + GitLab) - vhost only
-        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+        ADDRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
       pdf/                     # Stirling PDF
-        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+        ADDRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
       work/                    # Work-resume Next.js (deploy via webhook)
-        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+        ADDRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
         APP, BRANCH, DIR, PORT, REPO
         hook/                  # config webhook pour ce service
           REPO                 # owner/name (GH) ou namespace/name (GL)
@@ -60,13 +60,13 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
           WORKFLOW             # optionnel, filtre sur nom CI
           BRANCH               # optionnel, filtre sur branche
       korai/                   # Korai (Docker multi-containers, deploy via webhook)
-        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME, PORT
+        ADDRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME, PORT
         INFISICAL_API_URL, INFISICAL_PROJECT_ID,
         INFISICAL_CLIENT_ID, INFISICAL_CLIENT_SECRET, INFISICAL_ENV
         hook/                  # config webhook (idem)
           REPO, WEBHOOK_SECRET, SCRIPT, GIT_PROVIDER, ...
       <service-avec-data>/     # services stateful (Ghost, Wiki, etc.)
-        ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
+        ADDRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
         ... autres secrets applicatifs ...
         hook/                  # optionnel, si le service a un repo branche
 ```
@@ -153,13 +153,13 @@ Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.s
 
 ## `/services/webhooks/<host_type>/`
 
-Le receiver webhooks tourne potentiellement sur plusieurs hosts (`vps` et `server`) avec une `ADRESS` distincte par host. La config est donc scopee par host_type : `/services/webhooks/vps/` pour le VPS, `/services/webhooks/server/` pour le home server. Le `service.conf` du webhooks utilise `INFISICAL_PATH="/services/webhooks/${HOST_TYPE}"`.
+Le receiver webhooks tourne potentiellement sur plusieurs hosts (`vps` et `server`) avec une `ADDRESS` distincte par host. La config est donc scopee par host_type : `/services/webhooks/vps/` pour le VPS, `/services/webhooks/server/` pour le home server. Le `service.conf` du webhooks utilise `INFISICAL_PATH="/services/webhooks/${HOST_TYPE}"`.
 
 ### `/services/webhooks/<host_type>/` : config du vhost
 
 | Cle | Exemple | Role |
 |-----|---------|------|
-| `ADRESS` | `webhooks.backlice.dev` (vps) / `hooks.lan.tld` (server) | FQDN de l'expo |
+| `ADDRESS` | `webhooks.backlice.dev` (vps) / `hooks.lan.tld` (server) | FQDN de l'expo |
 | `DOMAIN` | `backlice.dev` | apex cert wildcard |
 | `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
 | `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
@@ -189,12 +189,12 @@ Pour TOUT service expose via nginx, on met au minimum ces 4 cles :
 
 | Cle | Role |
 |-----|------|
-| `ADRESS` | FQDN = `server_name` nginx + record DNS A |
+| `ADDRESS` | FQDN = `server_name` nginx + record DNS A |
 | `DOMAIN` | apex du cert wildcard |
 | `DNS_PROVIDER` | `infomaniak` ou `ovh` (choisit le plugin certbot et le backend DNS sync) |
 | `DNS_TOKEN_NAME` | label du token sous `/certbot/<provider>/` |
 
-Ces cles sont referencees dans le `nginx.conf` du service via `__ADRESS__` / `__DOMAIN__` / `__PORT__`. `scripts/service.sh` substitue au moment du `services install <nom>`.
+Ces cles sont referencees dans le `nginx.conf` du service via `__ADDRESS__` / `__DOMAIN__` / `__PORT__`. `scripts/service.sh` substitue au moment du `services install <nom>`.
 
 **Obligatoire** : sans `DNS_PROVIDER` + `DNS_TOKEN_NAME`, `ensure_cert` refuse d'emettre un cert (le service est deploye sans SSL). Les 2 cles doivent pointer sur un label existant sous `/certbot/<provider>/`.
 

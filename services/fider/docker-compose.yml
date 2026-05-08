@@ -1,6 +1,6 @@
 # Fider - feedback / votes feature requests open-source (Go binary + Postgres).
 # Variables substituees depuis /var/lib/services/fider/runtime.env :
-#   - SERVICE_NAME, PORT, ADRESS, DATA_DIR  (cloud Infisical /services/fider/)
+#   - SERVICE_NAME, PORT, ADDRESS, DATA_DIR  (cloud Infisical /services/fider/)
 #   - POSTGRES_*, JWT_SECRET, EMAIL_*       (self-hosted Infisical /fider/)
 
 services:
@@ -35,7 +35,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # BASE_URL : Fider panic au boot si absent. Doit etre l'URL publique
       # (utilisee dans les magic-links et les notifs mail).
-      BASE_URL: https://${ADRESS}
+      BASE_URL: https://${ADDRESS}
       # SMTP : indispensable car Fider n'a pas de password classique, login
       # uniquement via magic-link envoye par mail (y compris l'admin).
       EMAIL_NOREPLY: ${EMAIL_NOREPLY}

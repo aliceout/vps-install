@@ -5,7 +5,7 @@
 #
 # Cles attendues dans Infisical CLOUD sous /services/nodea/ :
 #   - DOMAIN                  (ex: nodea.app) - apex pour le cert wildcard
-#   - ADRESS                  (ex: nodea.app) - FQDN du vhost
+#   - ADDRESS                  (ex: nodea.app) - FQDN du vhost
 #   - PORT                    (ex: 8061) - port host du container web
 #   - DNS_PROVIDER            infomaniak | ovh
 #   - DNS_TOKEN_NAME          label sous /certbot/<provider>/

@@ -20,7 +20,7 @@ export VPS_USER
 
 # HOST_TYPE (vps|server) : ecrit par bootstrap.sh dans /etc/infisical/host-type.
 # Utilise par les service.conf qui ont besoin de scoper leur INFISICAL_PATH par
-# host (ex: webhooks dont l'ADRESS differe entre vps et server).
+# host (ex: webhooks dont l'ADDRESS differe entre vps et server).
 # Toujours initialise (eventuellement vide) pour ne pas casser le source d'un
 # service.conf qui le reference sous set -u.
 HOST_TYPE="${HOST_TYPE:-}"
@@ -338,7 +338,7 @@ apply_nginx() {
   fi
 
   if [[ ${#domains[@]} -eq 0 ]]; then
-    echo "AVERTISSEMENT: aucun server_name valide dans $vhost_src apres templating (manque ADRESS dans Infisical ?), skip DNS/cert."
+    echo "AVERTISSEMENT: aucun server_name valide dans $vhost_src apres templating (manque ADDRESS dans Infisical ?), skip DNS/cert."
   else
     # Ordre important : ensure_cert AVANT ensure_dns.
     # ensure_cert ecrit /etc/certbot/providers.conf (apex -> provider:token) et

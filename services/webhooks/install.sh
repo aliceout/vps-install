@@ -65,7 +65,7 @@ generate_agent_templates() {
   pid="$(cat /etc/infisical/project-id)"
   env="$(cat /etc/infisical/environment)"
 
-  # Template "main" du service (ADRESS, DOMAIN au niveau /services/webhooks/)
+  # Template "main" du service (ADDRESS, DOMAIN au niveau /services/webhooks/)
   cat > /etc/infisical/templates/_${SERVICE_NAME}.tmpl <<EOF
 {{- with listSecrets "${pid}" "${env}" "${INFISICAL_PATH}" }}
 {{- range . }}

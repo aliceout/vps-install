@@ -1,6 +1,6 @@
 # FreeScout - help desk PHP (image tiredofit/freescout) + MariaDB linuxserver.
 # Variables substituees depuis /var/lib/services/freescout/runtime.env :
-#   - SERVICE_NAME, PORT, ADRESS, DATA_DIR  (cloud Infisical /services/freescout/)
+#   - SERVICE_NAME, PORT, ADDRESS, DATA_DIR  (cloud Infisical /services/freescout/)
 #   - DB_*, APP_KEY, ADMIN_*, MAIL_*        (self-hosted Infisical /freescout/)
 #   - PUID, PGID, TIMEZONE                  (self-hosted, optionnels)
 # Bind mounts sur disque host.
@@ -44,7 +44,7 @@ services:
       PGID: ${PGID:-1000}
 
       # URL publique (genere les liens dans les notifications mail)
-      SITE_URL: https://${ADRESS}/
+      SITE_URL: https://${ADDRESS}/
       # Important : on est derriere nginx en HTTPS
       ENABLE_SSL_PROXY: "TRUE"
 

@@ -5,7 +5,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/freescout/ :
-#   - ADRESS, DOMAIN, PORT
+#   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
 #     (creds vers self-hosted env.backlice.dev pour fetch les secrets app)
@@ -38,10 +38,10 @@ fi
 source "$SECRETS_FILE"
 
 # Construit le runtime.env consomme par docker compose : merge des cles cloud
-# (PORT, ADRESS, DATA_DIR, SERVICE_NAME) + dump dotenv des cles app fetchees
+# (PORT, ADDRESS, DATA_DIR, SERVICE_NAME) + dump dotenv des cles app fetchees
 # depuis self-hosted (DB_*, APP_KEY, ADMIN_*, MAIL_*, TIMEZONE, PUID, PGID).
 build_runtime_env() {
-  : "${ADRESS:?ADRESS manquant}"
+  : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
   : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
   : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
@@ -68,7 +68,7 @@ build_runtime_env() {
   {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
-    echo "ADRESS=${ADRESS}"
+    echo "ADDRESS=${ADDRESS}"
     echo "DATA_DIR=${DATA_DIR}"
     # Dump tous les secrets app depuis self-hosted (projet dedie freescout,
     # racine flat).
@@ -125,7 +125,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADRESS}/"
+    echo "URL : https://${ADDRESS}/"
     echo "Admin : (cf ADMIN_EMAIL / ADMIN_PASSWORD dans Infisical self-hosted)"
     echo "Data : ${DATA_DIR}/{db,app} (backup auto via /home/${VPS_USER}/data/)"
     echo

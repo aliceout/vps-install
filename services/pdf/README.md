@@ -14,14 +14,14 @@ services install pdf
 
 | Cle | Exemple | Role |
 |-----|---------|------|
-| `ADRESS` | `pdf.backlice.dev` | FQDN expose (server_name nginx + record DNS A) |
+| `ADDRESS` | `pdf.backlice.dev` | FQDN expose (server_name nginx + record DNS A) |
 | `DOMAIN` | `backlice.dev` | apex pour le cert wildcard |
 
-`service.sh` lit ces cles depuis `/etc/secrets/pdf.env` (synce par l'agent Infisical) et substitue `__ADRESS__` / `__DOMAIN__` dans `nginx.conf` au moment du deploiement.
+`service.sh` lit ces cles depuis `/etc/secrets/pdf.env` (synce par l'agent Infisical) et substitue `__ADDRESS__` / `__DOMAIN__` dans `nginx.conf` au moment du deploiement.
 
 ## Reverse proxy
 
-- Expose : `https://<ADRESS>`
+- Expose : `https://<ADDRESS>`
 - Cert : wildcard sur `<DOMAIN>`
 - Upload max : 200 Mo
 

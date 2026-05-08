@@ -72,7 +72,7 @@ Vhost du service, **rendu** dans `/etc/nginx/conf/<nom>.conf` (inclus directemen
 Pour ne rien hardcoder (adresse, domaine, ...), le vhost peut contenir des placeholders de la forme `__KEY__`. Juste avant le deploiement, `service.sh` lit `/etc/secrets/<nom>.env` (synce depuis Infisical par l'agent) et substitue chaque `__KEY__` par la valeur correspondante.
 
 Convention minimale pour les services expose via nginx :
-- `__ADRESS__` = FQDN (`server_name`, cible du record DNS A)
+- `__ADDRESS__` = FQDN (`server_name`, cible du record DNS A)
 - `__DOMAIN__` = apex (chemin du cert wildcard `/etc/letsencrypt/live/<apex>/`)
 
 Tu peux ajouter d'autres placeholders : toute cle presente dans Infisical sous `/services/<nom>/` est substituable via `__KEY__`.
@@ -100,7 +100,7 @@ Un vhost de service type ressemble donc a :
 
 ```nginx
 server {
-    server_name __ADRESS__;
+    server_name __ADDRESS__;
     include /etc/nginx/include/vhost-head.conf;
     include /etc/nginx/certificat/__DOMAIN__.conf;
 
@@ -113,7 +113,7 @@ server {
 }
 
 server {
-    server_name __ADRESS__;
+    server_name __ADDRESS__;
     include /etc/nginx/include/vhost-http-redirect.conf;
 }
 ```

@@ -3,7 +3,7 @@
 # pour BullMQ) + App (build local depuis ${SOURCE_DIR}).
 #
 # Variables substituees depuis /var/lib/services/quackback/runtime.env :
-#   - SERVICE_NAME, PORT, ADRESS, DATA_DIR, SOURCE_DIR
+#   - SERVICE_NAME, PORT, ADDRESS, DATA_DIR, SOURCE_DIR
 #       (cloud Infisical /services/quackback/ + computed)
 #   - POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
 #   - REDIS_PASSWORD
@@ -79,7 +79,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@dragonfly:6379
-      BASE_URL: https://${ADRESS}
+      BASE_URL: https://${ADDRESS}
       PORT: "3000"
       SECRET_KEY: ${SECRET_KEY}
       EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST}

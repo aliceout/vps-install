@@ -2,7 +2,7 @@
 
 Serveur Node.js qui recoit les webhooks GitHub **et GitLab**, verifie l'auth, et lance un script de deploy par repo.
 
-Installe en systemd natif (tourne sous `$VPS_USER`), expose via nginx sur `https://<ADRESS>/webhooks`.
+Installe en systemd natif (tourne sous `$VPS_USER`), expose via nginx sur `https://<ADDRESS>/webhooks`.
 
 Auth selon la forge :
 - **GitHub** : HMAC SHA-256 sur le body, header `X-Hub-Signature-256`
@@ -14,7 +14,7 @@ Auth selon la forge :
 
 | Cle | Exemple | Role |
 |-----|---------|------|
-| `ADRESS` | `webhooks.backlice.dev` | FQDN public |
+| `ADDRESS` | `webhooks.backlice.dev` | FQDN public |
 | `DOMAIN` | `backlice.dev` | apex cert wildcard |
 | `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
 | `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
@@ -42,13 +42,13 @@ Chaque service deployee via webhook met sa config webhook chez lui sous `hook/` 
 2. Dans le repo `vps-install`, cree un `services/<nom>/` avec son `hook.sh` + `install.sh` qui publie le hook.
 3. Commit + push, pull sur le VPS.
 4. `services install <nom>` → installe l'app, publie le hook, trigger `services update webhooks`.
-5. Sur GitHub, Settings > Webhooks > Add : Payload URL `https://<ADRESS>/webhooks`, Content-type `application/json`, Secret = la meme valeur que `WEBHOOK_SECRET`, Events = ce que tu veux (ping + push + workflow_run typiquement).
+5. Sur GitHub, Settings > Webhooks > Add : Payload URL `https://<ADDRESS>/webhooks`, Content-type `application/json`, Secret = la meme valeur que `WEBHOOK_SECRET`, Events = ce que tu veux (ping + push + workflow_run typiquement).
 
 ### Repo GitLab
 
 1. Dans Infisical, cree `/services/<nom>/hook/` avec `REPO` (format `namespace/name`), `WEBHOOK_SECRET`, `SCRIPT`, **`GIT_PROVIDER=gitlab`**.
 2. Meme logique cote `services/<nom>/` dans vps-install.
-3. Sur GitLab, Settings > Webhooks > Add : URL `https://<ADRESS>/webhooks`, Secret token = la valeur de `WEBHOOK_SECRET`, Trigger = Push events / Pipeline events (et **activer Enable SSL verification**).
+3. Sur GitLab, Settings > Webhooks > Add : URL `https://<ADDRESS>/webhooks`, Secret token = la valeur de `WEBHOOK_SECRET`, Trigger = Push events / Pipeline events (et **activer Enable SSL verification**).
 
 ## Install du service webhooks lui-meme
 
@@ -61,7 +61,7 @@ Ca :
 - Cree `/var/lib/services/webhooks/{hooks,log}/`
 - Installe `/etc/systemd/system/webhooks.service` avec hardening (ProtectSystem, ReadWritePaths sur `/var/www`, `/home/<user>`, etc.)
 - Genere les templates Infisical (un par service ayant `/services/<nom>/hook/`) → `/etc/secrets/webhooks.env` (main) + `/etc/secrets/webhooks/<nom>.env` (un par hook)
-- Reverse proxy nginx `https://<ADRESS>/webhooks` → `127.0.0.1:8070`
+- Reverse proxy nginx `https://<ADDRESS>/webhooks` → `127.0.0.1:8070`
 - Cert wildcard `*.<DOMAIN>` (skip si deja present)
 
 ## Update apres ajout d'un nouveau hook
@@ -88,7 +88,7 @@ tail -f /var/lib/services/webhooks/log/aliceout_Work-resume.log
 # Test GitHub ping (pas besoin d'auth)
 curl -X POST -H "X-GitHub-Event: ping" -H "Content-Type: application/json" \
   -d '{"repository":{"full_name":"aliceout/Work-resume"}}' \
-  https://<ADRESS>/webhooks
+  https://<ADDRESS>/webhooks
 
 # Test GitLab (signature requise)
 curl -X POST \
@@ -96,12 +96,12 @@ curl -X POST \
   -H "X-Gitlab-Token: <le-secret>" \
   -H "Content-Type: application/json" \
   -d '{"project":{"path_with_namespace":"riana/projet"}}' \
-  https://<ADRESS>/webhooks
+  https://<ADDRESS>/webhooks
 ```
 
 ## Architecture interne
 
-- `/etc/secrets/webhooks.env` : ADRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME (main)
+- `/etc/secrets/webhooks.env` : ADDRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME (main)
 - `/etc/secrets/webhooks/<repo>.env` : REPO, WEBHOOK_SECRET, SCRIPT, GIT_PROVIDER, WORKFLOW, BRANCH par repo
 - `/var/lib/services/webhooks/app.js` : le serveur Node (stdlib only, pas de deps)
 - `/var/lib/services/webhooks/hooks/` : scripts bash deployes par les services consommateurs

@@ -6,7 +6,7 @@
 # Cles attendues dans Infisical sous /services/korai/ (cloud Infisical, celui
 # du VPS, pas le self-hosted Korai) :
 #   - DOMAIN                  (ex: alyss.cc) - apex pour le cert wildcard
-#   - ADRESS                  (ex: korai.alyss.cc) - FQDN du vhost
+#   - ADDRESS                  (ex: korai.alyss.cc) - FQDN du vhost
 #   - PORT                    (ex: 8060) - port host expose par le container web
 #   - INFISICAL_API_URL       (ex: https://env.backlice.dev) - Infisical self-hosted
 #   - INFISICAL_PROJECT_ID    - project id cote self-hosted (projet Korai)

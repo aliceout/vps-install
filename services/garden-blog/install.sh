@@ -5,7 +5,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/garden-blog/ :
-#   - ADRESS, DOMAIN, PORT
+#   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
 #     (creds vers self-hosted env.backlice.dev pour fetch les SMTP)
@@ -13,7 +13,7 @@
 # Cles attendues dans Infisical SELF-HOSTED sous /garden-blog/ (flat) :
 #   - MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS, MAIL_SECURE, MAIL_FROM
 #
-# URL est calculee a partir d'ADRESS, pas a stocker dans Infisical.
+# URL est calculee a partir d'ADDRESS, pas a stocker dans Infisical.
 
 set -euo pipefail
 
@@ -35,7 +35,7 @@ source "$SECRETS_FILE"
 # (PORT, DATA_DIR, URL calculee) + des cles app fetchees depuis self-hosted
 # (MAIL_*). La valeur expose juste ce dont docker-compose.yml a besoin.
 build_runtime_env() {
-  : "${ADRESS:?ADRESS manquant}"
+  : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
   : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
   : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
@@ -63,7 +63,7 @@ build_runtime_env() {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
     echo "DATA_DIR=${DATA_DIR}"
-    echo "URL=https://${ADRESS}"
+    echo "URL=https://${ADDRESS}"
     # Fetch les secrets app depuis self-hosted. Le projet self-hosted etant
     # dedie au blog, on tape la racine (pas de sous-dossier).
     infisical export \
@@ -97,7 +97,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "Setup admin : visite https://${ADRESS}/ghost/ et cree le compte owner."
+    echo "Setup admin : visite https://${ADDRESS}/ghost/ et cree le compte owner."
     echo "Data : ${DATA_DIR}/content (backup auto via /home/${VPS_USER}/data/)"
     ;;
 

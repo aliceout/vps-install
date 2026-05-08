@@ -5,7 +5,7 @@
 # l'Infisical self-hosted, genere le .env, docker compose pull + up + seed).
 #
 # Source aussi /etc/secrets/nodea.env (cloud Infisical, sync par l'agent)
-# avant deploy.sh, pour que les vars cloud (ADRESS, PORT_*, DOMAIN, etc.)
+# avant deploy.sh, pour que les vars cloud (ADDRESS, PORT_*, DOMAIN, etc.)
 # soient disponibles dans l'env du compose. Single source of truth = cloud.
 set -Eeuo pipefail
 
@@ -26,7 +26,7 @@ else
   git clone --branch "$BRANCH" "$REPO_URL" "$DEPLOY_DIR"
 fi
 
-# Expose les vars cloud (ports, ADRESS, etc.) a deploy.sh + au compose
+# Expose les vars cloud (ports, ADDRESS, etc.) a deploy.sh + au compose
 if [[ -r "$CLOUD_ENV" ]]; then
   set -a
   # shellcheck disable=SC1090

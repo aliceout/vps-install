@@ -2,7 +2,7 @@
 # Variables substituees depuis /var/lib/services/garden-blog/runtime.env :
 #   - PORT       (cloud Infisical /services/garden-blog/PORT)
 #   - DATA_DIR   (calcule a l'install : /home/<VPS_USER>/data/garden-blog)
-#   - URL        (calcule a l'install : https://<ADRESS>)
+#   - URL        (calcule a l'install : https://<ADDRESS>)
 #   - MAIL_*     (self-hosted Infisical /garden-blog/)
 
 services:

@@ -5,7 +5,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/quackback/ :
-#   - ADRESS, DOMAIN, PORT
+#   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
 #     (creds vers self-hosted env.backlice.dev pour fetch les secrets app)
@@ -49,10 +49,10 @@ sync_source() {
 }
 
 # Construit le runtime.env consomme par docker compose : merge cloud
-# (PORT, ADRESS, computed) + dump dotenv self-hosted (POSTGRES_*, REDIS_*,
+# (PORT, ADDRESS, computed) + dump dotenv self-hosted (POSTGRES_*, REDIS_*,
 # SECRET_KEY, EMAIL_*).
 build_runtime_env() {
-  : "${ADRESS:?ADRESS manquant}"
+  : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
   : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
   : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
@@ -79,7 +79,7 @@ build_runtime_env() {
   {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
-    echo "ADRESS=${ADRESS}"
+    echo "ADDRESS=${ADDRESS}"
     echo "DATA_DIR=${DATA_DIR}"
     echo "SOURCE_DIR=${SOURCE_DIR}"
     infisical export \
@@ -123,7 +123,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADRESS}/"
+    echo "URL : https://${ADDRESS}/"
     echo "Setup admin : visite l'URL et signup avec le 1er compte (= admin)."
     echo "Source : ${SOURCE_DIR}"
     echo "Data   : ${DATA_DIR}/{postgres,dragonfly} (backup auto via /home/${VPS_USER}/data/)"

@@ -2,7 +2,7 @@
 # Variables substituees depuis /var/lib/services/choupi-blog/runtime.env :
 #   - PORT       (cloud Infisical /services/choupi-blog/PORT)
 #   - DATA_DIR   (calcule a l'install : /home/<VPS_USER>/data/choupi-blog)
-#   - URL        (calcule a l'install : https://<ADRESS>)
+#   - URL        (calcule a l'install : https://<ADDRESS>)
 #   - MAIL_*     (self-hosted Infisical /choupi-blog/)
 
 services:

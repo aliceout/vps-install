@@ -6,7 +6,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/torrent/ :
-#   - ADRESS, DOMAIN, PORT, AUTH_PORT
+#   - ADDRESS, DOMAIN, PORT, AUTH_PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
 #     (creds vers self-hosted)
@@ -38,7 +38,7 @@ fi
 source "$SECRETS_FILE"
 
 build_runtime_env() {
-  : "${ADRESS:?ADRESS manquant}"
+  : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
   : "${AUTH_PORT:?AUTH_PORT manquant (port pour tinyauth, ex 9092)}"
   : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
@@ -67,7 +67,7 @@ build_runtime_env() {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
     echo "AUTH_PORT=${AUTH_PORT}"
-    echo "ADRESS=${ADRESS}"
+    echo "ADDRESS=${ADDRESS}"
     infisical export \
       --domain="$INFISICAL_API_URL" \
       --projectId="$INFISICAL_PROJECT_ID" \
@@ -112,7 +112,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADRESS}/  (login form via tinyauth)"
+    echo "URL : https://${ADDRESS}/  (login form via tinyauth)"
     echo "Data : ${DATA_DIR_VALUE}"
     echo
     echo "Verif VPN actif :"

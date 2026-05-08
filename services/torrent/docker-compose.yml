@@ -3,7 +3,7 @@
 # avec les password managers).
 #
 # Variables substituees depuis /var/lib/services/torrent/runtime.env :
-#   - SERVICE_NAME, PORT, AUTH_PORT, ADRESS  (cloud Infisical /services/torrent/)
+#   - SERVICE_NAME, PORT, AUTH_PORT, ADDRESS  (cloud Infisical /services/torrent/)
 #   - DATA_DIR, OPENVPN_*                    (self-hosted)
 #   - TINYAUTH_USERS, TINYAUTH_SECRET        (self-hosted)
 #
@@ -67,7 +67,7 @@ services:
       - ${DATA_DIR}/tinyauth:/app/data
     environment:
       # URL publique de l'app proteget (v5+ : TINYAUTH_APPURL, etait APP_URL)
-      TINYAUTH_APPURL: https://${ADRESS}
+      TINYAUTH_APPURL: https://${ADDRESS}
 
       # Liste des users : "alice:$$2a$$10$$xxxxx" (plusieurs separes par virgule)
       # Hash bcrypt genere avec :

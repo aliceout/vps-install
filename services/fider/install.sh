@@ -4,7 +4,7 @@
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/fider/ :
-#   - ADRESS, DOMAIN, PORT
+#   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
 #     (creds vers self-hosted env.backlice.dev pour fetch les secrets app)
@@ -33,7 +33,7 @@ fi
 source "$SECRETS_FILE"
 
 build_runtime_env() {
-  : "${ADRESS:?ADRESS manquant}"
+  : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
   : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
   : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
@@ -60,7 +60,7 @@ build_runtime_env() {
   {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
-    echo "ADRESS=${ADRESS}"
+    echo "ADDRESS=${ADDRESS}"
     echo "DATA_DIR=${DATA_DIR}"
     infisical export \
       --domain="$INFISICAL_API_URL" \
@@ -98,7 +98,7 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADRESS}/"
+    echo "URL : https://${ADDRESS}/"
     echo "Setup : visite l'URL et entre ton email -> magic link arrive par mail."
     echo "        Le 1er compte cree devient admin de l'instance."
     echo "Data : ${DATA_DIR}/postgres (backup auto via /home/${VPS_USER}/data/)"
