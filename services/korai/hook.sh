@@ -2,10 +2,15 @@
 # Webhook hook pour Korai. Appele par le webhooks receiver sur push GitHub.
 # Git-pull le repo puis delegue a infra/scripts/deploy.sh (qui fetch Infisical,
 # pull les images GHCR, docker compose down -v + up -d, seed).
+#
+# Source aussi /etc/secrets/korai.env (cloud Infisical, sync par l'agent)
+# avant deploy.sh, pour que les vars cloud (ADRESS, PORT_*, DOMAIN, etc.)
+# soient disponibles dans l'env du compose. Single source of truth = cloud.
 set -Eeuo pipefail
 
 DEPLOY_DIR="/var/www/korai"
 BRANCH="main"
+CLOUD_ENV="/etc/secrets/korai.env"
 # Repo prive : on passe par SSH (cle deployee par 15_github_ssh.sh sous
 # ~/.ssh/id_ed25519 + config Host github.com). Pas de HTTPS qui demanderait
 # un PAT.
@@ -19,6 +24,14 @@ if [[ -d "$DEPLOY_DIR/.git" ]]; then
   git -C "$DEPLOY_DIR" reset --hard "origin/${BRANCH}"
 else
   git clone --branch "$BRANCH" "$REPO_URL" "$DEPLOY_DIR"
+fi
+
+# Expose les vars cloud (ports, ADRESS, etc.) a deploy.sh + au compose
+if [[ -r "$CLOUD_ENV" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$CLOUD_ENV"
+  set +a
 fi
 
 exec bash "$DEPLOY_DIR/infra/scripts/deploy.sh" "$@"
