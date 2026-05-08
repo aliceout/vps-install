@@ -39,9 +39,10 @@ case "$ACTION" in
       usermod -aG docker "$VPS_USER"
     fi
 
-    # Postgres run en uid 999 (postgres). Bind mount doit etre owned 999:999.
+    # Postgres alpine run en uid 70 (pas 999 comme l'image debian officielle).
+    # Bind mount doit etre owned 70:70.
     install -d -m 755 "$DATA_DIR"
-    install -d -m 700 -o 999 -g 999 "$DATA_DIR/postgres"
+    install -d -m 700 -o 70 -g 70 "$DATA_DIR/postgres"
 
     cd "$SERVICE_DIR"
     SERVICE_NAME="$SERVICE_NAME" DATA_DIR="$DATA_DIR" $COMPOSE pull
