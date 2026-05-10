@@ -68,7 +68,7 @@ cat > /etc/logrotate.d/vps-docker-prune <<'EOF'
 }
 EOF
 
-# Auth GHCR : si GHCR_TOKEN est present (Infisical /infra/vps/), on logue
+# Auth GHCR : si GHCR_TOKEN est present (Infisical /infra/<host>/ ou /infra/shared/), on logue
 # DEUX users sur ghcr.io :
 #   - $VPS_USER : pour les hooks webhook (qui tournent en VPS_USER via le
 #     receiver) -> credential dans /home/$VPS_USER/.docker/config.json
@@ -94,7 +94,7 @@ if [[ -n "${GHCR_TOKEN:-}" ]]; then
     echo "AVERTISSEMENT: docker login ghcr.io ($VPS_USER) echoue."
   fi
 else
-  echo "GHCR_TOKEN absent de /infra/vps, skip docker login (les images publiques sont OK)."
+  echo "GHCR_TOKEN absent de /infra/<host>/ et /infra/shared/, skip docker login (les images publiques sont OK)."
 fi
 
 echo "Docker OK. (relogin pour que le groupe docker s'applique)"
