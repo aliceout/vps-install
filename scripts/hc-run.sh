@@ -43,13 +43,14 @@ fi
 
 url="https://hc-ping.com/${PING_KEY}/${slug}"
 
-# Ping start (best-effort, on continue meme si reseau down)
-curl -fsS -m 10 --retry 3 -o /dev/null "${url}/start" 2>/dev/null || true
+# ?create=1 : auto-cree le check au premier ping s'il n'existe pas encore
+# (sinon Healthchecks renvoie 404 sur slug inconnu).
+curl -fsS -m 10 --retry 3 -o /dev/null "${url}/start?create=1" 2>/dev/null || true
 
 "$@"
 rc=$?
 
 # Ping resultat avec exit code (0 = OK, autre = fail)
-curl -fsS -m 10 --retry 3 -o /dev/null "${url}/${rc}" 2>/dev/null || true
+curl -fsS -m 10 --retry 3 -o /dev/null "${url}/${rc}?create=1" 2>/dev/null || true
 
 exit "$rc"
