@@ -96,6 +96,46 @@ fi
 chmod +x "$ROOT_DIR/scripts/hc-run.sh"
 ln -sf /opt/vps-install/scripts/hc-run.sh /usr/local/sbin/hc-run
 
+# --- hc-ping : ping direct (sans exec) pour les services systemd ------------
+# Utilise par les template units hc-ping@.service / hc-ping-fail@.service,
+# wires via OnSuccess=/OnFailure= dans des drop-ins service.d/.
+chmod +x "$ROOT_DIR/scripts/hc-ping.sh"
+ln -sf /opt/vps-install/scripts/hc-ping.sh /usr/local/sbin/hc-ping
+
+# Template units reutilisables : OnSuccess=hc-ping@<slug>.service ping le
+# slug en mode "ok", OnFailure=hc-ping-fail@<slug>.service ping en "fail".
+# Le %i de systemd = la partie apres le @ dans le nom du service.
+cat > /etc/systemd/system/hc-ping@.service <<'EOF'
+[Unit]
+Description=Healthchecks success ping for %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hc-ping %i ok
+EOF
+
+cat > /etc/systemd/system/hc-ping-fail@.service <<'EOF'
+[Unit]
+Description=Healthchecks fail ping for %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hc-ping %i fail
+EOF
+
+# Drop-in pour apt-daily-upgrade.service : ping Healthchecks au resultat
+# de chaque cycle unattended-upgrades. Si le service n'a pas tourne du tout
+# (VPS down, timer cassee), aucun ping -> Healthchecks alerte "late/down"
+# apres le grace period configure cote dashboard.
+install -d -m 755 /etc/systemd/system/apt-daily-upgrade.service.d
+cat > /etc/systemd/system/apt-daily-upgrade.service.d/healthchecks.conf <<'EOF'
+[Unit]
+OnSuccess=hc-ping@apt-upgrade.service
+OnFailure=hc-ping-fail@apt-upgrade.service
+EOF
+
+systemctl daemon-reload
+
 # --- Notifier Telegram + digest ---------------------------------------------
 install -d /usr/local/sbin
 chmod +x "$ROOT_DIR/scripts/notify-telegram.sh" \
