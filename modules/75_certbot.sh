@@ -174,3 +174,15 @@ rm -f /etc/infisical/templates/_certbot_legacy.tmpl
 
 # Timer certbot renew
 systemctl enable --now certbot.timer 2>/dev/null || true
+
+# Drop-in Healthchecks pour certbot.service : ping au resultat de chaque
+# renewal (~2x par mois). hc-ping@ et hc-ping-fail@ sont les template units
+# poses par le module 29_audit_tools. Slug = "certbot" -> avec le prefix
+# HOST_TYPE -> check Healthchecks "vps-certbot".
+install -d -m 755 /etc/systemd/system/certbot.service.d
+cat > /etc/systemd/system/certbot.service.d/healthchecks.conf <<'EOF'
+[Unit]
+OnSuccess=hc-ping@certbot.service
+OnFailure=hc-ping-fail@certbot.service
+EOF
+systemctl daemon-reload
