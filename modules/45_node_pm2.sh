@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte VPS_USER).
+VPS_USER="${VPS_USER:-$(cat /etc/infisical/vps-user 2>/dev/null || true)}"
+
 echo "Node.js + pm2"
 NODE_MAJOR="20"
 install -m 0755 -d /usr/share/keyrings

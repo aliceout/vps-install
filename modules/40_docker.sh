@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte VPS_USER).
+VPS_USER="${VPS_USER:-$(cat /etc/infisical/vps-user 2>/dev/null || true)}"
+
 echo "Docker (repo officiel Docker) + compose plugin"
 # Doc Docker Debian 13: remove conflicts, add keyring, add repo, install packages. :contentReference[oaicite:5]{index=5}
 apt-get remove -y docker.io docker-compose docker-doc podman-docker containerd runc || true

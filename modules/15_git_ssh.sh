@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte VPS_USER).
+VPS_USER="${VPS_USER:-$(cat /etc/infisical/vps-user 2>/dev/null || true)}"
+
 # Deploie les cles SSH des forges git (GitHub, GitLab) pour $VPS_USER
 # depuis Infisical (/infra/vps/<PROVIDER>_SSH_PRIVKEY).
 #
