@@ -76,6 +76,55 @@ EOF
 #     -> credential dans /root/.docker/config.json
 # Sans le login root, docker compose pull en root choue avec "unauthorized"
 # sur les images privees.
+
+# Template Infisical pour GHCR_TOKEN -> /etc/secrets/ghcr.env. Permet au module
+# de retrouver la cle quand re-lance standalone (sans bootstrap qui exporte
+# GHCR_TOKEN dans l'env). Token per-host : /infra/<host>/GHCR_TOKEN.
+INFISICAL_PROJECT_ID="${INFISICAL_PROJECT_ID:-$(cat /etc/infisical/project-id 2>/dev/null || true)}"
+INFISICAL_ENV="${INFISICAL_ENV:-$(cat /etc/infisical/environment 2>/dev/null || true)}"
+HOST_TYPE="${HOST_TYPE:-$(cat /etc/infisical/host-type 2>/dev/null || true)}"
+if [[ -n "$INFISICAL_PROJECT_ID" && -n "$INFISICAL_ENV" && -n "$HOST_TYPE" ]]; then
+  install -d -m 755 /etc/infisical/templates
+  install -d -m 700 /etc/infisical/agent.d
+  install -d -m 700 /etc/secrets
+
+  cat > /etc/infisical/templates/_ghcr.tmpl <<EOF
+GHCR_TOKEN={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/${HOST_TYPE}" "GHCR_TOKEN" }}{{ .Value }}{{- end }}
+EOF
+
+  cat > /etc/infisical/agent.d/_ghcr.yaml <<'EOF'
+  - source-path: /etc/infisical/templates/_ghcr.tmpl
+    destination-path: /etc/secrets/ghcr.env
+    config:
+      polling-interval: 300s
+EOF
+  chmod 600 /etc/infisical/agent.d/_ghcr.yaml
+
+  if [[ -f /etc/infisical/agent.base.yaml ]]; then
+    cp /etc/infisical/agent.base.yaml /etc/infisical/agent.yaml
+    shopt -s nullglob
+    for f in /etc/infisical/agent.d/*.yaml; do
+      cat "$f" >> /etc/infisical/agent.yaml
+    done
+    shopt -u nullglob
+    chmod 600 /etc/infisical/agent.yaml
+    systemctl restart infisical-agent.service 2>/dev/null || true
+  fi
+
+  # Attente best-effort de la sync (~30s max). Si l'agent met plus, on
+  # continuera quand meme et le login sera skip ce coup-ci.
+  for i in $(seq 1 30); do
+    [[ -s /etc/secrets/ghcr.env ]] && break
+    sleep 1
+  done
+fi
+
+# Charge GHCR_TOKEN depuis le fichier sync (fallback standalone).
+if [[ -z "${GHCR_TOKEN:-}" && -s /etc/secrets/ghcr.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/secrets/ghcr.env
+fi
+
 if [[ -n "${GHCR_TOKEN:-}" ]]; then
   GHCR_LOGIN_USER="${GHCR_USER:-aliceout}"
   echo "Login GHCR pour root..."
