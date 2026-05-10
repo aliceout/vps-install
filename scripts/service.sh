@@ -20,6 +20,7 @@ colorize_output() {
   awk '
     /^ERREUR/        { printf "\033[1;31m%s\033[0m\n", $0; fflush(); next }
     /^AVERTISSEMENT/ { printf "\033[1;33m%s\033[0m\n", $0; fflush(); next }
+    /^=== .* ===$/   { printf "\033[1;36m%s\033[0m\n", $0; fflush(); next }
                      { print; fflush() }
   '
 }
