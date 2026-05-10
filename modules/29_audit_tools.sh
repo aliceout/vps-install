@@ -1,37 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Outils d'audit securite (lynis, rkhunter, debsecan)"
+echo "Outils d'audit securite (lynis, aide, debsecan)"
 
-apt-get install -y lynis rkhunter debsecan
+apt-get install -y lynis aide debsecan
 
 install -d -m 755 /var/log/audit
 
-# --- rkhunter ----------------------------------------------------------------
-# Config par defaut: envoie des mails root. On redirige plutot dans un log.
-if [[ -f /etc/default/rkhunter ]]; then
-  sed -i 's|^CRON_DAILY_RUN=.*|CRON_DAILY_RUN="no"|'   /etc/default/rkhunter
-  sed -i 's|^CRON_DB_UPDATE=.*|CRON_DB_UPDATE="no"|'   /etc/default/rkhunter
-  sed -i 's|^REPORT_EMAIL=.*|REPORT_EMAIL=""|'         /etc/default/rkhunter
+# --- Cleanup rkhunter (remplace par AIDE) -----------------------------------
+# rkhunter upstream est abandonne (2022), mirrors morts, signature-based
+# detection obsolete face aux rootkits modernes. AIDE prend le relai pour la
+# file integrity ; CrowdSec couvre la threat detection live.
+if dpkg -l rkhunter 2>/dev/null | grep -q '^ii'; then
+  apt-get purge -y rkhunter
 fi
-# Desactive le cron packagee qui voulait envoyer des mails
-chmod -x /etc/cron.daily/rkhunter 2>/dev/null || true
+rm -f /etc/cron.daily/rkhunter
+rm -f /var/log/audit/rkhunter.log /var/log/audit/rkhunter.log.*
 
-# Le projet rkhunter upstream est abandonne (2022) : les URLs des data files
-# sont mortes -> 'rkhunter --update' echoue toujours. On disable l'auto-update
-# (UPDATE_MIRRORS=0) et on s'appuie sur les data files bundled dans le paquet
-# Debian, qui sont maintenus par le package maintainer. Le scan reste OK.
-if [[ -f /etc/rkhunter.conf ]]; then
-  if grep -qE '^\s*#?\s*UPDATE_MIRRORS=' /etc/rkhunter.conf; then
-    sed -i 's|^\s*#\?\s*UPDATE_MIRRORS=.*|UPDATE_MIRRORS=0|' /etc/rkhunter.conf
-  else
-    echo 'UPDATE_MIRRORS=0' >> /etc/rkhunter.conf
-  fi
+# --- AIDE -------------------------------------------------------------------
+# File integrity: snapshot local des hash de tous les binaires/configs critiques.
+# Au scan quotidien, diff vs baseline -> on voit ce qui a change. La baseline
+# est regeneree chaque dimanche apres le digest, pour absorber les apt upgrade
+# de la semaine sans accumuler de faux positifs.
+
+# Le cron Debian par defaut envoie les diffs par mail a root. On disable au
+# profit de notre cron qui logue dans /var/log/audit/aide.log.
+chmod -x /etc/cron.daily/aide 2>/dev/null || true
+
+# Initialise la baseline si absente. aideinit prend 5-15min sur un VPS typique
+# (hash recursif de /usr, /etc, /bin...) -> background pour ne pas bloquer
+# le bootstrap.
+if [[ ! -f /var/lib/aide/aide.db ]]; then
+  echo "AIDE: initialisation de la baseline en background (~10min)..."
+  (
+    aideinit -y -f >/dev/null 2>&1 || true
+    [[ -f /var/lib/aide/aide.db.new ]] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+  ) >/dev/null 2>&1 &
 fi
-
-# Initialise la baseline des permissions/hashes des binaires systemes
-# (--propupd ne contacte aucun mirror, juste un snapshot local).
-rkhunter --propupd --nocolors >/dev/null 2>&1 || true
 
 # --- debsecan ----------------------------------------------------------------
 # Le cron packagee envoie un mail si CVE detectee. On prefere un log.
@@ -54,14 +59,19 @@ cat > /etc/cron.d/vps-audit-tools <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Quotidien 05:15 - rkhunter scan (--update skip, mirrors upstream morts)
-15 5 * * * root /usr/bin/rkhunter --cronjob --report-warnings-only --appendlog --nocolors >> /var/log/audit/rkhunter.log 2>&1
+# Quotidien 05:15 - AIDE check (diff vs baseline). aide --check renvoie != 0
+# des qu'il y a des diffs -> on swallow l'exit code, le digest fait le tri.
+15 5 * * * root /usr/bin/aide --check > /var/log/audit/aide.log 2>&1 || true
 
 # Quotidien 05:30 - debsecan (CVE vs paquets installes, uniquement celles patchables)
 30 5 * * * root /usr/bin/debsecan --format=report --suite ${CODENAME} --only-fixed >> /var/log/audit/debsecan.log 2>&1
 
 # Hebdomadaire dimanche 05:45 - lynis audit complet
 45 5 * * 0 root /usr/bin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat >/dev/null 2>&1
+
+# Hebdomadaire dimanche 06:30 - regen baseline AIDE (apres digest hebdo,
+# absorbe les apt upgrade de la semaine pour eviter les faux positifs)
+30 6 * * 0 root bash -c '/usr/bin/aide --update >/dev/null 2>&1; [ -f /var/lib/aide/aide.db.new ] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db'
 
 # Quotidien 08:00 - digest Telegram (silencieux si rien d'interessant)
 0 8 * * * root /usr/local/sbin/audit-digest >> /var/log/audit/digest.log 2>&1
@@ -80,7 +90,7 @@ cat > /etc/logrotate.d/vps-audit-tools <<'EOF'
 }
 EOF
 
-# Run initial une fois : snapshot de reference
+# Run initial une fois : snapshot de reference lynis
 (
   echo "=== Lynis initial scan $(date -Is) ==="
   lynis audit system --quick --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat 2>/dev/null || true

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Digest quotidien des outils d'audit (rkhunter, debsecan, lynis, CrowdSec)
+# Digest quotidien des outils d'audit (aide, debsecan, lynis, CrowdSec)
 # envoye via Telegram. Ne dit rien si rien d'interessant.
 
 set -euo pipefail
@@ -14,14 +14,18 @@ append() {
   DIGEST+="$1"
 }
 
-# --- rkhunter (warnings du dernier scan) ------------------------------------
-if [[ -f "$LOG_DIR/rkhunter.log" ]]; then
-  # rkhunter log contient des blocs marques "Warning:" quand il voit un truc
-  WARNS="$(grep -i '^\[.*\] Warning:' "$LOG_DIR/rkhunter.log" 2>/dev/null | tail -10)"
-  if [[ -n "$WARNS" ]]; then
-    append $'\n—— rkhunter warnings ——\n'
-    append "$WARNS"
-    append $'\n'
+# --- AIDE (file integrity vs baseline) --------------------------------------
+if [[ -f "$LOG_DIR/aide.log" ]]; then
+  # aide --check ecrit "AIDE found differences..." + un bloc "Summary:" avec
+  # les compteurs Added/Removed/Changed. Si tout est clean, message different
+  # et on dit rien.
+  if grep -q 'found differences' "$LOG_DIR/aide.log" 2>/dev/null; then
+    SUMMARY="$(grep -E '^\s*(Added|Removed|Changed) entries' "$LOG_DIR/aide.log" 2>/dev/null | head -3)"
+    if [[ -n "$SUMMARY" ]]; then
+      append $'\n—— AIDE (changements depuis baseline) ——\n'
+      append "$SUMMARY"
+      append $'\n'
+    fi
   fi
 fi
 
