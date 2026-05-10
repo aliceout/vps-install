@@ -392,6 +392,9 @@ if [[ "$DOCKER_ENABLED" -eq 1 ]]; then
   run_module "40_docker.sh"
 fi
 
+# Scripts server-only : le module skip lui-meme si HOST_TYPE != server.
+run_module "41_server_scripts.sh"
+
 if [[ "$NODE_ENABLED" -eq 1 ]]; then
   run_module "45_node_pm2.sh"
 fi
