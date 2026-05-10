@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte ROOT_DIR).
+ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
 echo "Outils d'audit securite (lynis, aide, debsecan)"
 
 apt-get install -y lynis aide debsecan
