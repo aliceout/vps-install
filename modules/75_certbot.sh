@@ -40,6 +40,17 @@ install -d -m 700 /etc/certbot/creds/ovh
 touch /etc/certbot/providers.conf
 chmod 644 /etc/certbot/providers.conf
 
+# Charge INFISICAL_PROJECT_ID / INFISICAL_ENV depuis les fichiers persistes
+# par 35_infisical.sh, pour que le module puisse aussi tourner standalone
+# (ex: sudo bash modules/75_certbot.sh apres une migration de path Infisical).
+# Au bootstrap initial, ces vars sont deja dans l'env (set par bootstrap.sh).
+INFISICAL_PROJECT_ID="${INFISICAL_PROJECT_ID:-$(cat /etc/infisical/project-id 2>/dev/null || true)}"
+INFISICAL_ENV="${INFISICAL_ENV:-$(cat /etc/infisical/environment 2>/dev/null || true)}"
+if [[ -z "$INFISICAL_PROJECT_ID" || -z "$INFISICAL_ENV" ]]; then
+  echo "ERREUR: INFISICAL_PROJECT_ID ou INFISICAL_ENV introuvable (ni env ni /etc/infisical/)." >&2
+  exit 1
+fi
+
 # Agent template Infisical pour /etc/letsencrypt/email (email du compte
 # ACME Let's Encrypt). Source : /certbot/CERTBOT_EMAIL.
 #
