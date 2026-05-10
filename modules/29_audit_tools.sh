@@ -59,15 +59,18 @@ fi
 
 INFISICAL_PROJECT_ID="${INFISICAL_PROJECT_ID:-$(cat /etc/infisical/project-id 2>/dev/null || true)}"
 INFISICAL_ENV="${INFISICAL_ENV:-$(cat /etc/infisical/environment 2>/dev/null || true)}"
-if [[ -z "$INFISICAL_PROJECT_ID" || -z "$INFISICAL_ENV" ]]; then
-  echo "AVERTISSEMENT: INFISICAL_PROJECT_ID ou INFISICAL_ENV introuvable, skip Healthchecks setup."
+HOST_TYPE="${HOST_TYPE:-$(cat /etc/infisical/host-type 2>/dev/null || true)}"
+if [[ -z "$INFISICAL_PROJECT_ID" || -z "$INFISICAL_ENV" || -z "$HOST_TYPE" ]]; then
+  echo "AVERTISSEMENT: INFISICAL_PROJECT_ID/ENV/HOST_TYPE introuvable, skip Healthchecks setup."
 else
   install -d -m 755 /etc/infisical/templates
   install -d -m 700 /etc/infisical/agent.d
   install -d -m 700 /etc/secrets
 
+  # La cle est sous /infra/<host_type> (per-host) car chaque host a son propre
+  # projet Healthchecks -> chaque host doit pinger avec sa propre cle.
   cat > /etc/infisical/templates/_healthchecks.tmpl <<EOF
-HEALTHCHECKS_PING_KEY={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/shared" "HEALTHCHECKS_PING_KEY" }}{{ .Value }}{{- end }}
+HEALTHCHECKS_PING_KEY={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/${HOST_TYPE}" "HEALTHCHECKS_PING_KEY" }}{{ .Value }}{{- end }}
 EOF
 
   cat > /etc/infisical/agent.d/_healthchecks.yaml <<'EOF'
