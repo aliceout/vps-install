@@ -9,7 +9,11 @@ ufw default deny incoming
 ufw default allow outgoing
 
 ufw allow "${SSH_PORT}/tcp"
-if [[ "${WEB_ENABLED:-1}" -eq 1 ]]; then
+# WEB_FIREWALL_ENABLED gate l'ouverture des ports HTTP/HTTPS independamment
+# de WEB_ENABLED (qui pilote l'install de nginx). Permet d'avoir un nginx
+# pre-existant accessible sans laisser le framework le reinstaller. Fallback
+# sur WEB_ENABLED pour la compat avec les bootstraps deja faits.
+if [[ "${WEB_FIREWALL_ENABLED:-${WEB_ENABLED:-1}}" -eq 1 ]]; then
   ufw allow 80/tcp
   ufw allow 443/tcp
 fi

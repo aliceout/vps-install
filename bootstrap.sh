@@ -342,10 +342,23 @@ fi
 say_ok "Config chargee depuis Infisical."
 
 # --- Questions features (yes/no uniquement) ---
-if ask_yes_no "Serveur web (nginx + reverse proxy) ?" "yes"; then
+if ask_yes_no "Installer nginx + reverse proxy + certbot + collections CrowdSec nginx ?" "yes"; then
   WEB_ENABLED=1
 else
   WEB_ENABLED=0
+fi
+
+# Decouple l'ouverture firewall 80/443 de l'install nginx : si tu reponds non
+# a la question precedente parce que tu as deja ton propre nginx, tu peux
+# quand meme demander a ce que les ports HTTP/HTTPS soient ouverts dans ufw.
+if [[ "$WEB_ENABLED" -eq 1 ]]; then
+  WEB_FIREWALL_ENABLED=1
+else
+  if ask_yes_no "Ouvrir quand meme HTTP/HTTPS (80/443) dans le firewall (nginx deja existant) ?" "no"; then
+    WEB_FIREWALL_ENABLED=1
+  else
+    WEB_FIREWALL_ENABLED=0
+  fi
 fi
 
 if ask_yes_no "Installer Docker ?" "yes"; then
@@ -360,7 +373,7 @@ else
   NODE_ENABLED=0
 fi
 
-export WEB_ENABLED DOCKER_ENABLED NODE_ENABLED
+export WEB_ENABLED WEB_FIREWALL_ENABLED DOCKER_ENABLED NODE_ENABLED
 export INFISICAL_ENABLED=1
 
 say_info "Config: user=${VPS_USER} | ssh_port=${SSH_PORT} | web=${WEB_ENABLED} | docker=${DOCKER_ENABLED} | node=${NODE_ENABLED}"
