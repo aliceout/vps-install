@@ -147,7 +147,7 @@ EOF
 cat > /etc/cron.d/dns-sync <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-17 * * * * root /usr/local/sbin/dns-sync >/dev/null 2>&1
+17 * * * * root /usr/local/sbin/hc-run dns-sync /usr/local/sbin/dns-sync >/dev/null 2>&1
 EOF
 chmod 644 /etc/cron.d/dns-sync
 

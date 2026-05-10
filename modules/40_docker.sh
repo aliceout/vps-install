@@ -47,9 +47,9 @@ cat > /etc/cron.d/vps-docker-prune <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Dimanche 04:00 - prune docker complet (system + buildx)
-0 4 * * 0 root /usr/bin/docker system prune -af --volumes --filter "until=168h" >> /var/log/docker-prune.log 2>&1
-5 4 * * 0 root /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+# Dimanche 04:00 - prune docker complet (system + buildx), wrappes Healthchecks
+0 4 * * 0 root /usr/local/sbin/hc-run docker-prune /usr/bin/docker system prune -af --volumes --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+5 4 * * 0 root /usr/local/sbin/hc-run docker-buildx-prune /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
 EOF
 chmod 644 /etc/cron.d/vps-docker-prune
 

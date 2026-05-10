@@ -4,9 +4,9 @@ set -euo pipefail
 # Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte ROOT_DIR).
 ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
-echo "Outils d'audit securite (lynis, aide, debsecan)"
+echo "Outils d'audit securite (lynis, aide) + Healthchecks"
 
-apt-get install -y lynis aide debsecan
+apt-get install -y lynis aide
 
 install -d -m 755 /var/log/audit
 
@@ -19,6 +19,16 @@ if dpkg -l rkhunter 2>/dev/null | grep -q '^ii'; then
 fi
 rm -f /etc/cron.daily/rkhunter
 rm -f /var/log/audit/rkhunter.log /var/log/audit/rkhunter.log.*
+
+# --- Cleanup debsecan (redondant avec unattended-upgrades) ------------------
+# unattended-upgrades patche deja les CVE quotidiennement. Le rapport debsecan
+# liste surtout les CVE sans fix dispo (bruit) et les CVE deja patchees mais
+# non-rebooted -> peu actionnable en pratique.
+if dpkg -l debsecan 2>/dev/null | grep -q '^ii'; then
+  apt-get purge -y debsecan
+fi
+rm -f /etc/cron.d/debsecan
+rm -f /var/log/audit/debsecan.log /var/log/audit/debsecan.log.*
 
 # --- AIDE -------------------------------------------------------------------
 # File integrity: snapshot local des hash de tous les binaires/configs critiques.
@@ -41,10 +51,50 @@ if [[ ! -f /var/lib/aide/aide.db ]]; then
   ) >/dev/null 2>&1 &
 fi
 
-# --- debsecan ----------------------------------------------------------------
-# Le cron packagee envoie un mail si CVE detectee. On prefere un log.
-chmod -x /etc/cron.d/debsecan 2>/dev/null || true
-rm -f /etc/cron.d/debsecan  # retire completement, on pilote depuis vps-bootstrap
+# --- Healthchecks template (Infisical agent) --------------------------------
+# Sync /infra/shared/HEALTHCHECKS_PING_KEY -> /etc/secrets/healthchecks.env
+# Le wrapper hc-run lit cette cle pour pinger https://hc-ping.com/<key>/<slug>.
+# Si le secret n'est pas defini cote Infisical, le fichier sera vide et hc-run
+# fera un no-op (exec direct sans ping) -> safe pour le bootstrap initial.
+
+INFISICAL_PROJECT_ID="${INFISICAL_PROJECT_ID:-$(cat /etc/infisical/project-id 2>/dev/null || true)}"
+INFISICAL_ENV="${INFISICAL_ENV:-$(cat /etc/infisical/environment 2>/dev/null || true)}"
+if [[ -z "$INFISICAL_PROJECT_ID" || -z "$INFISICAL_ENV" ]]; then
+  echo "AVERTISSEMENT: INFISICAL_PROJECT_ID ou INFISICAL_ENV introuvable, skip Healthchecks setup."
+else
+  install -d -m 755 /etc/infisical/templates
+  install -d -m 700 /etc/infisical/agent.d
+  install -d -m 700 /etc/secrets
+
+  cat > /etc/infisical/templates/_healthchecks.tmpl <<EOF
+HEALTHCHECKS_PING_KEY={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/shared" "HEALTHCHECKS_PING_KEY" }}{{ .Value }}{{- end }}
+EOF
+
+  cat > /etc/infisical/agent.d/_healthchecks.yaml <<'EOF'
+  - source-path: /etc/infisical/templates/_healthchecks.tmpl
+    destination-path: /etc/secrets/healthchecks.env
+    config:
+      polling-interval: 300s
+EOF
+  chmod 600 /etc/infisical/agent.d/_healthchecks.yaml
+
+  # Reconstruit agent.yaml depuis base + tous les fragments dans agent.d/
+  if [[ -f /etc/infisical/agent.base.yaml ]]; then
+    cp /etc/infisical/agent.base.yaml /etc/infisical/agent.yaml
+    shopt -s nullglob
+    for f in /etc/infisical/agent.d/*.yaml; do
+      cat "$f" >> /etc/infisical/agent.yaml
+    done
+    shopt -u nullglob
+    chmod 600 /etc/infisical/agent.yaml
+    systemctl enable --now infisical-agent.service 2>/dev/null || true
+    systemctl restart infisical-agent.service 2>/dev/null || true
+  fi
+fi
+
+# --- hc-run : wrapper Healthchecks pour les crons ---------------------------
+chmod +x "$ROOT_DIR/scripts/hc-run.sh"
+ln -sf /opt/vps-install/scripts/hc-run.sh /usr/local/sbin/hc-run
 
 # --- Notifier Telegram + digest ---------------------------------------------
 install -d /usr/local/sbin
@@ -54,30 +104,24 @@ ln -sf /opt/vps-install/scripts/notify-telegram.sh /usr/local/sbin/notify-telegr
 ln -sf /opt/vps-install/scripts/audit-digest.sh    /usr/local/sbin/audit-digest
 
 # --- Cron unifie des audits --------------------------------------------------
-# On resout le codename Debian maintenant pour le passer a debsecan (qui exige
-# --suite des qu'on utilise --only-fixed).
-CODENAME="$(. /etc/os-release; echo "${VERSION_CODENAME:-trixie}")"
-
-cat > /etc/cron.d/vps-audit-tools <<EOF
+# Toutes les commandes sont wrappees avec hc-run pour pinger Healthchecks
+# (no-op si la cle n'est pas encore configuree).
+cat > /etc/cron.d/vps-audit-tools <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Quotidien 05:15 - AIDE check (diff vs baseline). aide --check renvoie != 0
-# des qu'il y a des diffs -> on swallow l'exit code, le digest fait le tri.
-15 5 * * * root /usr/bin/aide --check > /var/log/audit/aide.log 2>&1 || true
-
-# Quotidien 05:30 - debsecan (CVE vs paquets installes, uniquement celles patchables)
-30 5 * * * root /usr/bin/debsecan --format=report --suite ${CODENAME} --only-fixed >> /var/log/audit/debsecan.log 2>&1
+# Quotidien 05:15 - AIDE check (|| true car diffs renvoient != 0, normal)
+15 5 * * * root /usr/local/sbin/hc-run aide-check bash -c '/usr/bin/aide --check > /var/log/audit/aide.log 2>&1 || true'
 
 # Hebdomadaire dimanche 05:45 - lynis audit complet
-45 5 * * 0 root /usr/bin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat >/dev/null 2>&1
+45 5 * * 0 root /usr/local/sbin/hc-run lynis-audit /usr/bin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat
 
-# Hebdomadaire dimanche 06:30 - regen baseline AIDE (apres digest hebdo,
-# absorbe les apt upgrade de la semaine pour eviter les faux positifs)
-30 6 * * 0 root bash -c '/usr/bin/aide --update >/dev/null 2>&1; [ -f /var/lib/aide/aide.db.new ] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db'
+# Hebdomadaire dimanche 06:30 - regen baseline AIDE (absorbe les apt upgrade
+# de la semaine pour eviter les faux positifs)
+30 6 * * 0 root /usr/local/sbin/hc-run aide-update bash -c '/usr/bin/aide --update >/dev/null 2>&1; [ -f /var/lib/aide/aide.db.new ] && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db'
 
 # Quotidien 08:00 - digest Telegram (silencieux si rien d'interessant)
-0 8 * * * root /usr/local/sbin/audit-digest >> /var/log/audit/digest.log 2>&1
+0 8 * * * root /usr/local/sbin/hc-run audit-digest /usr/local/sbin/audit-digest >> /var/log/audit/digest.log 2>&1
 EOF
 chmod 644 /etc/cron.d/vps-audit-tools
 
