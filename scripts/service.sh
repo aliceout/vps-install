@@ -11,6 +11,22 @@ AGENT_TEMPLATES_DIR="/etc/infisical/templates"
 SECRETS_DIR="/etc/secrets"
 NGINX_CONF_DIR="/etc/nginx/conf"
 
+# Coloration des lignes ERREUR / AVERTISSEMENT pour qu'elles ressortent
+# au milieu du flux verbeux de install.sh + apt + docker. Couvre stdout
+# ET stderr de service.sh + tous ses sous-process (install.sh herite des
+# FDs). Activee uniquement si stdout est un TTY -> cron/logs restent
+# clean (pas de codes ANSI \033[xx;m).
+colorize_output() {
+  awk '
+    /^ERREUR/        { printf "\033[1;31m%s\033[0m\n", $0; fflush(); next }
+    /^AVERTISSEMENT/ { printf "\033[1;33m%s\033[0m\n", $0; fflush(); next }
+                     { print; fflush() }
+  '
+}
+if [[ -t 1 ]]; then
+  exec > >(colorize_output) 2> >(colorize_output >&2)
+fi
+
 # VPS_USER (user non-root principal) : chargé depuis le fichier persiste par
 # 35_infisical.sh. Transmis ensuite aux install.sh des services.
 if [[ -z "${VPS_USER:-}" && -s /etc/infisical/vps-user ]]; then
