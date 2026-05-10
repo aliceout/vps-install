@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte ROOT_DIR).
+# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte ROOT_DIR/VPS_USER).
 ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+VPS_USER="${VPS_USER:-$(cat /etc/infisical/vps-user 2>/dev/null || true)}"
 
 echo "Nginx + Certbot"
 apt-get install -y nginx python3-certbot-nginx

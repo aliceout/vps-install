@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte VPS_USER).
+VPS_USER="${VPS_USER:-$(cat /etc/infisical/vps-user 2>/dev/null || true)}"
+
 # Supprime les users par defaut laisses par le provider VPS (debian, ubuntu,
 # admin, ...) s'ils existent ET ne sont pas le $VPS_USER qu'on vient de creer.
 #
