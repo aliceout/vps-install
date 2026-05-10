@@ -19,8 +19,51 @@ EOF
 apt-get update -y
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+# Log rotation par defaut au niveau daemon. Sans ca, json-file grossit
+# indefiniment (un container bavard peut bouffer 10 GB en quelques semaines).
+# Affecte UNIQUEMENT les containers crees apres ce restart de docker.
+# 10 MB max par fichier, 3 fichiers = 30 MB max par container.
+install -d -m 755 /etc/docker
+cat > /etc/docker/daemon.json <<'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOF
+chmod 644 /etc/docker/daemon.json
+
 systemctl enable --now docker
+systemctl restart docker
 usermod -aG docker "$VPS_USER"
+
+# Cron weekly : prune des images / containers / build cache non utilises.
+# system prune --volumes ne touche PAS les volumes nommes (uniquement les
+# anonymes). Filter "until=168h" garde les images recentes meme si
+# temporairement non utilisees (evite de re-pull immediatement apres push).
+cat > /etc/cron.d/vps-docker-prune <<'EOF'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Dimanche 04:00 - prune docker complet (system + buildx)
+0 4 * * 0 root /usr/bin/docker system prune -af --volumes --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+5 4 * * 0 root /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+EOF
+chmod 644 /etc/cron.d/vps-docker-prune
+
+# Logrotate pour le log du prune lui-meme
+cat > /etc/logrotate.d/vps-docker-prune <<'EOF'
+/var/log/docker-prune.log {
+    monthly
+    rotate 6
+    missingok
+    notifempty
+    compress
+    delaycompress
+}
+EOF
 
 # Auth GHCR : si GHCR_TOKEN est present (Infisical /infra/vps/), on logue
 # DEUX users sur ghcr.io :
