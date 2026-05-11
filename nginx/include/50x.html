@@ -70,10 +70,23 @@ p {
   margin-top: 1.25rem;
   margin-bottom: 0;
 }
+.error-code {
+  display: inline-block;
+  padding: 4px 12px;
+  margin-bottom: 1.25rem;
+  background: #fed7d7;
+  color: #c53030;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
 </style>
 </head>
 <body>
 <div class="card">
+  <div class="error-code">ERREUR <!--#echo var="status" --></div>
   <div class="icon">🛠️</div>
   <h1>Ça redémarre dans la cuisine</h1>
   <p>Le service est momentanément indisponible. Patience, c'est presque prêt.</p>
