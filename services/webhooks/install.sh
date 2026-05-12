@@ -65,22 +65,22 @@ generate_agent_templates() {
   pid="$(cat /etc/infisical/project-id)"
   env="$(cat /etc/infisical/environment)"
 
-  # Template "main" du service (ADDRESS, DOMAIN au niveau /services/webhooks/)
-  cat > /etc/infisical/templates/_${SERVICE_NAME}.tmpl <<EOF
-{{- with listSecrets "${pid}" "${env}" "${INFISICAL_PATH}" }}
-{{- range . }}
-{{ .Key }}={{ .Value }}
-{{- end }}
-{{- end }}
-EOF
+  # NB: la template "main" (-> ${SECRETS_FILE} avec ADDRESS, DOMAIN, etc.) est
+  # gérée par scripts/service.sh apply_secrets(), qui lit INFISICAL_PATH depuis
+  # service.conf (= /services/webhooks/${HOST_TYPE}) et écrit dans
+  # /etc/infisical/agent.d/${SERVICE_NAME}.yaml. Ne PAS la dupliquer ici : sinon
+  # les deux sinks ciblent ${SECRETS_FILE} et se courent dessus (celui qui rend
+  # en dernier écrase l'autre - typiquement, le notre vide le fichier car il
+  # liste /services/webhooks/ au lieu de /services/webhooks/${HOST_TYPE}/).
+  #
+  # On gère uniquement les sinks per-hook ci-dessous, dans agent.d/_${SERVICE_NAME}.yaml.
 
-  # Init le fragment agent.d avec le sink "main"
-  cat > /etc/infisical/agent.d/_${SERVICE_NAME}.yaml <<EOF
-  - source-path: /etc/infisical/templates/_${SERVICE_NAME}.tmpl
-    destination-path: ${SECRETS_FILE}
-    config:
-      polling-interval: 60s
-EOF
+  # Nettoie l'ancien template "main" (migration des installs ou cette fonction
+  # le generait elle-meme, en doublon avec apply_secrets() et au mauvais path).
+  rm -f /etc/infisical/templates/_${SERVICE_NAME}.tmpl
+
+  # Init le fragment agent.d vide (les per-hook sinks sont append plus bas)
+  : > /etc/infisical/agent.d/_${SERVICE_NAME}.yaml
 
   # Un template + sink par service ayant un sous-dossier 'hook/' Infisical
   # ET dont le script de deploiement <svc>.sh est publie localement dans
