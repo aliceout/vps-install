@@ -99,6 +99,38 @@ load_service_conf() {
   export TYPE DESCRIPTION
 }
 
+# Parse une ligne KEY=value d'un .env-like file. Retourne la valeur (sans
+# quotes externes), vide si la cle est absente.
+#
+# Plus robuste que le 'grep -E ^KEY= | cut -d= -f2- | tr -d ...' qu'on
+# duplique partout :
+#   - skip commentaires et lignes blanches
+#   - match strict de la cle (KEY= ; pas KEY_FOO= ni FOOKEY=)
+#   - strip uniquement les quotes EXTERNES balancees (single ou double),
+#     un seul niveau -> 'val\'ue' reste intact si guillemets internes
+#   - retourne la 1ere occurrence si dup
+env_get() {
+  local file="$1" key="$2"
+  [[ -n "$file" && -f "$file" ]] || return 0
+
+  local line val
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    if [[ "$line" == "${key}="* ]]; then
+      val="${line#"${key}="}"
+      if (( ${#val} >= 2 )); then
+        if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]]; then
+          val="${val:1:-1}"
+        elif [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
+          val="${val:1:-1}"
+        fi
+      fi
+      printf '%s\n' "$val"
+      return 0
+    fi
+  done < "$file"
+}
+
 # Extrait les server_name d'un fichier nginx (un par ligne, dedupliques)
 extract_domains_from_nginx() {
   local conf="$1"
@@ -278,11 +310,9 @@ maybe_restore_data() {
   local conf="$SERVICES_DIR/$name/service.conf"
   [[ -f "$conf" ]] || return 0
 
-  # Le `|| true` evite que grep sans match (rc=1) + pipefail + set -e ne
-  # tue action_install en plein vol avant run_service_script.
   local restore_flag="" data_dir=""
-  restore_flag="$(grep -E '^RESTORE_ON_INSTALL=' "$conf" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"'"'" || true)"
-  data_dir="$(grep -E '^DATA_DIR=' "$conf" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"'"'" || true)"
+  restore_flag="$(env_get "$conf" RESTORE_ON_INSTALL)"
+  data_dir="$(env_get "$conf" DATA_DIR)"
 
   # Remplace $VPS_USER / ${VPS_USER} si present dans la valeur
   data_dir="${data_dir//\$VPS_USER/$VPS_USER}"
@@ -475,11 +505,9 @@ apply_nginx() {
   # DNS_PROVIDER / DNS_TOKEN_NAME : requis pour obtenir un cert. Pointent sur
   # /certbot/<provider>/<name> dans Infisical.
   local apex_from_env="" dns_provider="" dns_token_name=""
-  if [[ -f "$env_file" ]]; then
-    apex_from_env="$(grep -E '^DOMAIN=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"
-    dns_provider="$(grep -E '^DNS_PROVIDER=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"
-    dns_token_name="$(grep -E '^DNS_TOKEN_NAME=' "$env_file" | head -n1 | cut -d= -f2- | tr -d ' "'"'" || true)"
-  fi
+  apex_from_env="$(env_get "$env_file" DOMAIN)"
+  dns_provider="$(env_get "$env_file" DNS_PROVIDER)"
+  dns_token_name="$(env_get "$env_file" DNS_TOKEN_NAME)"
 
   if [[ ${#domains[@]} -eq 0 ]]; then
     echo "AVERTISSEMENT: aucun server_name dans $vhost_src, skip DNS/cert."
@@ -557,7 +585,8 @@ action_list() {
     if is_installed "$s"; then state="[x] "; extra=" (installe: $(marker_info "$s"))"; else state="[ ] "; fi
     local type="?"
     if [[ -f "$SERVICES_DIR/$s/service.conf" ]]; then
-      type=$(grep -E '^TYPE=' "$SERVICES_DIR/$s/service.conf" | head -n1 | cut -d= -f2- | tr -d '"' || true)
+      type="$(env_get "$SERVICES_DIR/$s/service.conf" TYPE)"
+      [[ -z "$type" ]] && type="?"
     fi
     printf '  %s%-25s %-15s%s\n' "$state" "$s" "($type)" "$extra"
   done < <(list_services)
