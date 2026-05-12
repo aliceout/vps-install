@@ -65,10 +65,17 @@ eval "$(ssh-agent -s)" >/dev/null
 trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
 
 # Pipe la cle dans l'agent via stdin. Pas d'ecriture disque.
-printf '%s\n' "$HOME_SSH_PRIVKEY" | ssh-add - 2>/dev/null
+# Check explicitement le rc : si ssh-add echoue (cle malformee, agent KO),
+# restic tomberait sur un prompt password en cron silencieux et hang.
+ssh_add_rc=0
+ssh_add_out="$(printf '%s\n' "$HOME_SSH_PRIVKEY" | ssh-add - 2>&1)" || ssh_add_rc=$?
+if [[ $ssh_add_rc -ne 0 ]]; then
+  echo "Backup: ssh-add KO (rc=$ssh_add_rc): $ssh_add_out" >&2
+  exit 1
+fi
 # On peut clear la var maintenant que la cle est dans l'agent
 HOME_SSH_PRIVKEY=""
-unset HOME_SSH_PRIVKEY
+unset HOME_SSH_PRIVKEY ssh_add_out ssh_add_rc
 
 # --- Restic -----------------------------------------------------------------
 
