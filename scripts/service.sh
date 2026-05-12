@@ -342,9 +342,15 @@ apply_nginx() {
   # avec __DOMAIN__ litteral si DOMAIN manque dans Infisical). On bail
   # AVANT d'ecrire le vhost pour ne pas casser un vhost qui marchait avant
   # et eviter le mv .broken + reload nginx de la branche d'erreur en aval.
-  local unresolved
-  unresolved="$(grep -oE '__[A-Z][A-Z0-9_]*__' "$rendered" | sort -u | tr '\n' ' ')"
-  if [[ -n "${unresolved% }" ]]; then
+  #
+  # NB : grep -qE en gate avant l'extraction. Faire directement
+  # unresolved=$(grep -oE ... | sort | tr) laisse $?=1 quand grep ne matche
+  # rien (cas nominal), parce que pipefail propage le rc=1 du grep -- bash
+  # n'applique pas set -e aux variable assignments donc on n'exit pas, mais
+  # le $?=1 residuel peut induire en erreur tout code futur qui le teste.
+  if grep -qE '__[A-Z][A-Z0-9_]*__' "$rendered"; then
+    local unresolved
+    unresolved="$(grep -oE '__[A-Z][A-Z0-9_]*__' "$rendered" | sort -u | tr '\n' ' ')"
     echo "AVERTISSEMENT: placeholders non resolus dans $vhost_src apres templating: ${unresolved% }"
     echo "  Verifie que ces cles existent dans Infisical (${INFISICAL_PATH:-/services/$name}) puis relance."
     echo "  Vhost non installe (le precedent reste en place s'il existait)."
