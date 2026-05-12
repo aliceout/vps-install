@@ -30,8 +30,15 @@ if [[ ! -x /opt/certbot-venv/bin/certbot ]]; then
 fi
 /opt/certbot-venv/bin/pip install --upgrade --quiet pip
 /opt/certbot-venv/bin/pip install --upgrade --quiet certbot
+# Pin du fork certbot-dns-infomaniak : installer depuis HEAD ('main' par
+# defaut) signifie qu'un push malveillant ou un bug introduit cassera tous
+# les renewals au prochain bootstrap. Override via CERTBOT_DNS_INFOMANIAK_PIN
+# avec un SHA / tag pour figer (ex: CERTBOT_DNS_INFOMANIAK_PIN=v2.0.1 ou
+# un sha 40 chars). Voir https://github.com/aliceout/certbot-dns-infomaniak
+# pour la liste des tags / SHA stables.
+CERTBOT_DNS_INFOMANIAK_PIN="${CERTBOT_DNS_INFOMANIAK_PIN:-main}"
 /opt/certbot-venv/bin/pip install --upgrade --quiet \
-  git+https://github.com/aliceout/certbot-dns-infomaniak.git
+  "git+https://github.com/aliceout/certbot-dns-infomaniak.git@${CERTBOT_DNS_INFOMANIAK_PIN}"
 /opt/certbot-venv/bin/pip install --upgrade --quiet certbot-dns-ovh
 ln -sf /opt/certbot-venv/bin/certbot /usr/local/bin/certbot
 

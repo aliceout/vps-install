@@ -4,7 +4,14 @@ set -euo pipefail
 echo "UFW + regles minimales (SSH $SSH_PORT, HTTP/HTTPS)"
 apt-get install -y ufw nftables
 
-ufw --force reset
+# Idempotent : on ne reset PAS si UFW tourne deja. 'ufw --force reset' vide
+# toutes les regles avant de re-appliquer -> fenetre d'exposition pendant le
+# re-bootstrap d'un host vivant. Les commandes 'ufw default' et 'ufw allow'
+# sont elles-memes idempotentes, donc inutile de reset systematiquement.
+# Pour reset volontairement, lance manuellement 'sudo ufw reset' avant.
+if ! ufw status 2>/dev/null | grep -q 'Status: active'; then
+  ufw --force reset
+fi
 ufw default deny incoming
 ufw default allow outgoing
 
