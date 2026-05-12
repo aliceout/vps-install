@@ -113,13 +113,23 @@ extract_domains_from_nginx() {
 
 regen_agent_conf() {
   [[ -f "$AGENT_BASE" ]] || { echo "Agent Infisical non configure (lance bootstrap avec infisical=yes)." >&2; return 1; }
-  cp "$AGENT_BASE" "$AGENT_CONF"
+  # Write-then-rename : si on ecrivait directement dans $AGENT_CONF, un restart
+  # de l'agent pendant la concat pourrait le faire charger un YAML tronque (et
+  # crasher -> tous les secrets de tous les services indisponibles).
+  local tmp="${AGENT_CONF}.new.$$"
+  cp "$AGENT_BASE" "$tmp"
   shopt -s nullglob
   for f in "$AGENT_FRAGMENTS_DIR"/*.yaml; do
-    cat "$f" >> "$AGENT_CONF"
+    cat "$f" >> "$tmp"
   done
   shopt -u nullglob
-  chmod 600 "$AGENT_CONF"
+  if [[ ! -s "$tmp" ]]; then
+    rm -f "$tmp"
+    echo "ERREUR: agent.yaml temp vide, refuse de remplacer $AGENT_CONF" >&2
+    return 1
+  fi
+  chmod 600 "$tmp"
+  mv "$tmp" "$AGENT_CONF"
 }
 
 restart_agent_if_any() {
@@ -128,13 +138,32 @@ restart_agent_if_any() {
   fi
 }
 
+# Considere un env file Infisical "valide" : non vide ET contenant au moins une
+# ligne KEY=value. L'agent peut creer un fichier vide ou ne contenant que des
+# blancs si le path Infisical est inconnu / vide / sans permission - on doit
+# detecter ces cas plutot que continuer avec un env file inutilisable.
+_secret_file_valid() {
+  local path="$1"
+  [[ -s "$path" ]] || return 1
+  grep -qE '^[A-Z_][A-Z0-9_]*=' "$path"
+}
+
 wait_for_secret_file() {
-  local path="$1" timeout="${2:-60}" i=0
-  while [[ ! -f "$path" ]] && (( i < timeout )); do
+  local path="$1" timeout="${2:-60}" i=0 had_file=0
+  while (( i < timeout )); do
+    if _secret_file_valid "$path"; then
+      return 0
+    fi
+    [[ -f "$path" ]] && had_file=1
     sleep 1
     i=$((i+1))
   done
-  [[ -f "$path" ]]
+  if (( had_file == 0 )); then
+    echo "  -> $path n'a jamais ete cree par l'agent (verifie journalctl -u infisical-agent)." >&2
+  else
+    echo "  -> $path cree mais aucune ligne KEY=value detectee. Verifie INFISICAL_PATH et la couverture machine identity." >&2
+  fi
+  return 1
 }
 
 apply_secrets() {
@@ -154,52 +183,82 @@ apply_secrets() {
     echo "ERREUR: /etc/infisical/project-id ou /etc/infisical/environment manquant" >&2
     return 1
   fi
-  local infisical_path="${INFISICAL_PATH:-/vps/$name}"
+  local infisical_path="${INFISICAL_PATH:-/services/$name}"
 
-  # Substitution des placeholders dans le template
+  local tmpl_target="$AGENT_TEMPLATES_DIR/$name.tmpl"
+  local frag_target="$AGENT_FRAGMENTS_DIR/$name.yaml"
+  local secret_target="$SECRETS_DIR/$name.env"
+
+  # Genere le contenu attendu dans des tempfiles, puis compare a l'etat actuel.
+  # Sans cette comparaison, chaque 'services update <svc>' restart l'agent meme
+  # quand rien n'a change cote templates -> cascade de restarts qui invalident
+  # tous les /etc/secrets/*.env en cours d'usage par d'autres services.
+  local new_tmpl new_frag
+  new_tmpl="$(mktemp)"
+  new_frag="$(mktemp)"
+
   PROJECT_ID="$project_id" \
   INFISICAL_ENV="$env_slug" \
   INFISICAL_PATH="$infisical_path" \
     envsubst '${PROJECT_ID} ${INFISICAL_ENV} ${INFISICAL_PATH}' \
-      < "$tmpl_src" > "$AGENT_TEMPLATES_DIR/$name.tmpl"
-  chmod 644 "$AGENT_TEMPLATES_DIR/$name.tmpl"
+      < "$tmpl_src" > "$new_tmpl"
 
-  cat > "$AGENT_FRAGMENTS_DIR/$name.yaml" <<EOF
-  - source-path: $AGENT_TEMPLATES_DIR/$name.tmpl
-    destination-path: $SECRETS_DIR/$name.env
+  cat > "$new_frag" <<EOF
+  - source-path: $tmpl_target
+    destination-path: $secret_target
     config:
       polling-interval: 60s
 EOF
-  chmod 600 "$AGENT_FRAGMENTS_DIR/$name.yaml"
 
-  regen_agent_conf
-  # Supprime l'ancien env file avant de restart, pour que wait_for_secret_file
-  # bloque jusqu'a ce que l'agent regenere depuis le template a jour. Sinon, si
-  # le template a change (nouveau format, nouvelles cles), le wait retournerait
-  # immediatement sur le fichier stale.
-  rm -f "$SECRETS_DIR/$name.env"
-  systemctl enable --now infisical-agent.service
-  systemctl restart infisical-agent.service
+  local restart_needed=0
+  if ! cmp -s "$new_tmpl" "$tmpl_target" 2>/dev/null; then
+    mv "$new_tmpl" "$tmpl_target"
+    chmod 644 "$tmpl_target"
+    restart_needed=1
+  else
+    rm -f "$new_tmpl"
+  fi
+  if ! cmp -s "$new_frag" "$frag_target" 2>/dev/null; then
+    mv "$new_frag" "$frag_target"
+    chmod 600 "$frag_target"
+    restart_needed=1
+  else
+    rm -f "$new_frag"
+  fi
+  # Sink absent ou corrompu : faut restart pour le (re)generer
+  _secret_file_valid "$secret_target" || restart_needed=1
 
-  echo "Attente generation $SECRETS_DIR/$name.env..."
-  if ! wait_for_secret_file "$SECRETS_DIR/$name.env" 60; then
-    echo "AVERTISSEMENT: $SECRETS_DIR/$name.env pas genere (verifie l'agent: journalctl -u infisical-agent -n 50)"
-    return 1
+  if (( restart_needed == 0 )); then
+    echo "Secrets $name : templates et sink inchanges, skip restart agent."
+  else
+    regen_agent_conf
+    # Supprime l'ancien env file avant restart, pour que wait_for_secret_file
+    # bloque jusqu'a ce que l'agent regenere depuis le template a jour. Sinon,
+    # si le template a change mais que le fichier rendu reste valide, le wait
+    # retournerait immediatement sur du contenu stale.
+    rm -f "$secret_target"
+    systemctl enable --now infisical-agent.service
+    systemctl restart infisical-agent.service
+
+    echo "Attente generation $secret_target..."
+    if ! wait_for_secret_file "$secret_target" 60; then
+      echo "ERREUR: $secret_target non genere ou vide." >&2
+      return 1
+    fi
   fi
 
   # Le hook script de chaque service tourne en tant que VPS_USER (via runuser),
   # il doit pouvoir lire son env file. /etc/secrets/ reste en 700, mais on
   # rend le fichier lisible par le groupe VPS_USER (chgrp + 640).
   if [[ -n "${VPS_USER:-}" ]]; then
-    chgrp "$VPS_USER" "$SECRETS_DIR/$name.env" 2>/dev/null || true
-    chmod 640 "$SECRETS_DIR/$name.env" || true
-    # Le dir parent doit etre traversable par VPS_USER
+    chgrp "$VPS_USER" "$secret_target" 2>/dev/null || true
+    chmod 640 "$secret_target" || true
     chgrp "$VPS_USER" "$SECRETS_DIR" 2>/dev/null || true
     chmod 750 "$SECRETS_DIR" || true
   else
-    chmod 600 "$SECRETS_DIR/$name.env" || true
+    chmod 600 "$secret_target" || true
   fi
-  echo "Secrets injectes: $SECRETS_DIR/$name.env"
+  echo "Secrets injectes: $secret_target"
 }
 
 remove_secrets() {
@@ -472,7 +531,10 @@ action_install() {
   load_service_conf "$name"
   echo "=== Install $name (type=$TYPE) ==="
 
-  apply_secrets "$name" || true
+  if ! apply_secrets "$name"; then
+    echo "ERREUR: apply_secrets KO pour $name, abort (l'agent Infisical n'a pas pu rendre les secrets)." >&2
+    return 1
+  fi
   apply_nginx "$name"
   maybe_restore_data "$name"
   run_service_script "$name" "install"
@@ -490,7 +552,10 @@ action_update() {
   fi
   load_service_conf "$name"
   echo "=== Update $name ==="
-  apply_secrets "$name" || true
+  if ! apply_secrets "$name"; then
+    echo "ERREUR: apply_secrets KO pour $name, abort (l'agent Infisical n'a pas pu rendre les secrets)." >&2
+    return 1
+  fi
   apply_nginx "$name"
   run_service_script "$name" "update"
   mark_installed "$name"
