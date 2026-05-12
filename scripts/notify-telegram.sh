@@ -32,26 +32,19 @@ fi
 
 # --- Fetch Infisical ---------------------------------------------------------
 
-CLIENT_ID="$(cat /etc/infisical/client-id 2>/dev/null || true)"
-CLIENT_SECRET="$(cat /etc/infisical/client-secret 2>/dev/null || true)"
 PROJECT_ID="$(cat /etc/infisical/project-id 2>/dev/null || true)"
 ENV_SLUG="$(cat /etc/infisical/environment 2>/dev/null || true)"
-if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" ]]; then
-  echo "Infisical creds absents, skip Telegram" >&2
-  exit 0
-fi
 
-TOKEN="$(infisical login \
-  --method=universal-auth \
-  --client-id="$CLIENT_ID" --client-secret="$CLIENT_SECRET" \
-  --plain --silent 2>/dev/null || true)"
+TOKEN="$(infi-token --silent 2>/dev/null || true)"
 if [[ -z "$TOKEN" ]]; then
   echo "Login Infisical echoue, skip Telegram" >&2
   exit 0
 fi
+DOMAIN="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
 
 fetch() {
   infisical secrets get "$1" \
+    --domain="$DOMAIN" \
     --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path=/telegram \
     --token="$TOKEN" --plain 2>/dev/null || true
 }

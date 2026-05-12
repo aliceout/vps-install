@@ -16,28 +16,27 @@ set -uo pipefail
 PROVIDERS_CONF="/etc/certbot/providers.conf"
 CREDS_DIR="/etc/certbot/creds"
 
-CLIENT_ID="$(cat /etc/infisical/client-id 2>/dev/null || true)"
-CLIENT_SECRET="$(cat /etc/infisical/client-secret 2>/dev/null || true)"
 PROJECT_ID="$(cat /etc/infisical/project-id 2>/dev/null || true)"
 ENV_SLUG="$(cat /etc/infisical/environment 2>/dev/null || true)"
 
-if [[ -z "$CLIENT_ID" || -z "$CLIENT_SECRET" || -z "$PROJECT_ID" || -z "$ENV_SLUG" ]]; then
+if [[ -z "$PROJECT_ID" || -z "$ENV_SLUG" ]]; then
   echo "Infisical config incomplete dans /etc/infisical/, skip refresh." >&2
   exit 0
 fi
 
-TOKEN="$(infisical login \
-  --method=universal-auth \
-  --client-id="$CLIENT_ID" --client-secret="$CLIENT_SECRET" \
-  --plain --silent 2>/dev/null || true)"
+# infi-token gere creds, domain self-hosted et cache 10min. Sortie != 0 -> on
+# skip le refresh, les ini existants devraient encore marcher.
+TOKEN="$(infi-token --silent || true)"
 if [[ -z "$TOKEN" ]]; then
   echo "Login Infisical echoue, skip refresh." >&2
   exit 0
 fi
+DOMAIN="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
 
 fetch() {
   local path="$1" key="$2"
   infisical secrets get "$key" \
+    --domain="$DOMAIN" \
     --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path="$path" \
     --token="$TOKEN" --plain 2>/dev/null || true
 }

@@ -25,27 +25,35 @@ fi
 
 # --- Helpers Infisical -------------------------------------------------------
 
-infi_login() {
-  local cid csec
-  cid="$(cat /etc/infisical/client-id)"
-  csec="$(cat /etc/infisical/client-secret)"
-  infisical login --method=universal-auth \
-    --client-id="$cid" --client-secret="$csec" \
-    --plain --silent
+# Resout token + domain UNE SEULE FOIS au demarrage (infi-token cache 10min).
+# Avant ce refacto, list_subfolders relogait pour chaque service detecte,
+# multipliant les appels Infisical et risquant le rate-limit (60 req/min).
+INFI_TOKEN=""
+INFI_DOMAIN=""
+INFI_PID="$(cat /etc/infisical/project-id 2>/dev/null || true)"
+INFI_ENV="$(cat /etc/infisical/environment 2>/dev/null || true)"
+
+infi_init() {
+  [[ -n "$INFI_TOKEN" ]] && return 0
+  INFI_TOKEN="$(infi-token --silent 2>/dev/null || true)"
+  if [[ -z "$INFI_TOKEN" ]]; then
+    echo "ERREUR: infi-token a echoue (verifie /etc/infisical/* et la connectivite)" >&2
+    return 1
+  fi
+  INFI_DOMAIN="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
 }
 
 list_subfolders() {
-  local path="$1" token pid env
-  pid="$(cat /etc/infisical/project-id)"
-  env="$(cat /etc/infisical/environment)"
-  token="$(infi_login)"
+  local path="$1"
+  infi_init || return 1
 
   # `infisical secrets folders get` sort un tableau en Unicode box drawing
   # (│, ─, ┌, etc.). On filtre les lignes de donnees (qui commencent par │)
   # et on extrait la 1ere colonne (le nom du folder).
   infisical secrets folders get \
-    --projectId="$pid" --env="$env" --path="$path" \
-    --token="$token" 2>/dev/null \
+    --domain="$INFI_DOMAIN" \
+    --projectId="$INFI_PID" --env="$INFI_ENV" --path="$path" \
+    --token="$INFI_TOKEN" 2>/dev/null \
     | awk '
         /^│/ && !/FOLDER NAME/ {
           n = split($0, parts, "│")
