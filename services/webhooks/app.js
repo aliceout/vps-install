@@ -273,9 +273,20 @@ const server = http.createServer((req, res) => {
 
     const logFile = path.join(LOG_DIR, `${repo.replace(/\//g, "_")}.log`);
     const cmd     = `bash "${scriptPath}" >> "${logFile}" 2>&1`;
-    exec(cmd, { timeout: 0 }, (err) => {
-      if (err) console.error(`${script} exit ${err.code}: ${err.message}`);
-      else     console.log(`${script} OK`);
+    // Timeout 30 min : un hook qui hang (docker pull stalled, network KO,
+    // git clone bloque) laissait sinon un zombie pour toujours -- timeout: 0
+    // signifie 'pas de timeout'. 30 min couvre les deploys les plus lourds.
+    const HOOK_TIMEOUT_MS = 30 * 60 * 1000;
+    exec(cmd, { timeout: HOOK_TIMEOUT_MS, killSignal: "SIGTERM" }, (err) => {
+      if (err) {
+        if (err.killed && err.signal === "SIGTERM") {
+          console.error(`${script} TIMEOUT after ${HOOK_TIMEOUT_MS / 60000} min, killed`);
+        } else {
+          console.error(`${script} exit ${err.code}: ${err.message}`);
+        }
+      } else {
+        console.log(`${script} OK`);
+      }
     });
   });
 });

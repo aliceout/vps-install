@@ -111,12 +111,18 @@ EOF
     systemctl restart infisical-agent.service 2>/dev/null || true
   fi
 
-  # Attente best-effort de la sync (~30s max). Si l'agent met plus, on
-  # continuera quand meme et le login sera skip ce coup-ci.
+  # Attente best-effort de la sync (~30s max). On checke que la cle a une
+  # vraie valeur (pas juste 'GHCR_TOKEN=' renvoyé par l'agent si la cle est
+  # absente cote Infisical), sinon le login plus bas skip silencieusement.
   for i in $(seq 1 30); do
-    [[ -s /etc/secrets/ghcr.env ]] && break
+    if [[ -s /etc/secrets/ghcr.env ]] && grep -qE '^GHCR_TOKEN=.+' /etc/secrets/ghcr.env; then
+      break
+    fi
     sleep 1
   done
+  if [[ -s /etc/secrets/ghcr.env ]] && ! grep -qE '^GHCR_TOKEN=.+' /etc/secrets/ghcr.env; then
+    echo "AVERTISSEMENT: /etc/secrets/ghcr.env genere mais GHCR_TOKEN vide. Cle absente de /infra/${HOST_TYPE}/ ?"
+  fi
 fi
 
 # Charge GHCR_TOKEN depuis le fichier sync (fallback standalone).
