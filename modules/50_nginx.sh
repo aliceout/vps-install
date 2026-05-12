@@ -28,9 +28,13 @@ cat > /etc/nginx/conf.d/00-vhosts.conf <<'EOF'
 include /etc/nginx/conf/*.conf;
 EOF
 
-# Desactive le vhost par defaut de Debian et nettoie l'ancien pattern
-rm -f /etc/nginx/sites-enabled/default
-rm -rf /etc/nginx/sites-enabled
+# Desactive tous les vhosts pre-existants (default Debian + autres) en vidant
+# le repertoire sites-enabled. On garde le dir lui-meme : la nginx.conf default
+# de Debian contient 'include /etc/nginx/sites-enabled/*;', et certaines
+# versions de nginx failent 'nginx -t' si le path d'include n'existe pas du
+# tout (vs path vide qui est tolere).
+install -d /etc/nginx/sites-enabled
+rm -f /etc/nginx/sites-enabled/*
 
 nginx -t
 systemctl enable --now nginx
