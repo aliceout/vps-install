@@ -337,10 +337,25 @@ apply_nginx() {
     done < "$env_file"
   fi
 
+  # Verifie qu'aucun placeholder __KEY__ ne subsiste apres rendu : sinon
+  # nginx -t planterait (ex: include /etc/nginx/certificat/__DOMAIN__.conf
+  # avec __DOMAIN__ litteral si DOMAIN manque dans Infisical). On bail
+  # AVANT d'ecrire le vhost pour ne pas casser un vhost qui marchait avant
+  # et eviter le mv .broken + reload nginx de la branche d'erreur en aval.
+  local unresolved
+  unresolved="$(grep -oE '__[A-Z][A-Z0-9_]*__' "$rendered" | sort -u | tr '\n' ' ')"
+  if [[ -n "${unresolved% }" ]]; then
+    echo "AVERTISSEMENT: placeholders non resolus dans $vhost_src apres templating: ${unresolved% }"
+    echo "  Verifie que ces cles existent dans Infisical (${INFISICAL_PATH:-/services/$name}) puis relance."
+    echo "  Vhost non installe (le precedent reste en place s'il existait)."
+    rm -f "$rendered"
+    return 1
+  fi
+
   # Recupere les domaines du vhost RENDU (apres substitution) pour DNS + cert
   local domains=()
   while IFS= read -r d; do
-    [[ -n "$d" && "$d" != *__*__* ]] && domains+=("$d")
+    [[ -n "$d" ]] && domains+=("$d")
   done < <(extract_domains_from_nginx "$rendered")
 
   # Extrait DOMAIN, DNS_PROVIDER et DNS_TOKEN_NAME depuis l'env file.
@@ -355,7 +370,7 @@ apply_nginx() {
   fi
 
   if [[ ${#domains[@]} -eq 0 ]]; then
-    echo "AVERTISSEMENT: aucun server_name valide dans $vhost_src apres templating (manque ADDRESS dans Infisical ?), skip DNS/cert."
+    echo "AVERTISSEMENT: aucun server_name dans $vhost_src, skip DNS/cert."
   else
     # Ordre important : ensure_cert AVANT ensure_dns.
     # ensure_cert ecrit /etc/certbot/providers.conf (apex -> provider:token) et
