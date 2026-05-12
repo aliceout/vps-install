@@ -377,23 +377,70 @@ apply_nginx() {
 
   local env_file="$SECRETS_DIR/$name.env"
   if [[ -f "$env_file" ]]; then
-    while IFS= read -r line; do
-      [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-      local k="${line%%=*}"
-      local v="${line#*=}"
-      # Strip les quotes externes (le template Infisical emet KEY='value')
-      if [[ ${#v} -ge 2 ]]; then
-        case "$v" in
-          \'*\') v="${v:1:-1}" ;;
-          \"*\") v="${v:1:-1}" ;;
-        esac
-      fi
-      # Protege | et & pour sed
-      v="${v//\\/\\\\}"
-      v="${v//|/\\|}"
-      v="${v//&/\\&}"
-      sed -i "s|__${k}__|${v}|g" "$rendered"
-    done < "$env_file"
+    # Substitution en une passe awk : evite la cascade de sed -i + le quoting
+    # shell hazardeux des valeurs (caracteres |, &, \, voire newline incrustes
+    # dans un secret). Awk lit l'env file, construit une map, puis remplace
+    # __KEY__ par la valeur literale (& et \ sont reechappes pour gsub).
+    local rendered_new
+    rendered_new="$(mktemp)"
+    if ! awk \
+      -v envf="$env_file" \
+      -v sq="'" \
+      '
+      # Remplacement literal via index/substr : pas de regex, pas de pieges
+      # autour de & ou \\ comme avec gsub (ou la chaine de remplacement est
+      # interpretee). On accepte donc nimporte quelle valeur tel quel.
+      function replace_all(haystack, needle, repl,    out, pos) {
+        out = ""
+        while ((pos = index(haystack, needle)) > 0) {
+          out = out substr(haystack, 1, pos - 1) repl
+          haystack = substr(haystack, pos + length(needle))
+        }
+        return out haystack
+      }
+      BEGIN {
+        while ((getline line < envf) > 0) {
+          if (line ~ /^[[:space:]]*#/ || line ~ /^[[:space:]]*$/) continue
+          eq = index(line, "=")
+          if (eq == 0) continue
+          key = substr(line, 1, eq-1)
+          val = substr(line, eq+1)
+          if (length(val) >= 1) {
+            c1 = substr(val, 1, 1)
+            cN = substr(val, length(val), 1)
+            # Si la valeur commence par un quote mais ne finit pas par le meme,
+            # cest probablement une valeur multi-ligne (template Infisical
+            # KEY=quote {{ .Value }} quote rend des newlines literales pour des
+            # secrets multi-lignes). On skip plutot que polluer le vhost.
+            if (c1 == sq && cN != sq) {
+              printf "AVERTISSEMENT: cle %s : valeur multi-ligne ou guillemets desequilibres, skip.\n", key > "/dev/stderr"
+              continue
+            }
+            if (c1 == "\"" && cN != "\"") {
+              printf "AVERTISSEMENT: cle %s : valeur multi-ligne ou guillemets desequilibres, skip.\n", key > "/dev/stderr"
+              continue
+            }
+            if (length(val) >= 2 && ((c1 == sq && cN == sq) || (c1 == "\"" && cN == "\""))) {
+              val = substr(val, 2, length(val)-2)
+            }
+          }
+          vars[key] = val
+        }
+        close(envf)
+      }
+      {
+        line = $0
+        for (k in vars) {
+          line = replace_all(line, "__" k "__", vars[k])
+        }
+        print line
+      }
+      ' "$rendered" > "$rendered_new"; then
+      rm -f "$rendered" "$rendered_new"
+      echo "ERREUR: substitution awk KO pour $vhost_src" >&2
+      return 1
+    fi
+    mv "$rendered_new" "$rendered"
   fi
 
   # Verifie qu'aucun placeholder __KEY__ ne subsiste apres rendu : sinon
