@@ -27,7 +27,7 @@ EOF
 
 chmod +x /usr/local/sbin/apt-daily-update.sh /usr/local/sbin/apt-daily-upgrade.sh
 
-rm -f /etc/cron.d/apt-daily /etc/cron.d/certbot-dns /etc/cron.d/fail2ban-badips
+rm -f /etc/cron.d/apt-daily /etc/cron.d/certbot-dns
 
 # (Tous les jours) 03:17 update, 03:27 upgrade
 cat > /etc/cron.d/vps-bootstrap <<'EOF'

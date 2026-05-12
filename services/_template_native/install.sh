@@ -5,6 +5,8 @@ set -euo pipefail
 # shellcheck disable=SC1091
 source "$SERVICE_DIR/service.conf"
 
+: "${UNIT_NAME:?UNIT_NAME doit etre defini dans service.conf (ex: UNIT_NAME=monservice.service)}"
+
 UNIT_PATH="/etc/systemd/system/$UNIT_NAME"
 
 install_unit() {

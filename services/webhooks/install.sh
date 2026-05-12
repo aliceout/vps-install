@@ -212,7 +212,11 @@ Environment=HOOKS_ENV_DIR=${HOOKS_ENV_DIR}
 # par le groupe VPS_USER avant chaque start (safety net si le chmod post-install
 # a ete ecrase par un re-sync). Le prefix '+' lance la commande en tant que
 # root, peu importe le User= plus bas.
-ExecStartPre=+/bin/sh -c 'chgrp ${VPS_USER} ${HOOKS_ENV_DIR}/*.env 2>/dev/null || true; chmod 640 ${HOOKS_ENV_DIR}/*.env 2>/dev/null || true'
+#
+# find au lieu d'un glob shell : si HOOKS_ENV_DIR est vide (premier boot
+# avant qu'un hook soit publie), le glob *.env reste litteral et 'chgrp *.env'
+# echoue bruyamment. find -exec ne tire rien si pas de match.
+ExecStartPre=+/usr/bin/find ${HOOKS_ENV_DIR} -maxdepth 1 -name "*.env" -exec chgrp ${VPS_USER} {} + -exec chmod 640 {} +
 
 ExecStart=/usr/bin/node ${DATA_DIR}/app.js
 Restart=on-failure

@@ -331,7 +331,11 @@ for v in "${REQUIRED[@]}"; do
 done
 if (( ${#missing[@]} > 0 )); then
   say_err "ERREUR: variables manquantes dans ${INFISICAL_PATH_SHARED} ou ${INFISICAL_PATH_INFRA}:"
-  printf '  %s\n' "${C_RED}- ${missing[@]}${C_RESET}"
+  # printf repete le format pour chaque arg : chaque cle manquante a ses
+  # propres codes couleur (avant on prefixait C_RED a la 1ere uniquement et
+  # suffixait C_RESET a la derniere, donc toutes les lignes du milieu
+  # heritaient du rouge sans reset).
+  printf "  ${C_RED}- %s${C_RESET}\n" "${missing[@]}"
   exit 1
 fi
 if [[ "$INSTALL_MODE" == "existing" ]] && ! id -u "$VPS_USER" >/dev/null 2>&1; then
