@@ -101,7 +101,7 @@ case "$ACTION" in
       exit 1
     fi
     if [[ ! -d "$DATA_DIR_VALUE" ]]; then
-      echo "AVERTISSEMENT: $DATA_DIR_VALUE n'existe pas. Cree-le a la main avant le up :"
+      echo "ERREUR: $DATA_DIR_VALUE n'existe pas. Cree-le a la main avant le up :"
       echo "  sudo install -d -m 755 -o $VPS_USER -g $VPS_USER '$DATA_DIR_VALUE'"
       exit 1
     fi
