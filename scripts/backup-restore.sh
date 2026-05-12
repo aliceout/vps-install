@@ -61,9 +61,16 @@ HOME_SSH_PORT="${HOME_SSH_PORT:-22}"
 eval "$(ssh-agent -s)" >/dev/null
 trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
 
-printf '%s\n' "$HOME_SSH_PRIVKEY" | ssh-add - 2>/dev/null
+# Check explicitement le rc : si ssh-add echoue (cle malformee, agent KO),
+# restic tomberait sur un prompt password silencieux et hang.
+ssh_add_rc=0
+ssh_add_out="$(printf '%s\n' "$HOME_SSH_PRIVKEY" | ssh-add - 2>&1)" || ssh_add_rc=$?
+if [[ $ssh_add_rc -ne 0 ]]; then
+  echo "Restore: ssh-add KO (rc=$ssh_add_rc): $ssh_add_out" >&2
+  exit 1
+fi
 HOME_SSH_PRIVKEY=""
-unset HOME_SSH_PRIVKEY
+unset HOME_SSH_PRIVKEY ssh_add_out ssh_add_rc
 
 # --- Restic restore ---------------------------------------------------------
 
@@ -79,9 +86,14 @@ fi
 
 echo "[$(date -Is)] Restore du dernier snapshot pour $TARGET ..."
 
-# --include <path> = ne restore que ce chemin
-# --target / = restore au chemin absolu (meme emplacement qu'a l'origine)
+# --path <abs-path>  = filtre 'latest' aux snapshots qui ont effectivement
+#                      backup $TARGET (sinon on pourrait piocher un snapshot
+#                      sans cette donnee)
+# --include <path>   = filtre les chemins a restorer (literal-segment match,
+#                      donc 'foo' ne capture pas 'foo-old')
+# --target /         = restore aux chemins absolus d'origine
 restic --option sftp.args="$SFTP_ARGS" restore latest \
+  --path "$TARGET" \
   --include "$TARGET" \
   --target / \
   --verbose=1
