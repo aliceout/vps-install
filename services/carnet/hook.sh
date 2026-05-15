@@ -35,5 +35,11 @@ if [[ -r "$CLOUD_ENV" ]]; then
   set +a
 fi
 
-exec bash "$DEPLOY_DIR/scripts/deploy.sh" "$@"
+# cd dans le repo avant l'exec : sinon deploy.sh herite du CWD du parent
+# (typiquement /opt/vps-install quand le hook tourne via 'services install')
+# et ses 'git'/'docker compose' sans -C echouent. (Carnet marche sans ce
+# cd parce que son deploy.sh resout son repo root tout seul, mais on
+# harmonise tous les hooks pour la robustesse.)
+cd "$DEPLOY_DIR"
+exec bash scripts/deploy.sh "$@"
 
