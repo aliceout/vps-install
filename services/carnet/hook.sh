@@ -3,7 +3,7 @@
 # workflow_run "Docker build" success.
 #
 # Git-pull le repo puis exec scripts/deploy.sh (qui fetch les secrets
-# app depuis Infisical self-hosted, genere .env, docker compose pull/up).
+# app depuis Infisical Cloud (sous /services/<name>/), genere .env, docker compose pull/up).
 #
 # Source aussi /etc/secrets/carnet.env (cloud Infisical, sync par l'agent)
 # avant deploy.sh, pour que les vars cloud (ADDRESS, PORT_*, DOMAIN, etc.)

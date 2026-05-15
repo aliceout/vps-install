@@ -9,15 +9,15 @@
 #   - PORT                    (ex: 8061) - port host du container web
 #   - DNS_PROVIDER            infomaniak | ovh
 #   - DNS_TOKEN_NAME          label sous /certbot/<provider>/
-#   - INFISICAL_API_URL       (ex: https://env.backlice.dev) - Infisical self-hosted
-#   - INFISICAL_PROJECT_ID    - project id cote self-hosted (projet Nodea)
-#   - INFISICAL_CLIENT_ID     - machine identity cote self-hosted
-#   - INFISICAL_CLIENT_SECRET
-#   - INFISICAL_ENV           (ex: prod)
 #
-# Les INFISICAL_* sont ecrits dans /home/$VPS_USER/.config/infisical/nodea.env
-# et consommes par deploy.sh (dans le repo Nodea) qui fetch les vraies cles
-# app (COOKIE_SECRET, POSTGRES_PASSWORD, SMTP_*, etc.) depuis le self-hosted.
+# Sous /services/nodea/{api,web,postgres}/ : les vraies cles app
+# (COOKIE_SECRET, POSTGRES_PASSWORD, JWT_SECRET, WEBAUTHN_*, etc.) lues
+# par deploy.sh dans le repo Nodea.
+#
+# On ecrit les creds Cloud du framework dans
+# /home/$VPS_USER/.config/infisical/nodea.env pour que deploy.sh puisse
+# fetcher /services/nodea/{api,web,postgres} avec la meme identite que
+# le framework (single source of truth, identite scopee dans Infisical).
 #
 # Le webhook cote receiver attend aussi /services/nodea/hook/ avec
 # REPO=aliceout/Nodea, WEBHOOK_SECRET=<hmac>, SCRIPT=nodea.sh,
@@ -57,12 +57,6 @@ find_compose_file() {
 
 case "$ACTION" in
   install|update)
-    : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant dans $SECRETS_FILE}"
-    : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
-    : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"
-    : "${INFISICAL_CLIENT_SECRET:?INFISICAL_CLIENT_SECRET manquant}"
-    : "${INFISICAL_ENV:?INFISICAL_ENV manquant}"
-
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 /var/www
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$DEPLOY_DIR"
 
@@ -71,15 +65,27 @@ case "$ACTION" in
       echo "$VPS_USER ajoute au groupe docker (effet au prochain login)."
     fi
 
-    # Creds Infisical self-hosted pour Nodea (lus par deploy.sh).
+    # Creds Cloud du framework pour Nodea (lus par deploy.sh).
+    # Single Infisical : meme identite que le framework, qui fetch ses
+    # sous-dossiers /services/nodea/{api,web,postgres}.
+    : "${INFISICAL_FRAMEWORK_ADDRESS:=$(cat /etc/infisical/address 2>/dev/null || echo 'https://app.infisical.com')}"
+    : "${INFISICAL_FRAMEWORK_PROJECT_ID:=$(cat /etc/infisical/project-id 2>/dev/null || true)}"
+    : "${INFISICAL_FRAMEWORK_ENV:=$(cat /etc/infisical/environment 2>/dev/null || true)}"
+    : "${INFISICAL_FRAMEWORK_CLIENT_ID:=$(cat /etc/infisical/client-id 2>/dev/null || true)}"
+    : "${INFISICAL_FRAMEWORK_CLIENT_SECRET:=$(cat /etc/infisical/client-secret 2>/dev/null || true)}"
+    if [[ -z "$INFISICAL_FRAMEWORK_PROJECT_ID" || -z "$INFISICAL_FRAMEWORK_CLIENT_ID" || -z "$INFISICAL_FRAMEWORK_CLIENT_SECRET" ]]; then
+      echo "ERREUR: creds Infisical framework manquantes (/etc/infisical/{project-id,client-id,client-secret})"
+      exit 1
+    fi
+
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 700 "$NODEA_CREDS_DIR"
     umask 077
     cat > "$NODEA_CREDS_FILE" <<EOF
-INFISICAL_API_URL=${INFISICAL_API_URL}
-INFISICAL_PROJECT_ID=${INFISICAL_PROJECT_ID}
-INFISICAL_CLIENT_ID=${INFISICAL_CLIENT_ID}
-INFISICAL_CLIENT_SECRET=${INFISICAL_CLIENT_SECRET}
-INFISICAL_ENV=${INFISICAL_ENV}
+INFISICAL_API_URL=${INFISICAL_FRAMEWORK_ADDRESS}
+INFISICAL_PROJECT_ID=${INFISICAL_FRAMEWORK_PROJECT_ID}
+INFISICAL_CLIENT_ID=${INFISICAL_FRAMEWORK_CLIENT_ID}
+INFISICAL_CLIENT_SECRET=${INFISICAL_FRAMEWORK_CLIENT_SECRET}
+INFISICAL_ENV=${INFISICAL_FRAMEWORK_ENV}
 EOF
     chown "$VPS_USER:$VPS_USER" "$NODEA_CREDS_FILE"
     chmod 600 "$NODEA_CREDS_FILE"

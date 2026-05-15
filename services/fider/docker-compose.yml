@@ -1,7 +1,7 @@
 # Fider - feedback / votes feature requests open-source (Go binary + Postgres).
 # Variables substituees depuis /var/lib/services/fider/runtime.env :
 #   - SERVICE_NAME, PORT, ADDRESS, DATA_DIR  (cloud Infisical /services/fider/)
-#   - POSTGRES_*, JWT_SECRET, EMAIL_*       (self-hosted Infisical /fider/)
+#   - POSTGRES_*, JWT_SECRET, EMAIL_*       (Infisical Cloud /services/fider/)
 
 services:
   db:

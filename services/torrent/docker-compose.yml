@@ -4,8 +4,8 @@
 #
 # Variables substituees depuis /var/lib/services/torrent/runtime.env :
 #   - SERVICE_NAME, PORT, AUTH_PORT, ADDRESS  (cloud Infisical /services/torrent/)
-#   - DATA_DIR, OPENVPN_*                    (self-hosted)
-#   - TINYAUTH_USERS, TINYAUTH_SECRET        (self-hosted)
+#   - DATA_DIR, OPENVPN_*                    (Cloud /services/torrent/)
+#   - TINYAUTH_USERS, TINYAUTH_SECRET        (Cloud /services/torrent/)
 #
 # Constantes hardcodees ici (pas dans Infisical) :
 #   - PUID/PGID 1000 (uid pi sur ce host)
@@ -13,9 +13,9 @@
 #   - TRANSMISSION_WEB_UI transmission-web-control
 #   - TRANSMISSION_PEER_PORT 51413 (default upstream)
 #
-# LOCAL_NETWORK : optionnel dans Infisical self-hosted (path /). Si absent,
-# default sur 192.168.1.0/24 (LAN typique home). Override en y ajoutant
-# LOCAL_NETWORK=<cidr> au self-hosted (ex: 10.0.0.0/24).
+# LOCAL_NETWORK : optionnel dans Infisical Cloud (path /services/torrent/).
+# Si absent, default sur 192.168.1.0/24 (LAN typique home). Override en y
+# ajoutant LOCAL_NETWORK=<cidr> (ex: 10.0.0.0/24).
 
 services:
   transmission:

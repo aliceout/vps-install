@@ -3,21 +3,16 @@
 #
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
-# Cles attendues dans Infisical sous /services/korai/ (cloud Infisical, celui
-# du VPS, pas le self-hosted Korai) :
+# Cles attendues dans Infisical CLOUD sous /services/korai/ :
 #   - DOMAIN                  (ex: alyss.cc) - apex pour le cert wildcard
 #   - ADDRESS                  (ex: korai.alyss.cc) - FQDN du vhost
 #   - PORT                    (ex: 8060) - port host expose par le container web
-#   - INFISICAL_API_URL       (ex: https://env.backlice.dev) - Infisical self-hosted
-#   - INFISICAL_PROJECT_ID    - project id cote self-hosted (projet Korai)
-#   - INFISICAL_CLIENT_ID     - machine identity "korai-server"
-#   - INFISICAL_CLIENT_SECRET
-#   - INFISICAL_ENV           (ex: prod)
 #
-# Ces INFISICAL_* sont les creds que deploy.sh utilise pour fetch les .env
-# applicatifs depuis le self-hosted. Ils ne collisionnent pas avec les creds
-# cloud du VPS (/etc/infisical/*) parce qu'ils ne sont que sources + ecrits
-# dans /home/$VPS_USER/.config/infisical/korai.env, jamais re-exportes.
+# Cles app sous /services/korai/<sous-dossier>/ : lues par deploy.sh.
+#
+# Les creds Cloud du framework sont passees au deploy.sh via
+# /home/$VPS_USER/.config/infisical/korai.env (meme identite que le
+# framework, lit /etc/infisical/).
 #
 # Le hook GitHub cote webhooks attend aussi /services/korai/hook/ avec
 # REPO=aliceout/Korai, SECRET=<hmac GitHub>, SCRIPT=korai.sh
@@ -56,12 +51,6 @@ find_compose_file() {
 
 case "$ACTION" in
   install|update)
-    : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant dans $SECRETS_FILE}"
-    : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
-    : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"
-    : "${INFISICAL_CLIENT_SECRET:?INFISICAL_CLIENT_SECRET manquant}"
-    : "${INFISICAL_ENV:?INFISICAL_ENV manquant}"
-
     # /var/www/korai appartient a VPS_USER (git clone, docker compose cwd)
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 /var/www
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$DEPLOY_DIR"
@@ -73,15 +62,27 @@ case "$ACTION" in
       echo "$VPS_USER ajoute au groupe docker (effet au prochain login)."
     fi
 
-    # Creds Infisical self-hosted pour l'app Korai (lus par deploy.sh).
+    # Creds Cloud du framework pour l'app Korai (lus par deploy.sh).
+    # Single Infisical : meme identite que le framework, qui fetch ses
+    # sous-dossiers /services/korai/{...} via la meme machine identity.
+    FRAMEWORK_ADDRESS="$(cat /etc/infisical/address 2>/dev/null || echo 'https://app.infisical.com')"
+    FRAMEWORK_PROJECT_ID="$(cat /etc/infisical/project-id 2>/dev/null || true)"
+    FRAMEWORK_ENV="$(cat /etc/infisical/environment 2>/dev/null || true)"
+    FRAMEWORK_CLIENT_ID="$(cat /etc/infisical/client-id 2>/dev/null || true)"
+    FRAMEWORK_CLIENT_SECRET="$(cat /etc/infisical/client-secret 2>/dev/null || true)"
+    if [[ -z "$FRAMEWORK_PROJECT_ID" || -z "$FRAMEWORK_CLIENT_ID" || -z "$FRAMEWORK_CLIENT_SECRET" ]]; then
+      echo "ERREUR: creds Infisical framework manquantes (/etc/infisical/{project-id,client-id,client-secret})"
+      exit 1
+    fi
+
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 700 "$KORAI_CREDS_DIR"
     umask 077
     cat > "$KORAI_CREDS_FILE" <<EOF
-INFISICAL_API_URL=${INFISICAL_API_URL}
-INFISICAL_PROJECT_ID=${INFISICAL_PROJECT_ID}
-INFISICAL_CLIENT_ID=${INFISICAL_CLIENT_ID}
-INFISICAL_CLIENT_SECRET=${INFISICAL_CLIENT_SECRET}
-INFISICAL_ENV=${INFISICAL_ENV}
+INFISICAL_API_URL=${FRAMEWORK_ADDRESS}
+INFISICAL_PROJECT_ID=${FRAMEWORK_PROJECT_ID}
+INFISICAL_CLIENT_ID=${FRAMEWORK_CLIENT_ID}
+INFISICAL_CLIENT_SECRET=${FRAMEWORK_CLIENT_SECRET}
+INFISICAL_ENV=${FRAMEWORK_ENV}
 EOF
     chown "$VPS_USER:$VPS_USER" "$KORAI_CREDS_FILE"
     chmod 600 "$KORAI_CREDS_FILE"

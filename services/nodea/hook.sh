@@ -2,7 +2,7 @@
 # Webhook hook pour Nodea. Appele par le webhooks receiver sur
 # workflow_run "Docker build" success.
 # Git-pull le repo puis delegue a scripts/deploy.sh (qui fetch
-# l'Infisical self-hosted, genere le .env, docker compose pull + up + seed).
+# l'Infisical Cloud (sous /services/<name>/), genere le .env, docker compose pull + up + seed).
 #
 # Source aussi /etc/secrets/nodea.env (cloud Infisical, sync par l'agent)
 # avant deploy.sh, pour que les vars cloud (ADDRESS, PORT_*, DOMAIN, etc.)

@@ -6,10 +6,6 @@
 # Cles attendues dans Infisical CLOUD sous /services/fider/ :
 #   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
-#     (creds vers self-hosted env.backlice.dev pour fetch les secrets app)
-#
-# Cles attendues dans Infisical SELF-HOSTED sous projet fider, racine flat :
 #   - POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
 #   - JWT_SECRET                              (openssl rand -hex 32)
 #   - EMAIL_NOREPLY                           (from address)
@@ -35,24 +31,18 @@ source "$SECRETS_FILE"
 build_runtime_env() {
   : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
-  : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
-  : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
-  : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"
-  : "${INFISICAL_CLIENT_SECRET:?INFISICAL_CLIENT_SECRET manquant}"
-  : "${INFISICAL_ENV:?INFISICAL_ENV manquant}"
 
-  echo "Login Infisical self-hosted (${INFISICAL_API_URL})..."
-  local token
-  token="$(infisical login \
-    --method=universal-auth \
-    --domain="$INFISICAL_API_URL" \
-    --client-id="$INFISICAL_CLIENT_ID" \
-    --client-secret="$INFISICAL_CLIENT_SECRET" \
-    --plain --silent 2>/dev/null)"
+  # Single Infisical : on utilise l'identite framework via infi-token (cache
+  # 10min, --domain auto). Tout est sous /services/fider/ en Cloud.
+  local token domain pid env_slug
+  token="$(infi-token --silent 2>/dev/null || true)"
   if [[ -z "$token" ]]; then
-    echo "ERREUR: login Infisical self-hosted echoue"
+    echo "ERREUR: infi-token KO (creds /etc/infisical/* ou connectivite ?)"
     exit 1
   fi
+  domain="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
+  pid="$(cat /etc/infisical/project-id)"
+  env_slug="$(cat /etc/infisical/environment)"
 
   install -d -m 700 -o root -g "$VPS_USER" "$RUNTIME_DIR"
 
@@ -63,10 +53,10 @@ build_runtime_env() {
     echo "ADDRESS=${ADDRESS}"
     echo "DATA_DIR=${DATA_DIR}"
     infisical export \
-      --domain="$INFISICAL_API_URL" \
-      --projectId="$INFISICAL_PROJECT_ID" \
-      --env="$INFISICAL_ENV" \
-      --path="/" \
+      --domain="$domain" \
+      --projectId="$pid" \
+      --env="$env_slug" \
+      --path="/services/${SERVICE_NAME}" \
       --format=dotenv \
       --token="$token"
   } > "$RUNTIME_ENV"
@@ -75,7 +65,7 @@ build_runtime_env() {
 
   for k in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB JWT_SECRET EMAIL_NOREPLY EMAIL_SMTP_HOST; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
-      echo "AVERTISSEMENT: ${k} absent du self-hosted. Verifie /${SERVICE_NAME}/ sur ${INFISICAL_API_URL}."
+      echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
   done
 }
