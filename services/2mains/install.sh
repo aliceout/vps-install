@@ -11,17 +11,18 @@
 #   - PORT_PAYLOAD=8066
 #   - DNS_PROVIDER=infomaniak (ou ovh)
 #   - DNS_TOKEN_NAME=<label client>
-#   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
-#     (creds vers self-hosted, projet 2mains)
 #
-# Cles attendues dans Infisical SELF-HOSTED sous projet 2mains, env prod,
-# racine flat (le user remplit) :
+# Cles app sous /services/2mains/<sous-dossier>/ (lues par deploy.sh) :
 #   - POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
 #   - PAYLOAD_SECRET, PAYLOAD_PUBLIC_SERVER_URL
 #   - ASTRO_PUBLIC_PAYLOAD_URL
 #   - HELLOASSO_DON, HELLOASSO_ADHESION, HELLOASSO_NEWSLETTER
 #   - SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM
 #   - MAIL_TO, RATE_LIMIT_PER_HOUR, ALLOWED_ORIGIN
+#
+# Les creds Cloud du framework sont passees au deploy.sh via
+# /home/$VPS_USER/.config/infisical/2mains.env (meme identite que le
+# framework, lit /etc/infisical/).
 #
 # Le webhook cote receiver attend /services/2mains/hook/ avec
 # REPO=aliceout/2mains, WEBHOOK_SECRET, SCRIPT=2mains.sh, GIT_PROVIDER=github,
@@ -64,11 +65,6 @@ find_compose_file() {
 case "$ACTION" in
   install|update)
     : "${ADDRESS:?ADDRESS manquant}"
-    : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
-    : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
-    : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"
-    : "${INFISICAL_CLIENT_SECRET:?INFISICAL_CLIENT_SECRET manquant}"
-    : "${INFISICAL_ENV:?INFISICAL_ENV manquant}"
 
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 /var/www
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "$DEPLOY_DIR"
@@ -84,15 +80,27 @@ case "$ACTION" in
     install -d -m 700 -o 70   -g 70   "$DATA_DIR/postgres"
     install -d -m 755 -o 1000 -g 1000 "$DATA_DIR/payload-media"
 
-    # Creds Infisical self-hosted pour 2mains (lus par deploy.sh du repo).
+    # Creds Cloud du framework pour 2mains (lus par deploy.sh du repo).
+    # Single Infisical : meme identite que le framework, qui fetch ses
+    # sous-dossiers /services/2mains/{...} via la meme machine identity.
+    FRAMEWORK_ADDRESS="$(cat /etc/infisical/address 2>/dev/null || echo 'https://app.infisical.com')"
+    FRAMEWORK_PROJECT_ID="$(cat /etc/infisical/project-id 2>/dev/null || true)"
+    FRAMEWORK_ENV="$(cat /etc/infisical/environment 2>/dev/null || true)"
+    FRAMEWORK_CLIENT_ID="$(cat /etc/infisical/client-id 2>/dev/null || true)"
+    FRAMEWORK_CLIENT_SECRET="$(cat /etc/infisical/client-secret 2>/dev/null || true)"
+    if [[ -z "$FRAMEWORK_PROJECT_ID" || -z "$FRAMEWORK_CLIENT_ID" || -z "$FRAMEWORK_CLIENT_SECRET" ]]; then
+      echo "ERREUR: creds Infisical framework manquantes (/etc/infisical/{project-id,client-id,client-secret})"
+      exit 1
+    fi
+
     install -d -o "$VPS_USER" -g "$VPS_USER" -m 700 "$CREDS_DIR"
     umask 077
     cat > "$CREDS_FILE" <<EOF
-INFISICAL_API_URL=${INFISICAL_API_URL}
-INFISICAL_PROJECT_ID=${INFISICAL_PROJECT_ID}
-INFISICAL_CLIENT_ID=${INFISICAL_CLIENT_ID}
-INFISICAL_CLIENT_SECRET=${INFISICAL_CLIENT_SECRET}
-INFISICAL_ENV=${INFISICAL_ENV}
+INFISICAL_API_URL=${FRAMEWORK_ADDRESS}
+INFISICAL_PROJECT_ID=${FRAMEWORK_PROJECT_ID}
+INFISICAL_CLIENT_ID=${FRAMEWORK_CLIENT_ID}
+INFISICAL_CLIENT_SECRET=${FRAMEWORK_CLIENT_SECRET}
+INFISICAL_ENV=${FRAMEWORK_ENV}
 EOF
     chown "$VPS_USER:$VPS_USER" "$CREDS_FILE"
     chmod 600 "$CREDS_FILE"

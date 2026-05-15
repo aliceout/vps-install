@@ -1,8 +1,8 @@
 # Jellyfin (lscr.io/linuxserver/jellyfin) - media server.
 # Variables substituees depuis /var/lib/services/jellyfin/runtime.env :
 #   - SERVICE_NAME, PORT      (cloud Infisical /services/jellyfin/)
-#   - CONFIG_DIR              (self-hosted, ex: /media/pi/media/config)
-#   - MEDIA_ROOT              (self-hosted, ex: /media/pi/media/transmission/completed)
+#   - CONFIG_DIR              (Cloud /services/<name>/, ex: /media/pi/media/config)
+#   - MEDIA_ROOT              (Cloud /services/<name>/, ex: /media/pi/media/transmission/completed)
 #
 # Constantes hardcodees ici (pas dans Infisical) :
 #   - PUID/PGID 1000 (uid pi)

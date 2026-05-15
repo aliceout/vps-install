@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
-# Install Ghost blog (image officielle ghost:5-alpine, SQLite, data sur
-# disque, SMTP via Infisical self-hosted).
+# Install Ghost blog (image officielle ghost:5-alpine, SQLite, data sur disque).
 #
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
 # Cles attendues dans Infisical CLOUD sous /services/garden-blog/ :
 #   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - INFISICAL_API_URL, _PROJECT_ID, _CLIENT_ID, _CLIENT_SECRET, _ENV
-#     (creds vers self-hosted env.backlice.dev pour fetch les SMTP)
-#
-# Cles attendues dans Infisical SELF-HOSTED sous /garden-blog/ (flat) :
 #   - MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS, MAIL_SECURE, MAIL_FROM
 #
 # URL est calculee a partir d'ADDRESS, pas a stocker dans Infisical.
@@ -31,30 +26,24 @@ fi
 # shellcheck disable=SC1090
 source "$SECRETS_FILE"
 
-# Construit le runtime.env consomme par docker compose : merge des cles cloud
-# (PORT, DATA_DIR, URL calculee) + des cles app fetchees depuis self-hosted
-# (MAIL_*). La valeur expose juste ce dont docker-compose.yml a besoin.
+# Construit le runtime.env consomme par docker compose : merge des cles
+# "framework" (PORT, DATA_DIR, URL calculee) + export de toutes les cles sous
+# /services/garden-blog/ Cloud (ADDRESS, DOMAIN, MAIL_*, etc.).
 build_runtime_env() {
   : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
-  : "${INFISICAL_API_URL:?INFISICAL_API_URL manquant}"
-  : "${INFISICAL_PROJECT_ID:?INFISICAL_PROJECT_ID manquant}"
-  : "${INFISICAL_CLIENT_ID:?INFISICAL_CLIENT_ID manquant}"
-  : "${INFISICAL_CLIENT_SECRET:?INFISICAL_CLIENT_SECRET manquant}"
-  : "${INFISICAL_ENV:?INFISICAL_ENV manquant}"
 
-  echo "Login Infisical self-hosted (${INFISICAL_API_URL})..."
-  local token
-  token="$(infisical login \
-    --method=universal-auth \
-    --domain="$INFISICAL_API_URL" \
-    --client-id="$INFISICAL_CLIENT_ID" \
-    --client-secret="$INFISICAL_CLIENT_SECRET" \
-    --plain --silent 2>/dev/null)"
+  # Single Infisical : on utilise l'identite framework via infi-token (cache
+  # 10min, --domain auto). Tout est sous /services/garden-blog/ en Cloud.
+  local token domain pid env_slug
+  token="$(infi-token --silent 2>/dev/null || true)"
   if [[ -z "$token" ]]; then
-    echo "ERREUR: login Infisical self-hosted echoue"
+    echo "ERREUR: infi-token KO (creds /etc/infisical/* ou connectivite ?)"
     exit 1
   fi
+  domain="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
+  pid="$(cat /etc/infisical/project-id)"
+  env_slug="$(cat /etc/infisical/environment)"
 
   install -d -m 700 -o root -g "$VPS_USER" "$RUNTIME_DIR"
 
@@ -64,13 +53,11 @@ build_runtime_env() {
     echo "PORT=${PORT}"
     echo "DATA_DIR=${DATA_DIR}"
     echo "URL=https://${ADDRESS}"
-    # Fetch les secrets app depuis self-hosted. Le projet self-hosted etant
-    # dedie au blog, on tape la racine (pas de sous-dossier).
     infisical export \
-      --domain="$INFISICAL_API_URL" \
-      --projectId="$INFISICAL_PROJECT_ID" \
-      --env="$INFISICAL_ENV" \
-      --path="/" \
+      --domain="$domain" \
+      --projectId="$pid" \
+      --env="$env_slug" \
+      --path="/services/${SERVICE_NAME}" \
       --format=dotenv \
       --token="$token"
   } > "$RUNTIME_ENV"
@@ -78,7 +65,7 @@ build_runtime_env() {
   chmod 640 "$RUNTIME_ENV"
 
   if ! grep -q '^MAIL_HOST=' "$RUNTIME_ENV"; then
-    echo "AVERTISSEMENT: MAIL_HOST absent du self-hosted. Verifie /${SERVICE_NAME}/ sur ${INFISICAL_API_URL}."
+    echo "AVERTISSEMENT: MAIL_HOST absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
   fi
 }
 
