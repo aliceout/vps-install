@@ -34,6 +34,18 @@ if [[ ! -f /etc/server-scripts/backup-borg.env ]]; then
   chmod 644 /etc/server-scripts/backup-borg.env
 fi
 
+# --- nextcloud-snapshot -----------------------------------------------------
+# Snapshot leger Nextcloud AIO (pg_dump + tar des volumes critiques uniquement)
+# pour permettre une restauration sans dependre du backup borg integre d'AIO,
+# qui copie aussi les fichiers users (souvent 100+ GB inutiles).
+chmod +x "$ROOT_DIR/scripts/nextcloud-snapshot.sh"
+ln -sf /opt/vps-install/scripts/nextcloud-snapshot.sh /usr/local/sbin/nextcloud-snapshot
+
+if [[ ! -f /etc/server-scripts/nextcloud-snapshot.env ]]; then
+  cp -a "$ROOT_DIR/config/server-scripts/nextcloud-snapshot.env" /etc/server-scripts/nextcloud-snapshot.env
+  chmod 644 /etc/server-scripts/nextcloud-snapshot.env
+fi
+
 # --- Logrotate pour tous les logs server-scripts ----------------------------
 cat > /etc/logrotate.d/server-scripts <<'EOF'
 /var/log/server-scripts/*.log {
@@ -50,6 +62,10 @@ EOF
 cat > /etc/cron.d/server-scripts <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Quotidien 03:30 - snapshot Nextcloud AIO (pg_dump + tar volumes critiques)
+# AVANT le backup borg pour qu'il soit inclus dans l'archive du jour.
+30 3 * * * root /usr/local/sbin/hc-run nextcloud-snapshot /usr/local/sbin/nextcloud-snapshot
 
 # Quotidien 04:00 - backup borg rotatif
 0 4 * * * root /usr/local/sbin/hc-run backup-borg /usr/local/sbin/backup-borg
