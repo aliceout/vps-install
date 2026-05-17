@@ -43,15 +43,20 @@ systemctl restart docker
 usermod -aG docker "$VPS_USER"
 
 # Cron weekly : prune des images / containers / build cache non utilises.
-# system prune --volumes ne touche PAS les volumes nommes (uniquement les
-# anonymes). Filter "until=168h" garde les images recentes meme si
-# temporairement non utilisees (evite de re-pull immediatement apres push).
+# Le filter "until=168h" garde les images recentes meme si temporairement
+# non utilisees (evite de re-pull immediatement apres push). On split en
+# 2 etapes parce que docker rejette le combo --volumes + --filter "until=..."
+# (ERROR: The "until" filter is not supported with "--volumes"). Donc :
+#   1. system prune --filter until=168h (images, containers, network, build cache)
+#   2. volume prune (volumes anonymes uniquement, les nommes restent)
 cat > /etc/cron.d/vps-docker-prune <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Dimanche 04:00 - prune docker complet (system + buildx), wrappes Healthchecks
-0 4 * * 0 root /usr/local/sbin/hc-run docker-prune /usr/bin/docker system prune -af --volumes --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+# Dimanche 04:00 - prune docker complet (system + volumes anonymes + buildx),
+# wrappes Healthchecks. system + volumes sont split (docker ne supporte pas
+# --volumes avec --filter "until=").
+0 4 * * 0 root /usr/local/sbin/hc-run docker-prune bash -c '/usr/bin/docker system prune -af --filter "until=168h" && /usr/bin/docker volume prune -af' >> /var/log/docker-prune.log 2>&1
 5 4 * * 0 root /usr/local/sbin/hc-run docker-buildx-prune /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
 EOF
 chmod 644 /etc/cron.d/vps-docker-prune
