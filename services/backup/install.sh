@@ -38,7 +38,7 @@ EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 0,6,12,18 * * * root /usr/local/sbin/backup-run >> /var/log/vps-backup.log 2>&1
+15 0,6,12,18 * * * root /usr/local/sbin/hc-run backup /usr/local/sbin/backup-run >> /var/log/vps-backup.log 2>&1
 EOF
     chmod 644 /etc/cron.d/vps-backup
 
