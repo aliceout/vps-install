@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fallback standalone : SSH_PORT vient normalement de bootstrap.sh, mais quand
+# on relance ce module a la main (post-bootstrap, pour fix UFW), il n'est pas
+# en env. On le lit alors depuis sshd -T (config effective, prend en compte
+# tous les drop-ins). Last resort: 22.
+if [[ -z "${SSH_PORT:-}" ]]; then
+  SSH_PORT="$(sshd -T 2>/dev/null | awk 'tolower($1) == "port" { print $2; exit }')"
+  SSH_PORT="${SSH_PORT:-22}"
+fi
+# WEB_FIREWALL_ENABLED + DOCKER_ENABLED ont deja leur defaults dans les
+# expressions ${VAR:-X} plus bas, pas besoin d'init explicite.
+
 echo "UFW + regles minimales (SSH $SSH_PORT, HTTP/HTTPS)"
 apt-get install -y ufw nftables
 
