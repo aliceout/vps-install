@@ -11,22 +11,29 @@ AGENT_TEMPLATES_DIR="/etc/infisical/templates"
 SECRETS_DIR="/etc/secrets"
 NGINX_CONF_DIR="/etc/nginx/conf"
 
-# Coloration des lignes ERREUR / AVERTISSEMENT pour qu'elles ressortent
-# au milieu du flux verbeux de install.sh + apt + docker. Couvre stdout
-# ET stderr de service.sh + tous ses sous-process (install.sh herite des
-# FDs). Activee uniquement si stdout est un TTY -> cron/logs restent
-# clean (pas de codes ANSI \033[xx;m).
-colorize_output() {
-  awk '
-    /^ERREUR/        { printf "\033[1;31m%s\033[0m\n", $0; fflush(); next }
-    /^AVERTISSEMENT/ { printf "\033[1;33m%s\033[0m\n", $0; fflush(); next }
-    /^=== .* ===$/   { printf "\033[1;36m%s\033[0m\n", $0; fflush(); next }
-                     { print; fflush() }
-  '
-}
+# Coloration inline des marqueurs (===, ERREUR, AVERTISSEMENT). On evite
+# l'ancien `exec > >(awk ...) 2> >(awk ...)` qui pipait toute la sortie a
+# travers awk : les sous-process (docker, infisical, install.sh, etc.)
+# detectaient alors leur stdout comme pipe (pas TTY) et passaient en
+# block-buffering 4-8KB -> rien ne s'affichait jusqu'a la fin de chaque
+# sous-process. La sortie etait colorisee mais pas temps-reel.
+#
+# Maintenant chaque sous-process ecrit directement sur le TTY = line-buffer
+# = temps reel. La colorisation reste possible via les helpers say_* pour
+# les echo internes de service.sh. Les lignes "ERREUR"/"AVERTISSEMENT" qui
+# remontent des install.sh des services ne sont plus colorisees automatiquement
+# (compromis : temps reel > colorisation auto), mais elles restent visibles.
 if [[ -t 1 ]]; then
-  exec > >(colorize_output) 2> >(colorize_output >&2)
+  _C_RED=$'\033[1;31m'
+  _C_YEL=$'\033[1;33m'
+  _C_CYAN=$'\033[1;36m'
+  _C_RESET=$'\033[0m'
+else
+  _C_RED=""; _C_YEL=""; _C_CYAN=""; _C_RESET=""
 fi
+say_section() { printf '%s=== %s ===%s\n' "$_C_CYAN" "$1" "$_C_RESET"; }
+say_err()     { printf '%sERREUR: %s%s\n'  "$_C_RED"  "$*" "$_C_RESET" >&2; }
+say_warn()    { printf '%sAVERTISSEMENT: %s%s\n' "$_C_YEL" "$*" "$_C_RESET"; }
 
 # VPS_USER (user non-root principal) : chargé depuis le fichier persiste par
 # 35_infisical.sh. Transmis ensuite aux install.sh des services.
@@ -86,14 +93,14 @@ load_service_conf() {
   local name="$1"
   local conf="$SERVICES_DIR/$name/service.conf"
   if [[ ! -f "$conf" ]]; then
-    echo "ERREUR: $conf introuvable" >&2
+    say_err "$conf introuvable"
     return 1
   fi
   TYPE=""; DESCRIPTION=""
   # shellcheck disable=SC1090
   source "$conf"
   if [[ -z "$TYPE" ]]; then
-    echo "ERREUR: TYPE non defini dans $conf" >&2
+    say_err "TYPE non defini dans $conf"
     return 1
   fi
   export TYPE DESCRIPTION
@@ -157,7 +164,7 @@ regen_agent_conf() {
   shopt -u nullglob
   if [[ ! -s "$tmp" ]]; then
     rm -f "$tmp"
-    echo "ERREUR: agent.yaml temp vide, refuse de remplacer $AGENT_CONF" >&2
+    say_err "agent.yaml temp vide, refuse de remplacer $AGENT_CONF"
     return 1
   fi
   chmod 600 "$tmp"
@@ -212,7 +219,7 @@ apply_secrets() {
   project_id="$(cat /etc/infisical/project-id 2>/dev/null || true)"
   env_slug="$(cat /etc/infisical/environment 2>/dev/null || true)"
   if [[ -z "$project_id" || -z "$env_slug" ]]; then
-    echo "ERREUR: /etc/infisical/project-id ou /etc/infisical/environment manquant" >&2
+    say_err "/etc/infisical/project-id ou /etc/infisical/environment manquant"
     return 1
   fi
   local infisical_path="${INFISICAL_PATH:-/services/$name}"
@@ -274,7 +281,7 @@ EOF
 
     echo "Attente generation $secret_target..."
     if ! wait_for_secret_file "$secret_target" 60; then
-      echo "ERREUR: $secret_target non genere ou vide." >&2
+      say_err "$secret_target non genere ou vide."
       return 1
     fi
   fi
@@ -327,7 +334,7 @@ maybe_restore_data() {
   fi
 
   echo "Tentative de restore des donnees pour $name (target: $data_dir)..."
-  backup-restore "$data_dir" || echo "AVERTISSEMENT: restore KO (le service demarrera avec un dossier vide)."
+  backup-restore "$data_dir" || say_warn "restore KO (le service demarrera avec un dossier vide)."
 }
 
 ensure_cert() {
@@ -346,12 +353,12 @@ ensure_cert() {
   fi
 
   if ! command -v certbot-wildcard >/dev/null 2>&1; then
-    echo "AVERTISSEMENT: certbot-wildcard absent (module 75_certbot pas execute ?), skip cert pour $apex"
+    say_warn "certbot-wildcard absent (module 75_certbot pas execute ?), skip cert pour $apex"
     return 0
   fi
 
   if [[ -z "$provider" || -z "$token_name" ]]; then
-    echo "AVERTISSEMENT: DNS_PROVIDER et DNS_TOKEN_NAME manquants dans /etc/secrets/, skip cert pour $apex."
+    say_warn "DNS_PROVIDER et DNS_TOKEN_NAME manquants dans /etc/secrets/, skip cert pour $apex."
     echo "  Ajoute dans Infisical /services/<name>/ : DNS_PROVIDER=<infomaniak|ovh> + DNS_TOKEN_NAME=<label>"
     return 1
   fi
@@ -359,7 +366,7 @@ ensure_cert() {
   # certbot-wildcard est idempotent : demande le cert si absent, skip si
   # present (mais reecrit /etc/nginx/certificat/<apex>.conf dans les deux cas).
   if ! certbot-wildcard "$apex" "$provider" "$token_name"; then
-    echo "AVERTISSEMENT: cert non obtenu pour $apex ($provider:$token_name). Vhost deploye sans SSL."
+    say_warn "cert non obtenu pour $apex ($provider:$token_name). Vhost deploye sans SSL."
     return 1
   fi
 }
@@ -373,7 +380,7 @@ ensure_dns() {
     return 0
   fi
   echo "Sync record DNS A pour $fqdn..."
-  dns-sync "$fqdn" || echo "AVERTISSEMENT: DNS sync echoue pour $fqdn (le service sera injoignable le temps que tu corriges)."
+  dns-sync "$fqdn" || say_warn "DNS sync echoue pour $fqdn (le service sera injoignable le temps que tu corriges)."
 }
 
 apply_nginx() {
@@ -467,7 +474,7 @@ apply_nginx() {
       }
       ' "$rendered" > "$rendered_new"; then
       rm -f "$rendered" "$rendered_new"
-      echo "ERREUR: substitution awk KO pour $vhost_src" >&2
+      say_err "substitution awk KO pour $vhost_src"
       return 1
     fi
     mv "$rendered_new" "$rendered"
@@ -487,7 +494,7 @@ apply_nginx() {
   if grep -qE '__[A-Z][A-Z0-9_]*__' "$rendered"; then
     local unresolved
     unresolved="$(grep -oE '__[A-Z][A-Z0-9_]*__' "$rendered" | sort -u | tr '\n' ' ')"
-    echo "AVERTISSEMENT: placeholders non resolus dans $vhost_src apres templating: ${unresolved% }"
+    say_warn "placeholders non resolus dans $vhost_src apres templating: ${unresolved% }"
     echo "  Verifie que ces cles existent dans Infisical (${INFISICAL_PATH:-/services/$name}) puis relance."
     echo "  Vhost non installe (le precedent reste en place s'il existait)."
     rm -f "$rendered"
@@ -510,7 +517,7 @@ apply_nginx() {
   dns_token_name="$(env_get "$env_file" DNS_TOKEN_NAME)"
 
   if [[ ${#domains[@]} -eq 0 ]]; then
-    echo "AVERTISSEMENT: aucun server_name dans $vhost_src, skip DNS/cert."
+    say_warn "aucun server_name dans $vhost_src, skip DNS/cert."
   else
     # Ordre important : ensure_cert AVANT ensure_dns.
     # ensure_cert ecrit /etc/certbot/providers.conf (apex -> provider:token) et
@@ -533,7 +540,7 @@ apply_nginx() {
     echo "Vhost nginx installe: $dst (domaines: ${domains[*]:-aucun})"
   else
     # Vhost casse : on le degage pour ne pas bloquer les autres au prochain reload
-    echo "ERREUR: nginx -t KO apres ajout de $dst. Vhost retire pour preserver nginx."
+    say_err "nginx -t KO apres ajout de $dst. Vhost retire pour preserver nginx."
     nginx -t 2>&1 | sed 's/^/  /' || true
     mv "$dst" "${dst}.broken"
     echo "Vhost casse archive en ${dst}.broken (corrige et renomme pour reessayer)."
@@ -597,7 +604,7 @@ action_list() {
 
 action_install() {
   local name="$1" force="${2:-0}"
-  [[ -d "$SERVICES_DIR/$name" ]] || { echo "ERREUR: service '$name' introuvable"; return 1; }
+  [[ -d "$SERVICES_DIR/$name" ]] || { say_err "service '$name' introuvable"; return 1; }
 
   if is_installed "$name" && [[ "$force" -ne 1 ]]; then
     echo "'$name' deja installe ($(marker_info "$name")). Relance avec --force pour reinstaller."
@@ -605,10 +612,10 @@ action_install() {
   fi
 
   load_service_conf "$name"
-  echo "=== Install $name (type=$TYPE) ==="
+  say_section "Install $name (type=$TYPE)"
 
   if ! apply_secrets "$name"; then
-    echo "ERREUR: apply_secrets KO pour $name, abort (l'agent Infisical n'a pas pu rendre les secrets)." >&2
+    say_err "apply_secrets KO pour $name, abort (l'agent Infisical n'a pas pu rendre les secrets)."
     return 1
   fi
   apply_nginx "$name"
@@ -616,43 +623,43 @@ action_install() {
   run_service_script "$name" "install"
   mark_installed "$name"
 
-  echo "=== $name installe ==="
+  say_section "$name installe"
 }
 
 action_update() {
   local name="$1"
-  [[ -d "$SERVICES_DIR/$name" ]] || { echo "ERREUR: service '$name' introuvable"; return 1; }
+  [[ -d "$SERVICES_DIR/$name" ]] || { say_err "service '$name' introuvable"; return 1; }
   if ! is_installed "$name"; then
     echo "'$name' pas installe, lance 'install' a la place."
     return 1
   fi
   load_service_conf "$name"
-  echo "=== Update $name ==="
+  say_section "Update $name"
   if ! apply_secrets "$name"; then
-    echo "ERREUR: apply_secrets KO pour $name, abort (l'agent Infisical n'a pas pu rendre les secrets)." >&2
+    say_err "apply_secrets KO pour $name, abort (l'agent Infisical n'a pas pu rendre les secrets)."
     return 1
   fi
   apply_nginx "$name"
   run_service_script "$name" "update"
   mark_installed "$name"
-  echo "=== $name mis a jour ==="
+  say_section "$name mis a jour"
 }
 
 action_remove() {
   local name="$1"
-  [[ -d "$SERVICES_DIR/$name" ]] || { echo "ERREUR: service '$name' introuvable"; return 1; }
+  [[ -d "$SERVICES_DIR/$name" ]] || { say_err "service '$name' introuvable"; return 1; }
   load_service_conf "$name" || true
-  echo "=== Remove $name ==="
+  say_section "Remove $name"
   run_service_script "$name" "remove"
   remove_nginx "$name"
   remove_secrets "$name"
   mark_removed "$name"
-  echo "=== $name supprime ==="
+  say_section "$name supprime"
 }
 
 action_status() {
   local name="$1"
-  [[ -d "$SERVICES_DIR/$name" ]] || { echo "ERREUR: service '$name' introuvable"; return 1; }
+  [[ -d "$SERVICES_DIR/$name" ]] || { say_err "service '$name' introuvable"; return 1; }
   load_service_conf "$name" || true
   if is_installed "$name"; then
     echo "$name: INSTALLE ($(marker_info "$name"))"
