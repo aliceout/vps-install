@@ -26,7 +26,6 @@ En resume, il te faut :
 
 ```bash
 curl -fsSLo install.sh https://raw.githubusercontent.com/aliceout/vps-install/main/install.sh
-less install.sh                # review : verifie que le script ne fait pas n'importe quoi
 sudo bash install.sh
 ```
 
