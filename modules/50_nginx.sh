@@ -28,6 +28,31 @@ cat > /etc/nginx/conf.d/00-vhosts.conf <<'EOF'
 include /etc/nginx/conf/*.conf;
 EOF
 
+# Catch-all default server : sans ca, une requete vers un host non-matche
+# (apex de domaine sans vhost, ex alyss.cc, ou scan d'IP brute) est servie
+# par le 1er vhost charge alphabetiquement -> fuite de contenu d'un autre
+# service. Ici on attrape tout le non-matche et on rejette proprement :
+#   - HTTP 80  -> return 444 (ferme la connexion sans repondre)
+#   - HTTPS 443 -> ssl_reject_handshake (rejette le TLS si le SNI matche aucun
+#                  vhost reel ; aucun certificat necessaire, dispo nginx >=1.19.4)
+# Le prefixe '00-' le charge en premier ; le flag default_server est explicite
+# donc l'ordre n'a de toute facon pas d'importance pour nginx.
+cat > /etc/nginx/conf.d/00-default-server.conf <<'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+EOF
+
 # Desactive tous les vhosts pre-existants (default Debian + autres) en vidant
 # le repertoire sites-enabled. On garde le dir lui-meme : la nginx.conf default
 # de Debian contient 'include /etc/nginx/sites-enabled/*;', et certaines
