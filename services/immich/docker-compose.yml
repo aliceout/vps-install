@@ -11,12 +11,19 @@
 #                     ex: /media/pi/data/cloud/Photos
 #   - DB_PASSWORD     password postgres (genere une fois, stocke dans Infisical)
 #   - IMMICH_VERSION  tag d'image (defaut "release", peut etre v1.x pour pin)
+#   - HOST_UID, HOST_GID  UID/GID du VPS_USER host. Auto-cale par install.sh.
+#                         server + ML tournent en HOST_UID -> fichiers crees
+#                         appartiennent au user host, accessibles en CLI sans
+#                         sudo. Postgres reste en UID 999 (interne).
 
 services:
   server:
     container_name: ${SERVICE_NAME}-server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     restart: unless-stopped
+    # Tourne en HOST_UID:HOST_GID pour que les fichiers crees dans /library et
+    # /usr/src/app/upload appartiennent au user host (= VPS_USER), pas root.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     healthcheck:
       disable: false
     ports:
@@ -51,6 +58,9 @@ services:
     container_name: ${SERVICE_NAME}-ml
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
     restart: unless-stopped
+    # Meme que server : tourne en HOST_UID pour que le model-cache appartienne
+    # au user host.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     healthcheck:
       disable: false
     volumes:
