@@ -65,7 +65,10 @@ services:
 
   redis:
     container_name: ${SERVICE_NAME}-redis
-    image: docker.io/valkey/valkey:8-bookworm@sha256:fea8b3e67b15729d4bb70589eb03367bab3ad103a1b820ed9addedfaa0aaf30c
+    # Pas de pin SHA : le tag major:8-bookworm suffit, Valkey gere bien la
+    # compatibilite intra-major. Si tu veux figer une version precise,
+    # remplace par 8.x.y-bookworm@sha256:<sha>.
+    image: docker.io/valkey/valkey:8-bookworm
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping || exit 1"]
