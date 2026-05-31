@@ -3,18 +3,22 @@
 #
 # Variables substituees depuis /var/lib/services/immich/runtime.env :
 #   - SERVICE_NAME, PORT, ADDRESS   (cloud Infisical /services/immich/)
-#   - DATA_DIR        racine des donnees Immich (uploads + ML cache + postgres).
-#                     Auto-cale par install.sh sur /home/$VPS_USER/data/immich,
-#                     pas configurable via Infisical (c'est de l'ops data).
-#   - LIBRARY_PATH    bibliotheque externe en RW (photos deja organisees par
-#                     dossier, mountees telles quelles dans /library)
-#                     ex: /media/pi/data/cloud/Photos
-#   - DB_PASSWORD     password postgres (genere une fois, stocke dans Infisical)
-#   - IMMICH_VERSION  tag d'image (defaut "release", peut etre v1.x pour pin)
+#   - DATA_DIR         racine "ops data" Immich (ML cache + postgres).
+#                      Auto-cale par install.sh sur /home/$VPS_USER/data/immich,
+#                      pas configurable via Infisical (c'est de l'ops, pas du media).
+#   - UPLOAD_LOCATION  dossier ou Immich stocke TOUTES les photos (uploades via
+#                      UI/app mobile + thumbs + transcodes). Configurable via
+#                      Infisical, ex: /media/pi/data/Photos
+#   - DB_PASSWORD      password postgres (genere une fois, stocke dans Infisical)
+#   - IMMICH_VERSION   tag d'image (defaut "release", peut etre v1.x pour pin)
 #   - HOST_UID, HOST_GID  UID/GID du VPS_USER host. Auto-cale par install.sh.
 #                         server + ML tournent en HOST_UID -> fichiers crees
 #                         appartiennent au user host, accessibles en CLI sans
 #                         sudo. Postgres reste en UID 999 (interne).
+#
+# Note : pas d'External Library mountee ici. Si plus tard tu veux ajouter une
+# lib externe (dossier scanne en RO, hors upload location), ajoute un volume
+# bind '- /chemin:/library' sur le service 'server'.
 
 services:
   server:
@@ -29,12 +33,11 @@ services:
     ports:
       - "127.0.0.1:${PORT}:2283"
     volumes:
-      # Uploads geres par Immich (photos uploades via l'UI, thumbs, transcodes)
-      - ${DATA_DIR}/upload:/usr/src/app/upload
-      # Bibliotheque externe : tes photos deja organisees, RW pour permettre
-      # gestion depuis Immich (delete, rename, etc.). La corbeille Immich + le
-      # backup Borg sont la safety net.
-      - ${LIBRARY_PATH}:/library
+      # UPLOAD_LOCATION : dossier ou Immich stocke TOUTES les photos (uploades
+      # via UI/app mobile + thumbs + transcodes). Immich organise dedans sa
+      # propre arbo (library/<userId>/YYYY/YYYY-MM-DD/<hash>.ext par defaut,
+      # configurable via Storage Template dans l'UI admin).
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
     environment:
       DB_HOSTNAME: ${SERVICE_NAME}-postgres

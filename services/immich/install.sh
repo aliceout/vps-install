@@ -7,16 +7,17 @@
 # Cles attendues dans Infisical CLOUD sous /services/immich/ :
 #   - ADDRESS, DOMAIN, PORT       (PORT host expose par le container server)
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - LIBRARY_PATH                (ex: /media/pi/data/cloud/Photos, bibliotheque
-#                                  externe deja organisee, mountee RW dans /library)
+#   - UPLOAD_LOCATION             (ex: /media/pi/data/Photos, dossier ou Immich
+#                                  stocke toutes les photos uploades + thumbs +
+#                                  transcodes. Immich gere son arbo interne
+#                                  dedans, configurable via Storage Template UI.)
 #   - DB_PASSWORD                 (genere une fois, openssl rand -hex 32)
 #   - IMMICH_VERSION              (optionnel, defaut "release")
 #   - TZ                          (optionnel, defaut "Europe/Paris")
 #
-# DATA_DIR (uploads + ML cache + postgres) est auto-cale sur
-# /home/$VPS_USER/data/immich, comme les autres services framework
-# (fider/garden-blog/etc.). Pas configurable via Infisical, c'est de
-# l'ops data, pas du media.
+# DATA_DIR (ML cache + postgres) est auto-cale sur /home/$VPS_USER/data/immich,
+# comme les autres services framework (fider/garden-blog/etc.). Pas configurable
+# via Infisical, c'est de l'ops data, pas du media.
 
 set -euo pipefail
 
@@ -77,7 +78,7 @@ build_runtime_env() {
   chgrp "$VPS_USER" "$RUNTIME_ENV" || true
   chmod 640 "$RUNTIME_ENV"
 
-  for k in LIBRARY_PATH DB_PASSWORD; do
+  for k in UPLOAD_LOCATION DB_PASSWORD; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
@@ -92,25 +93,21 @@ case "$ACTION" in
 
     build_runtime_env
 
-    LIBRARY_PATH_VALUE="$(grep -E '^LIBRARY_PATH=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
-    if [[ -z "$LIBRARY_PATH_VALUE" ]]; then
-      echo "ERREUR: LIBRARY_PATH vide dans le runtime.env. Set-le sous /services/${SERVICE_NAME}/ en Infisical Cloud."
+    UPLOAD_LOCATION_VALUE="$(grep -E '^UPLOAD_LOCATION=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
+    if [[ -z "$UPLOAD_LOCATION_VALUE" ]]; then
+      echo "ERREUR: UPLOAD_LOCATION vide dans le runtime.env. Set-le sous /services/${SERVICE_NAME}/ en Infisical Cloud."
       exit 1
     fi
 
-    # Cree les sous-dossiers DATA_DIR (uploads + ML cache + postgres).
-    # DATA_DIR vit dans /home/$VPS_USER/data/immich, auto-cale.
+    # DATA_DIR : ops data (ML cache + postgres). Auto /home/$VPS_USER/data/immich.
     install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR"
-    install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR/upload"
     install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR/model-cache"
     # Postgres image officielle (immich) tourne en UID 999
     install -d -m 700 -o 999 -g 999 "$DATA_DIR/postgres"
 
-    if [[ ! -d "$LIBRARY_PATH_VALUE" ]]; then
-      echo "ERREUR: $LIBRARY_PATH_VALUE n'existe pas. Cree-le ou pointe LIBRARY_PATH ailleurs."
-      echo "  Si c'est ton dossier photos perso, verifie qu'il est bien monte/accessible."
-      exit 1
-    fi
+    # UPLOAD_LOCATION : cree si absent, owner VPS_USER pour cohert avec le
+    # HOST_UID/GID des containers.
+    install -d -m 750 -o "$VPS_USER" -g "$VPS_USER" "$UPLOAD_LOCATION_VALUE"
 
     cd "$SERVICE_DIR"
     $COMPOSE pull
@@ -118,15 +115,17 @@ case "$ACTION" in
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL  : https://${ADDRESS}/"
-    echo "Data : ${DATA_DIR} (uploads + ML cache + postgres)"
-    echo "Lib  : ${LIBRARY_PATH_VALUE} (bibliotheque externe, RW)"
+    echo "URL    : https://${ADDRESS}/"
+    echo "Data   : ${DATA_DIR} (ML cache + postgres)"
+    echo "Photos : ${UPLOAD_LOCATION_VALUE} (toutes tes photos vivront ici)"
     echo
     echo "Premier setup :"
     echo "  1. Visite https://${ADDRESS}/ → cree le compte admin"
-    echo "  2. Settings → External Libraries → New Library → path /library"
-    echo "  3. (Optionnel) Active 'auto-album from path' pour creer tes albums"
-    echo "     a partir de tes dossiers."
+    echo "  2. (Optionnel) Settings → Storage Template → configure ton format"
+    echo "     de nommage (ex: '{{y}}/{{MM}}/{{filename}}' pour year/month)"
+    echo "  3. Telecharge l'app mobile Immich et active le backup auto"
+    echo "  4. Pour importer tes anciennes photos : utilise 'immich-cli upload'"
+    echo "     ou drag-drop dans l'UI web."
     ;;
 
   remove)
