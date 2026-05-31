@@ -1,0 +1,103 @@
+# Immich : photo gestionnaire self-hosted, 4 services (server, ML, redis,
+# postgres). Reference compose officiel : https://immich.app/docs/install/docker-compose
+#
+# Variables substituees depuis /var/lib/services/immich/runtime.env :
+#   - SERVICE_NAME, PORT, ADDRESS   (cloud Infisical /services/immich/)
+#   - DATA_DIR        racine des donnees Immich (uploads + ML cache + postgres)
+#                     ex: /home/pi/data/immich  ou /media/pi/data/immich
+#   - LIBRARY_PATH    bibliotheque externe en RW (photos deja organisees par
+#                     dossier, mountees telles quelles dans /library)
+#                     ex: /media/pi/data/cloud/Photos
+#   - DB_PASSWORD     password postgres (genere une fois, stocke dans Infisical)
+#   - IMMICH_VERSION  tag d'image (defaut "release", peut etre v1.x pour pin)
+
+services:
+  server:
+    container_name: ${SERVICE_NAME}-server
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    restart: unless-stopped
+    healthcheck:
+      disable: false
+    ports:
+      - "127.0.0.1:${PORT}:2283"
+    volumes:
+      # Uploads geres par Immich (photos uploades via l'UI, thumbs, transcodes)
+      - ${DATA_DIR}/upload:/usr/src/app/upload
+      # Bibliotheque externe : tes photos deja organisees, RW pour permettre
+      # gestion depuis Immich (delete, rename, etc.). La corbeille Immich + le
+      # backup Borg sont la safety net.
+      - ${LIBRARY_PATH}:/library
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      DB_HOSTNAME: ${SERVICE_NAME}-postgres
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE_NAME: immich
+      REDIS_HOSTNAME: ${SERVICE_NAME}-redis
+      TZ: ${TZ:-Europe/Paris}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  machine-learning:
+    container_name: ${SERVICE_NAME}-ml
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    restart: unless-stopped
+    healthcheck:
+      disable: false
+    volumes:
+      - ${DATA_DIR}/model-cache:/cache
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    container_name: ${SERVICE_NAME}-redis
+    image: docker.io/valkey/valkey:8-bookworm@sha256:fea8b3e67b15729d4bb70589eb03367bab3ad103a1b820ed9addedfaa0aaf30c
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    container_name: ${SERVICE_NAME}-postgres
+    # Immich a besoin de pgvecto-rs / vectorchord. Image officielle qui inclut
+    # les extensions necessaires. Verifie la version recommandee dans la doc
+    # Immich lors d'un upgrade majeur.
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.5.4-pgvectors0.2.0
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - ${DATA_DIR}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready --dbname=immich --username=postgres || exit 1"]
+      interval: 5m
+      timeout: 10s
+      start_period: 5m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
