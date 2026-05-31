@@ -7,15 +7,20 @@
 # Cles attendues dans Infisical CLOUD sous /services/immich/ :
 #   - ADDRESS, DOMAIN, PORT       (PORT host expose par le container server)
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - DATA_DIR                    (ex: /home/pi/data/immich, racine uploads + ML + DB)
 #   - LIBRARY_PATH                (ex: /media/pi/data/cloud/Photos, bibliotheque
 #                                  externe deja organisee, mountee RW dans /library)
 #   - DB_PASSWORD                 (genere une fois, openssl rand -hex 32)
 #   - IMMICH_VERSION              (optionnel, defaut "release")
 #   - TZ                          (optionnel, defaut "Europe/Paris")
+#
+# DATA_DIR (uploads + ML cache + postgres) est auto-cale sur
+# /home/$VPS_USER/data/immich, comme les autres services framework
+# (fider/garden-blog/etc.). Pas configurable via Infisical, c'est de
+# l'ops data, pas du media.
 
 set -euo pipefail
 
+DATA_DIR="/home/${VPS_USER}/data/${SERVICE_NAME}"
 RUNTIME_DIR="/var/lib/services/${SERVICE_NAME}"
 RUNTIME_ENV="${RUNTIME_DIR}/runtime.env"
 COMPOSE="docker compose -f ${SERVICE_DIR}/docker-compose.yml -p ${SERVICE_NAME} --env-file ${RUNTIME_ENV}"
@@ -52,6 +57,7 @@ build_runtime_env() {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
     echo "ADDRESS=${ADDRESS}"
+    echo "DATA_DIR=${DATA_DIR}"
     infisical export \
       --domain="$domain" \
       --projectId="$pid" \
@@ -63,7 +69,7 @@ build_runtime_env() {
   chgrp "$VPS_USER" "$RUNTIME_ENV" || true
   chmod 640 "$RUNTIME_ENV"
 
-  for k in DATA_DIR LIBRARY_PATH DB_PASSWORD; do
+  for k in LIBRARY_PATH DB_PASSWORD; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
@@ -78,26 +84,19 @@ case "$ACTION" in
 
     build_runtime_env
 
-    # Lecture des paths depuis runtime.env pour valider qu'ils existent
-    DATA_DIR_VALUE="$(grep -E '^DATA_DIR=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
     LIBRARY_PATH_VALUE="$(grep -E '^LIBRARY_PATH=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
-
-    if [[ -z "$DATA_DIR_VALUE" ]]; then
-      echo "ERREUR: DATA_DIR vide dans le runtime.env. Set-le sous /services/${SERVICE_NAME}/ en Infisical Cloud."
-      exit 1
-    fi
     if [[ -z "$LIBRARY_PATH_VALUE" ]]; then
       echo "ERREUR: LIBRARY_PATH vide dans le runtime.env. Set-le sous /services/${SERVICE_NAME}/ en Infisical Cloud."
       exit 1
     fi
 
-    # Cree les sous-dossiers DATA_DIR si absents (uploads + ML cache + postgres)
-    install -d -m 755 "$DATA_DIR_VALUE"
-    install -d -m 755 "$DATA_DIR_VALUE/upload"
-    install -d -m 755 "$DATA_DIR_VALUE/model-cache"
-    # Postgres image utilise UID 70 (postgres alpine) ou 999 (postgres officiel).
-    # L'image immich-postgres = pgvecto basee sur postgres officiel = UID 999.
-    install -d -m 700 -o 999 -g 999 "$DATA_DIR_VALUE/postgres"
+    # Cree les sous-dossiers DATA_DIR (uploads + ML cache + postgres).
+    # DATA_DIR vit dans /home/$VPS_USER/data/immich, auto-cale.
+    install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR"
+    install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR/upload"
+    install -d -m 755 -o "$VPS_USER" -g "$VPS_USER" "$DATA_DIR/model-cache"
+    # Postgres image officielle (immich) tourne en UID 999
+    install -d -m 700 -o 999 -g 999 "$DATA_DIR/postgres"
 
     if [[ ! -d "$LIBRARY_PATH_VALUE" ]]; then
       echo "ERREUR: $LIBRARY_PATH_VALUE n'existe pas. Cree-le ou pointe LIBRARY_PATH ailleurs."
@@ -112,7 +111,7 @@ case "$ACTION" in
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
     echo "URL  : https://${ADDRESS}/"
-    echo "Data : ${DATA_DIR_VALUE} (uploads + ML cache + postgres)"
+    echo "Data : ${DATA_DIR} (uploads + ML cache + postgres)"
     echo "Lib  : ${LIBRARY_PATH_VALUE} (bibliotheque externe, RW)"
     echo
     echo "Premier setup :"

@@ -3,8 +3,9 @@
 #
 # Variables substituees depuis /var/lib/services/immich/runtime.env :
 #   - SERVICE_NAME, PORT, ADDRESS   (cloud Infisical /services/immich/)
-#   - DATA_DIR        racine des donnees Immich (uploads + ML cache + postgres)
-#                     ex: /home/pi/data/immich  ou /media/pi/data/immich
+#   - DATA_DIR        racine des donnees Immich (uploads + ML cache + postgres).
+#                     Auto-cale par install.sh sur /home/$VPS_USER/data/immich,
+#                     pas configurable via Infisical (c'est de l'ops data).
 #   - LIBRARY_PATH    bibliotheque externe en RW (photos deja organisees par
 #                     dossier, mountees telles quelles dans /library)
 #                     ex: /media/pi/data/cloud/Photos
