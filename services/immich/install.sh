@@ -52,12 +52,20 @@ build_runtime_env() {
 
   install -d -m 700 -o root -g "$VPS_USER" "$RUNTIME_DIR"
 
+  # UID/GID host pour que server + ML tournent comme VPS_USER (= les fichiers
+  # crees dans /library et /usr/src/app/upload appartiennent au user host).
+  local host_uid host_gid
+  host_uid="$(id -u "$VPS_USER")"
+  host_gid="$(id -g "$VPS_USER")"
+
   umask 077
   {
     echo "SERVICE_NAME=${SERVICE_NAME}"
     echo "PORT=${PORT}"
     echo "ADDRESS=${ADDRESS}"
     echo "DATA_DIR=${DATA_DIR}"
+    echo "HOST_UID=${host_uid}"
+    echo "HOST_GID=${host_gid}"
     infisical export \
       --domain="$domain" \
       --projectId="$pid" \
