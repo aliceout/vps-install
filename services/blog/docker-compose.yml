@@ -11,4 +11,4 @@ services:
     pull_policy: always
     ports:
       # Bind sur localhost uniquement, nginx host fait le reverse proxy TLS.
-      - "127.0.0.1:${HOST_PORT}:4321"
+      - "127.0.0.1:${HOST_PORT}:2367"
