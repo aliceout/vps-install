@@ -141,6 +141,11 @@ case "$ACTION" in
     install -d -m 755 -o 33 -g 33 "$DATA_DIR"
     install -d -m 755 -o 33 -g 33 "$DATA_DIR/upload"
     install -d -m 755 -o 33 -g 33 "$DATA_DIR/model-cache"
+    # chown -R force : si les dossiers existent deja d'un install precedent
+    # avec HOST_UID different (ex: 1000), 'install -d' ne re-chown pas. Le
+    # container immich-server (qui tourne en UID 33) se prend alors un EACCES
+    # sur upload/encoded-video/.immich et crash-loop. On force ici.
+    chown -R 33:33 "$DATA_DIR/upload" "$DATA_DIR/model-cache"
     # Postgres image officielle tourne en UID 999 (interne, separe)
     install -d -m 700 -o 999 -g 999 "$DATA_DIR/postgres"
 
