@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte ROOT_DIR).
+ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
 # Fallback standalone : SSH_PORT vient normalement de bootstrap.sh, mais quand
 # on relance ce module a la main (post-bootstrap, pour fix UFW), il n'est pas
 # en env. On le lit alors depuis sshd -T (config effective, prend en compte
@@ -99,6 +102,13 @@ if [[ "${WEB_ENABLED:-1}" -eq 1 ]]; then
   cscli collections install crowdsecurity/nginx --force
   cscli collections install crowdsecurity/base-http-scenarios --force
   cscli collections install crowdsecurity/http-cve --force
+
+  # Whitelist custom : 4xx legitimes de l'UI Immich (thumbs lazy) + WebDAV NC
+  # (PROPFIND items supprimes). Sans ca, http-probing ban l'utilisateur des
+  # ~10 thumbs manquants charges en parallele par l'UI Immich.
+  install -d -m 755 /etc/crowdsec/parsers/s02-enrich
+  cp -a "$ROOT_DIR/config/crowdsec/whitelists/immich-nc-4xx.yaml" \
+    /etc/crowdsec/parsers/s02-enrich/immich-nc-4xx.yaml
 fi
 
 # Enrollment sur app.crowdsec.net si cle fournie
