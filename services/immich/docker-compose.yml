@@ -3,22 +3,23 @@
 #
 # Variables substituees depuis /var/lib/services/immich/runtime.env :
 #   - SERVICE_NAME, PORT, ADDRESS   (cloud Infisical /services/immich/)
-#   - DATA_DIR         racine "ops data" Immich (ML cache + postgres).
-#                      Auto-cale par install.sh sur /home/$VPS_USER/data/immich,
-#                      pas configurable via Infisical (c'est de l'ops, pas du media).
-#   - UPLOAD_LOCATION  dossier ou Immich stocke TOUTES les photos (uploades via
-#                      UI/app mobile + thumbs + transcodes). Configurable via
-#                      Infisical, ex: /media/pi/data/Photos
-#   - DB_PASSWORD      password postgres (genere une fois, stocke dans Infisical)
-#   - IMMICH_VERSION   tag d'image (defaut "release", peut etre v1.x pour pin)
-#   - HOST_UID, HOST_GID  UID/GID du VPS_USER host. Auto-cale par install.sh.
-#                         server + ML tournent en HOST_UID -> fichiers crees
-#                         appartiennent au user host, accessibles en CLI sans
-#                         sudo. Postgres reste en UID 999 (interne).
-#
-# Note : pas d'External Library mountee ici. Si plus tard tu veux ajouter une
-# lib externe (dossier scanne en RO, hors upload location), ajoute un volume
-# bind '- /chemin:/library' sur le service 'server'.
+#   - DATA_DIR          racine "ops data" Immich (uploads UI/app + ML cache +
+#                       postgres). Auto-cale par install.sh sur
+#                       /home/$VPS_USER/data/immich, pas configurable via
+#                       Infisical (c'est de l'ops, pas du media).
+#   - UPLOAD_LOCATION   = ${DATA_DIR}/upload, set automatiquement par
+#                       install.sh. C'est ou Immich ecrit les photos uploades
+#                       via UI/app + thumbs + transcodes.
+#   - EXTERNAL_LIBRARY  Bibliotheque externe en RW, typiquement le dossier
+#                       photos d'un user Nextcloud. Immich y lit + modifie
+#                       (delete, retag) mais N'Y UPLOAD PAS. Cron quotidien
+#                       lance occ files:scan sur ce path pour que NC voit
+#                       les modifications.
+#   - DB_PASSWORD       password postgres (genere une fois, stocke dans Infisical)
+#   - IMMICH_VERSION    tag d'image (defaut "release", peut etre v1.x pour pin)
+#   - HOST_UID, HOST_GID  = 33 (www-data) hardcoded par install.sh. Partage
+#                       les perms avec NC AIO qui tourne aussi en www-data
+#                       interne. Postgres reste en UID 999 (interne).
 
 services:
   server:
@@ -33,11 +34,16 @@ services:
     ports:
       - "127.0.0.1:${PORT}:2283"
     volumes:
-      # UPLOAD_LOCATION : dossier ou Immich stocke TOUTES les photos (uploades
-      # via UI/app mobile + thumbs + transcodes). Immich organise dedans sa
-      # propre arbo (library/<userId>/YYYY/YYYY-MM-DD/<hash>.ext par defaut,
-      # configurable via Storage Template dans l'UI admin).
+      # UPLOAD_LOCATION : dossier ou Immich stocke les photos uploades via
+      # UI/app mobile + thumbs + transcodes. Set par install.sh sur
+      # ${DATA_DIR}/upload, organise par Immich (library/<userId>/YYYY/...).
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
+      # EXTERNAL_LIBRARY : dossier photos Nextcloud, lecture + modification
+      # autorisees. Mount en RW. Un cron quotidien lance 'occ files:scan'
+      # cote NC pour que les modifs faites par Immich soient visibles dans
+      # l'UI NC (et que les fichiers supprimes par Immich disparaissent
+      # bien aussi cote NC).
+      - ${EXTERNAL_LIBRARY}:/library
       - /etc/localtime:/etc/localtime:ro
     environment:
       DB_HOSTNAME: ${SERVICE_NAME}-postgres
