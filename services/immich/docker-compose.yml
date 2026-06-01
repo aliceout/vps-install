@@ -51,6 +51,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_DATABASE_NAME: immich
       REDIS_HOSTNAME: ${SERVICE_NAME}-redis
+      # Override le hostname ML : Immich attend "immich-machine-learning" par
+      # defaut (cf compose officiel), mais on a renomme le container en
+      # "${SERVICE_NAME}-ml". Sans cet override, les jobs ML (faces, CLIP,
+      # OCR, thumbnails IA) plantent avec "fetch failed".
+      IMMICH_MACHINE_LEARNING_URL: http://${SERVICE_NAME}-ml:3003
       TZ: ${TZ:-Europe/Paris}
     depends_on:
       redis:
