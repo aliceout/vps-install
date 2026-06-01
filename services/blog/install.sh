@@ -7,8 +7,6 @@
 # Cles attendues dans Infisical CLOUD sous /services/blog/ :
 #   - ADDRESS, DOMAIN, PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - IMAGE              (ex: ghcr.io/aliceout/blog:latest)
-#   - CONTAINER_PORT     (ex: 4321 pour Astro preview/SSR, 80 pour nginx interne)
 #
 # Le webhook cote receiver attend aussi /services/blog/hook/ avec
 # REPO=aliceout/blog, WEBHOOK_SECRET=<hmac>, SCRIPT=blog.sh,
@@ -33,8 +31,6 @@ fi
 # shellcheck disable=SC1090
 source "$SECRETS_FILE"
 : "${PORT:?PORT manquant dans $SECRETS_FILE}"
-: "${IMAGE:?IMAGE manquant dans $SECRETS_FILE (ex: ghcr.io/aliceout/blog:latest)}"
-: "${CONTAINER_PORT:?CONTAINER_PORT manquant dans $SECRETS_FILE (ex: 4321)}"
 
 trigger_webhooks_update() {
   if [[ -x /opt/vps-install/scripts/service.sh ]] && \
@@ -52,10 +48,8 @@ case "$ACTION" in
     fi
 
     cd "$SERVICE_DIR"
-    HOST_PORT="$PORT" CONTAINER_PORT="$CONTAINER_PORT" IMAGE="$IMAGE" \
-      SERVICE_NAME="$SERVICE_NAME" $COMPOSE pull
-    HOST_PORT="$PORT" CONTAINER_PORT="$CONTAINER_PORT" IMAGE="$IMAGE" \
-      SERVICE_NAME="$SERVICE_NAME" $COMPOSE up -d
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE pull
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE up -d
 
     if [[ -d "$WEBHOOKS_HOOKS_DIR" ]]; then
       install -m 755 -o "$VPS_USER" -g "$VPS_USER" "$HOOK_SRC" "$HOOK_DST"
@@ -69,8 +63,7 @@ case "$ACTION" in
 
   remove)
     cd "$SERVICE_DIR"
-    HOST_PORT="$PORT" CONTAINER_PORT="$CONTAINER_PORT" IMAGE="$IMAGE" \
-      SERVICE_NAME="$SERVICE_NAME" $COMPOSE down 2>/dev/null || true
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE down 2>/dev/null || true
     rm -f "$HOOK_DST"
     trigger_webhooks_update
     echo "Stack arretee + hook retire."
@@ -78,8 +71,7 @@ case "$ACTION" in
 
   status)
     cd "$SERVICE_DIR"
-    HOST_PORT="$PORT" CONTAINER_PORT="$CONTAINER_PORT" IMAGE="$IMAGE" \
-      SERVICE_NAME="$SERVICE_NAME" $COMPOSE ps 2>/dev/null \
+    HOST_PORT="$PORT" SERVICE_NAME="$SERVICE_NAME" $COMPOSE ps 2>/dev/null \
       || echo "Stack pas demarree."
     ;;
 

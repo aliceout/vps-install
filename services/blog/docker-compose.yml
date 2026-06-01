@@ -1,21 +1,14 @@
-# Blog (Astro statique/SSR, image officielle GHCR). Image et port interne
-# parametres via Infisical (contrairement a work qui les hardcode), parce
-# qu'Astro peut tourner sur 4321 (preview/SSR), 80 (build statique + nginx
-# interne), ou autre selon l'adapter choisi cote repo.
-#
+# Blog (Astro, image officielle aliceout/blog).
 # Variables substituees au runtime depuis l'env du shell qui invoque docker
-# compose (depuis /etc/secrets/blog.env via install.sh / hook.sh) :
-#   - IMAGE          (ex: ghcr.io/aliceout/blog:latest)
-#   - HOST_PORT      (port host expose, depuis Infisical PORT)
-#   - CONTAINER_PORT (port interne du container, depuis Infisical)
-#   - SERVICE_NAME   (passe explicitement par install.sh / hook.sh)
+# compose (HOST_PORT depuis /etc/secrets/blog.env, SERVICE_NAME passee
+# explicitement par install.sh / hook.sh).
 
 services:
   web:
-    image: ${IMAGE}
+    image: ghcr.io/aliceout/blog:latest
     container_name: ${SERVICE_NAME}
     restart: unless-stopped
     pull_policy: always
     ports:
       # Bind sur localhost uniquement, nginx host fait le reverse proxy TLS.
-      - "127.0.0.1:${HOST_PORT}:${CONTAINER_PORT}"
+      - "127.0.0.1:${HOST_PORT}:4321"
