@@ -1,0 +1,29 @@
+# CrowdSec whitelist : evite les ban-hammer sur trafic UI/sync legitime.
+#
+# Cause racine :
+# - Immich UI charge des dizaines de thumbs en parallele. Si un asset n'a pas
+#   encore son thumbnail genere (job background), l'API renvoie 404. Avec ~20
+#   404 en quelques secondes depuis le meme IP, le scenario http-probing
+#   trigger et ban l'utilisateur.
+# - Nextcloud WebDAV (sync mobile, navigation Files) PROPFIND-e des chemins
+#   qui peuvent legitimement 404 (items supprimes, items pas encore syncs).
+#
+# Risque accepte : un attaquant qui hit /api/assets/* ou /remote.php/dav/*
+# sur des UUID inexistants ne sera pas detecte par http-probing. Mais ces
+# endpoints sont 1) auth-required (filtres par Immich/NC), 2) pas une surface
+# d'attaque generique (les attaquants ciblent /wp-admin, /.env, etc., toujours
+# bannis car en dehors de ces prefixes).
+name: alyss/whitelist-immich-nc-4xx
+description: "Whitelist 4xx legitimes Immich (thumbs lazy) + NC (WebDAV PROPFIND)"
+whitelist:
+  reason: "API Immich + WebDAV NC : 4xx normaux pendant indexation/sync, sinon http-probing ban l'utilisateur legitime"
+  expression:
+    # Immich : /api/assets/<uuid>/thumbnail, /api/assets/<uuid>/original, etc.
+    - evt.Meta.http_path startsWith "/api/assets/" && evt.Meta.http_status startsWith "4"
+    # Immich : ancien path /api/asset/ (singulier, garde pour compat)
+    - evt.Meta.http_path startsWith "/api/asset/" && evt.Meta.http_status startsWith "4"
+    # Nextcloud WebDAV : PROPFIND/GET sur ressources supprimees ou pas encore syncs
+    - evt.Meta.http_path startsWith "/remote.php/dav/" && evt.Meta.http_status startsWith "4"
+    # Nextcloud apps : sync Photos + navigation Files
+    - evt.Meta.http_path startsWith "/index.php/apps/photos/" && evt.Meta.http_status startsWith "4"
+    - evt.Meta.http_path startsWith "/index.php/apps/files/" && evt.Meta.http_status startsWith "4"
