@@ -13,6 +13,11 @@
 #   - ALBUM_LEVELS       (optionnel, defaut 1)
 #   - ALBUM_SEPARATOR    (optionnel, defaut " / ")
 #   - ALBUM_ROOT_PATH    (optionnel, defaut /library = mount external library)
+#   - ALBUM_PATH_FILTER  (optionnel, glob fnmatch matche au path relatif a
+#                        ROOT_PATH. Seuls les assets matchant sont inclus.
+#                        Ex: "*/*" pour limiter aux photos directement dans
+#                        un dossier de premier niveau (ignore les photos
+#                        plus profondes).
 
 set -Eeuo pipefail
 
@@ -39,7 +44,15 @@ if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[$(date -Is)] album-create: levels=$ALBUM_LEVELS root=$ALBUM_ROOT_PATH"
+echo "[$(date -Is)] album-create: levels=$ALBUM_LEVELS root=$ALBUM_ROOT_PATH filter=${ALBUM_PATH_FILTER:-<none>}"
+
+# PATH_FILTER en variable optionnelle : on ne passe -e PATH_FILTER que si
+# ALBUM_PATH_FILTER est set + non-vide (sinon le tool interprete une chaine
+# vide comme un filtre qui exclut tout).
+DOCKER_FILTER_ARG=()
+if [[ -n "${ALBUM_PATH_FILTER:-}" ]]; then
+  DOCKER_FILTER_ARG=(-e "PATH_FILTER=$ALBUM_PATH_FILTER")
+fi
 
 docker run --rm \
   --network "$NETWORK" \
@@ -48,6 +61,7 @@ docker run --rm \
   -e ROOT_PATH="$ALBUM_ROOT_PATH" \
   -e ALBUM_LEVELS="$ALBUM_LEVELS" \
   -e ALBUM_SEPARATOR="$ALBUM_SEPARATOR" \
+  "${DOCKER_FILTER_ARG[@]}" \
   -e UNATTENDED=1 \
   -e LOG_LEVEL=INFO \
   salvoxia/immich-folder-album-creator:latest
