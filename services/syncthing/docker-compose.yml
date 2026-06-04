@@ -1,0 +1,48 @@
+# Syncthing : sync de fichiers p2p, web UI HTTPS self-signed + ports sync.
+#
+# Variables substituees depuis /var/lib/services/syncthing/runtime.env :
+#   - SERVICE_NAME, PORT, ADDRESS   (cloud Infisical /services/syncthing/)
+#   - DATA_DIR          racine "ops data" Syncthing (config + index + state),
+#                       auto-cale par install.sh sur /home/$VPS_USER/data/syncthing
+#   - DATA_PATH         chemin host des fichiers a syncher (cloud Infisical).
+#                       Mount-e dans le container a /var/syncthing/data : tu
+#                       configures tes folders Syncthing avec ce prefixe via
+#                       l'UI web.
+#   - HOST_UID, HOST_GID  UID/GID du VPS_USER, auto-cale par install.sh.
+#                       Permet aux fichiers crees par Syncthing d'appartenir
+#                       au user host (pas a root ou au UID 1000 par defaut
+#                       de l'image).
+
+services:
+  syncthing:
+    image: syncthing/syncthing:latest
+    container_name: ${SERVICE_NAME}
+    hostname: ${SERVICE_NAME}
+    restart: unless-stopped
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - ${DATA_DIR}/config:/var/syncthing/config
+      - ${DATA_PATH}:/var/syncthing/data
+    ports:
+      # Web UI : bind localhost, nginx reverse proxy fait le TLS externe.
+      # Syncthing sert lui-meme du HTTPS self-signed en interne (cf nginx.conf).
+      - "127.0.0.1:${PORT}:8384"
+      # Sync TCP/UDP : doit etre joignable depuis internet pour le sync p2p.
+      # Pense a ouvrir 22000/tcp + 22000/udp dans UFW + port-forward router.
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      # Local discovery LAN (utile sur reseau local pour decouvrir d'autres
+      # devices Syncthing sans passer par les serveurs de relais).
+      - "21027:21027/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://127.0.0.1:8384/rest/noauth/health || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
