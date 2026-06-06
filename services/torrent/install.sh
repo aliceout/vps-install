@@ -189,6 +189,9 @@ server:
   sources:
     - path: "/srv"
       name: data
+      config:
+        defaultEnabled: true
+        defaultUserScope: "/"
 auth:
   methods:
     proxy:
@@ -197,6 +200,12 @@ auth:
       createUser: true
     password:
       enabled: false
+userDefaults:
+  permissions:
+    admin: true
+    modify: true
+    share: true
+    api: true
 EOF
     chown "$HOST_UID_VALUE:$HOST_GID_VALUE" "$DATA_DIR/filebrowser/config.yaml"
 
