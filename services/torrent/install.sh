@@ -13,25 +13,32 @@
 #
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
+# Layout disk :
+#   DATA_DIR  (auto-cale sur /home/$VPS_USER/data/torrent) :
+#     - gluetun/        etat gluetun + forwarded_port file
+#     - transmission/   config Transmission (settings.json, torrents/, resume/)
+#     - tinyauth/       SQLite tinyauth
+#   DATA_PATH (Infisical, libre choix) :
+#     - downloads/      fichiers telecharges
+#     - watch/          .torrent a auto-charger
+#
 # Cles attendues dans Infisical CLOUD sous /services/torrent/ :
 #   - ADDRESS, DOMAIN, PORT, AUTH_PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - DATA_DIR                    (ex: /media/pi/media/transmission)
-#   - VPN_SERVICE_PROVIDER        (ex "protonvpn", cf doc gluetun pour autres)
+#   - DATA_PATH                   chemin host des downloads + watch
+#                                 (ex: /media/pi/media/transmission)
+#   - VPN_SERVICE_PROVIDER        (ex "protonvpn")
 #   - VPN_TYPE                    ("wireguard" ou "openvpn")
-#   - VPN_PORT_FORWARDING_PROVIDER (ex "protonvpn", souvent = VPN_SERVICE_PROVIDER)
-#   - WIREGUARD_PRIVATE_KEY       (generer depuis ProtonVPN dashboard :
-#                                  Account -> WireGuard -> Create config)
-#   - WIREGUARD_ADDRESSES         (ex "10.2.0.2/32" pour Proton)
+#   - VPN_PORT_FORWARDING_PROVIDER (ex "protonvpn")
+#   - WIREGUARD_PRIVATE_KEY       (Proton dashboard -> WG config)
+#   - WIREGUARD_ADDRESSES         (ex "10.2.0.2/32")
 #   - SERVER_COUNTRIES            (ex "Switzerland" ou "Switzerland,Netherlands")
 #   - LOCAL_NETWORK               (optionnel, defaut "192.168.1.0/24")
-#   - TINYAUTH_USERS              (format: user:bcrypt-hash, plusieurs separes
-#                                  par virgule. Generation :
-#                                  docker run --rm ghcr.io/steveiliop56/tinyauth:latest \
-#                                    user create -u <user> -p <password>)
+#   - TINYAUTH_USERS              (format user:bcrypt-hash, virgule-separe)
 
 set -euo pipefail
 
+DATA_DIR="/home/${VPS_USER}/data/${SERVICE_NAME}"
 RUNTIME_DIR="/var/lib/services/${SERVICE_NAME}"
 RUNTIME_ENV="${RUNTIME_DIR}/runtime.env"
 COMPOSE="docker compose -f ${SERVICE_DIR}/docker-compose.yml -p ${SERVICE_NAME} --env-file ${RUNTIME_ENV}"
@@ -69,6 +76,7 @@ build_runtime_env() {
     echo "PORT=${PORT}"
     echo "AUTH_PORT=${AUTH_PORT}"
     echo "ADDRESS=${ADDRESS}"
+    echo "DATA_DIR=${DATA_DIR}"
     infisical export \
       --domain="$domain" \
       --projectId="$pid" \
@@ -80,7 +88,7 @@ build_runtime_env() {
   chgrp "$VPS_USER" "$RUNTIME_ENV" || true
   chmod 640 "$RUNTIME_ENV"
 
-  for k in DATA_DIR VPN_SERVICE_PROVIDER VPN_TYPE VPN_PORT_FORWARDING_PROVIDER \
+  for k in DATA_PATH VPN_SERVICE_PROVIDER VPN_TYPE VPN_PORT_FORWARDING_PROVIDER \
            WIREGUARD_PRIVATE_KEY WIREGUARD_ADDRESSES SERVER_COUNTRIES TINYAUTH_USERS; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
@@ -96,26 +104,33 @@ case "$ACTION" in
 
     build_runtime_env
 
-    DATA_DIR_VALUE="$(grep -E '^DATA_DIR=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
-    if [[ -z "$DATA_DIR_VALUE" ]]; then
-      echo "ERREUR: DATA_DIR vide dans le runtime.env. Set-le sous /services/${SERVICE_NAME}/ en Infisical Cloud."
+    DATA_PATH_VALUE="$(grep -E '^DATA_PATH=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
+    if [[ -z "$DATA_PATH_VALUE" ]]; then
+      echo "ERREUR: DATA_PATH vide dans le runtime.env. Set-le sous /services/${SERVICE_NAME}/ en Infisical Cloud."
+      echo "  Ex: /media/pi/media/transmission"
       exit 1
     fi
-    if [[ ! -d "$DATA_DIR_VALUE" ]]; then
-      echo "ERREUR: $DATA_DIR_VALUE n'existe pas. Cree-le a la main avant le up :"
-      echo "  sudo install -d -m 755 -o $VPS_USER -g $VPS_USER '$DATA_DIR_VALUE'"
+    if [[ ! -d "$DATA_PATH_VALUE" ]]; then
+      echo "ERREUR: $DATA_PATH_VALUE n'existe pas. Cree-le :"
+      echo "  sudo install -d -m 755 -o $VPS_USER -g $VPS_USER '$DATA_PATH_VALUE'"
       exit 1
     fi
 
-    # Layout sous DATA_DIR : un sous-dir par container, perms VPS_USER.
     HOST_UID_VALUE="$(id -u "$VPS_USER")"
     HOST_GID_VALUE="$(id -g "$VPS_USER")"
+
+    # DATA_DIR : ops data framework (gluetun state, transmission config,
+    # tinyauth SQLite). Sous /home/$VPS_USER/data/$SERVICE_NAME, owned VPS_USER.
     install -d -m 755 -o "$HOST_UID_VALUE" -g "$HOST_GID_VALUE" \
-      "$DATA_DIR_VALUE/gluetun" \
-      "$DATA_DIR_VALUE/transmission" \
-      "$DATA_DIR_VALUE/downloads" \
-      "$DATA_DIR_VALUE/watch" \
-      "$DATA_DIR_VALUE/tinyauth"
+      "$DATA_DIR" \
+      "$DATA_DIR/gluetun" \
+      "$DATA_DIR/transmission" \
+      "$DATA_DIR/tinyauth"
+
+    # DATA_PATH : donnees user (downloads + watch). Sous-dirs crees si absents.
+    install -d -m 755 -o "$HOST_UID_VALUE" -g "$HOST_GID_VALUE" \
+      "$DATA_PATH_VALUE/downloads" \
+      "$DATA_PATH_VALUE/watch"
 
     chmod +x "$SERVICE_DIR/update-port.sh"
 
@@ -126,22 +141,22 @@ case "$ACTION" in
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
     echo "URL          : https://${ADDRESS}/  (login form via tinyauth)"
-    echo "Data         : ${DATA_DIR_VALUE}/{gluetun,transmission,downloads,watch,tinyauth}"
+    echo "Ops data     : ${DATA_DIR} (gluetun, transmission config, tinyauth)"
+    echo "User data    : ${DATA_PATH_VALUE}/{downloads,watch}"
     echo
-    echo "Verif VPN actif (= IP publique = IP Proton) :"
+    echo "Verif VPN actif (IP de sortie = IP Proton) :"
     echo "  docker exec ${SERVICE_NAME}-vpn wget -qO- https://ipinfo.io/ip"
     echo
-    echo "Verif port forwarded (gluetun -> Transmission) :"
-    echo "  docker logs ${SERVICE_NAME}-vpn 2>&1 | grep -i 'port forward'"
-    echo "  docker logs ${SERVICE_NAME}-vpn 2>&1 | grep 'update-port'"
-    echo "  cat ${DATA_DIR_VALUE}/gluetun/forwarded_port"
+    echo "Verif port forwarded :"
+    echo "  cat ${DATA_DIR}/gluetun/forwarded_port"
+    echo "  docker logs ${SERVICE_NAME}-vpn 2>&1 | grep update-port"
     ;;
 
   remove)
     cd "$SERVICE_DIR"
     $COMPOSE down 2>/dev/null || true
     rm -f "$RUNTIME_ENV"
-    echo "Stack arretee. Data preservee dans le DATA_DIR Infisical."
+    echo "Stack arretee. Data preservee dans DATA_DIR + DATA_PATH (rm -rf manuel pour purger)."
     ;;
 
   status)

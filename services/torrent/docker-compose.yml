@@ -14,15 +14,25 @@
 #   tinyauth      = form auth devant Transmission (RPC auth desactivee).
 #                   Tourne sur son propre network (pas besoin du VPN).
 #
+# Layout disk :
+#   DATA_DIR  (auto = /home/$VPS_USER/data/torrent) :
+#     - gluetun/        state gluetun + forwarded_port
+#     - transmission/   settings.json, torrents/, resume/
+#     - tinyauth/       SQLite
+#   DATA_PATH (Infisical, ex /media/pi/media/transmission) :
+#     - downloads/      les fichiers telecharges
+#     - watch/          .torrent auto-load
+#
 # Variables substituees depuis /var/lib/services/torrent/runtime.env :
 #   - SERVICE_NAME, PORT, AUTH_PORT, ADDRESS  (cloud Infisical /services/torrent/)
 #   - SERVICE_DIR                             (auto, pour bind-mount du script)
-#   - DATA_DIR                                (cloud /services/torrent/)
+#   - DATA_DIR                                (auto-cale par install.sh)
+#   - DATA_PATH                               (cloud, libre choix)
 #   - VPN_SERVICE_PROVIDER                    (cloud, ex "protonvpn")
-#   - VPN_TYPE                                (cloud, ex "wireguard" ou "openvpn")
+#   - VPN_TYPE                                (cloud, ex "wireguard")
 #   - VPN_PORT_FORWARDING_PROVIDER            (cloud, ex "protonvpn")
-#   - WIREGUARD_PRIVATE_KEY                   (cloud, genere depuis Proton account)
-#   - WIREGUARD_ADDRESSES                     (cloud, ex "10.2.0.2/32" pour Proton)
+#   - WIREGUARD_PRIVATE_KEY                   (cloud, depuis Proton account)
+#   - WIREGUARD_ADDRESSES                     (cloud, ex "10.2.0.2/32")
 #   - SERVER_COUNTRIES                        (cloud, ex "Switzerland,Netherlands")
 #   - TINYAUTH_USERS                          (cloud)
 #   - LOCAL_NETWORK                           (cloud, optionnel)
@@ -41,7 +51,7 @@ services:
       # cote container). nginx host fait le reverse proxy TLS.
       - "127.0.0.1:${PORT}:9091"
     volumes:
-      # State gluetun (servers.json, auth config, forwarded_port, etc.)
+      # State gluetun (servers.json, auth config, forwarded_port).
       - ${DATA_DIR}/gluetun:/gluetun
       # Hook script bind-mount : appele par gluetun quand le port forwarded
       # change. Read-only, pas de risque d'edit accidentel cote container.
@@ -86,9 +96,11 @@ services:
       gluetun:
         condition: service_healthy
     volumes:
+      # Config (settings.json, torrents/, resume/) -> ops data framework.
       - ${DATA_DIR}/transmission:/config
-      - ${DATA_DIR}/downloads:/downloads
-      - ${DATA_DIR}/watch:/watch
+      # Downloads + watch -> data user, sous DATA_PATH (Infisical).
+      - ${DATA_PATH}/downloads:/downloads
+      - ${DATA_PATH}/watch:/watch
     environment:
       PUID: "1000"
       PGID: "1000"
