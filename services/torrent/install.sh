@@ -46,6 +46,11 @@ RUNTIME_DIR="/var/lib/services/${SERVICE_NAME}"
 RUNTIME_ENV="${RUNTIME_DIR}/runtime.env"
 COMPOSE="docker compose -f ${SERVICE_DIR}/docker-compose.yml -p ${SERVICE_NAME} --env-file ${RUNTIME_ENV}"
 
+# Vhost nginx deploye par apply_nginx (cf scripts/service.sh). On le post-edit
+# pour substituer le placeholder __rpc_basic__ par base64(user:pass) sans
+# devoir toucher au framework. Cf substitute_rpc_basic ci-dessous.
+NGINX_VHOST="/etc/nginx/conf/${SERVICE_NAME}.conf"
+
 : "${VPS_USER:?VPS_USER manquant}"
 
 if [[ ! -s "$SECRETS_FILE" ]]; then
@@ -98,6 +103,42 @@ build_runtime_env() {
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
   done
+}
+
+# Substitue le placeholder __rpc_basic__ dans le vhost nginx deploye par
+# apply_nginx. Calcule base64(TRANSMISSION_USER:TRANSMISSION_PASS) et
+# remplace, puis reload nginx. Permet au web UI (cookie tinyauth) de ne pas
+# se prendre un popup Basic auth pour les XHR vers /transmission/rpc.
+#
+# Pourquoi pas via le mecanisme natif __KEY__ d'apply_nginx : apply_nginx
+# substitue depuis /etc/secrets/torrent.env (synce d'Infisical), donc il
+# faudrait stocker la base64 pre-calculee en Infisical. Faisable mais
+# manuel. Ici on fait tout cote install.sh, le user ne touche que USER+PASS
+# en Infisical.
+substitute_rpc_basic() {
+  local user pass b64
+  if [[ ! -f "$NGINX_VHOST" ]]; then
+    echo "INFO: $NGINX_VHOST absent (nginx pas installe ?), skip injection __rpc_basic__."
+    return 0
+  fi
+  user="$(grep -E '^TRANSMISSION_USER=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
+  pass="$(grep -E '^TRANSMISSION_PASS=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
+  if [[ -z "$user" || -z "$pass" ]]; then
+    echo "AVERTISSEMENT: TRANSMISSION_USER/PASS vides, le web UI demandera l'auth Basic au browser."
+    # Vire le placeholder : on remplace par "" pour que nginx -t ne fail pas
+    # sur un Authorization header invalide.
+    sed -i 's|__rpc_basic__||g' "$NGINX_VHOST"
+  else
+    b64=$(printf '%s:%s' "$user" "$pass" | base64 -w0)
+    # Substitution avec un separateur non-/ : la base64 contient des /.
+    sed -i "s|__rpc_basic__|${b64}|g" "$NGINX_VHOST"
+  fi
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx
+  else
+    echo "AVERTISSEMENT: nginx -t KO apres substitution __rpc_basic__, vhost potentiellement casse."
+    nginx -t 2>&1 | sed 's/^/  /'
+  fi
 }
 
 case "$ACTION" in
@@ -164,6 +205,10 @@ case "$ACTION" in
     fi
 
     chmod +x "$SERVICE_DIR/update-port.sh"
+
+    # Post-traitement du vhost nginx : substitue __rpc_basic__ par base64
+    # des creds, reload nginx. Cf substitute_rpc_basic plus haut.
+    substitute_rpc_basic
 
     cd "$SERVICE_DIR"
     $COMPOSE pull
