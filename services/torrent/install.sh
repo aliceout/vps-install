@@ -17,11 +17,13 @@
 #   - ADDRESS, DOMAIN, PORT, AUTH_PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - DATA_DIR                    (ex: /media/pi/media/transmission)
+#   - VPN_SERVICE_PROVIDER        (ex "protonvpn", cf doc gluetun pour autres)
+#   - VPN_TYPE                    ("wireguard" ou "openvpn")
+#   - VPN_PORT_FORWARDING_PROVIDER (ex "protonvpn", souvent = VPN_SERVICE_PROVIDER)
 #   - WIREGUARD_PRIVATE_KEY       (generer depuis ProtonVPN dashboard :
 #                                  Account -> WireGuard -> Create config)
-#   - WIREGUARD_ADDRESSES         (optionnel, defaut 10.2.0.2/32 pour Proton)
-#   - SERVER_COUNTRIES            (optionnel, defaut
-#                                  "Switzerland,Netherlands,Iceland,Sweden")
+#   - WIREGUARD_ADDRESSES         (ex "10.2.0.2/32" pour Proton)
+#   - SERVER_COUNTRIES            (ex "Switzerland" ou "Switzerland,Netherlands")
 #   - LOCAL_NETWORK               (optionnel, defaut "192.168.1.0/24")
 #   - TINYAUTH_USERS              (format: user:bcrypt-hash, plusieurs separes
 #                                  par virgule. Generation :
@@ -78,7 +80,8 @@ build_runtime_env() {
   chgrp "$VPS_USER" "$RUNTIME_ENV" || true
   chmod 640 "$RUNTIME_ENV"
 
-  for k in DATA_DIR WIREGUARD_PRIVATE_KEY TINYAUTH_USERS; do
+  for k in DATA_DIR VPN_SERVICE_PROVIDER VPN_TYPE VPN_PORT_FORWARDING_PROVIDER \
+           WIREGUARD_PRIVATE_KEY WIREGUARD_ADDRESSES SERVER_COUNTRIES TINYAUTH_USERS; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
