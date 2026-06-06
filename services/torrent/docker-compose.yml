@@ -1,57 +1,98 @@
-# Transmission via OpenVPN (haugene/transmission-openvpn) + tinyauth
-# (auth form-based devant le webUI car Transmission RPC = HTTP Basic, mauvais
-# avec les password managers).
+# Transmission via Gluetun (ProtonVPN WireGuard + NAT-PMP port-forwarding)
+# + tinyauth (form-based auth devant le webUI).
+#
+# Architecture :
+#   gluetun       = couche VPN (WG/Proton), port-forwarding NAT-PMP auto,
+#                   kill-switch nftables (FIREWALL=on par defaut).
+#                   Quand le port forwarded change, gluetun execute
+#                   /scripts/update-port.sh (cf VPN_PORT_FORWARDING_UP_COMMAND)
+#                   qui push le nouveau port vers Transmission via RPC.
+#   transmission  = client BitTorrent, partage le namespace reseau de gluetun
+#                   (network_mode: service:gluetun) -> tout son trafic sort
+#                   par le tunnel VPN, et son web UI sort sur le port expose
+#                   par gluetun.
+#   tinyauth      = form auth devant Transmission (RPC auth desactivee).
+#                   Tourne sur son propre network (pas besoin du VPN).
 #
 # Variables substituees depuis /var/lib/services/torrent/runtime.env :
 #   - SERVICE_NAME, PORT, AUTH_PORT, ADDRESS  (cloud Infisical /services/torrent/)
-#   - DATA_DIR, OPENVPN_*                    (Cloud /services/torrent/)
-#   - TINYAUTH_USERS, TINYAUTH_SECRET        (Cloud /services/torrent/)
-#
-# Constantes hardcodees ici (pas dans Infisical) :
-#   - PUID/PGID 1000 (uid pi sur ce host)
-#   - TZ Europe/Paris
-#   - TRANSMISSION_WEB_UI transmission-web-control
-#   - TRANSMISSION_PEER_PORT 51413 (default upstream)
-#
-# LOCAL_NETWORK : optionnel dans Infisical Cloud (path /services/torrent/).
-# Si absent, default sur 192.168.1.0/24 (LAN typique home). Override en y
-# ajoutant LOCAL_NETWORK=<cidr> (ex: 10.0.0.0/24).
+#   - SERVICE_DIR                             (auto, pour bind-mount du script)
+#   - DATA_DIR                                (cloud /services/torrent/)
+#   - WIREGUARD_PRIVATE_KEY                   (cloud, genere depuis Proton account)
+#   - WIREGUARD_ADDRESSES                     (cloud, defaut 10.2.0.2/32 pour Proton)
+#   - SERVER_COUNTRIES                        (cloud, optionnel, defaut large)
+#   - TINYAUTH_USERS                          (cloud)
+#   - LOCAL_NETWORK                           (cloud, optionnel)
 
 services:
-  transmission:
-    image: haugene/transmission-openvpn:latest
-    container_name: ${SERVICE_NAME}
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: ${SERVICE_NAME}-vpn
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
     ports:
+      # Transmission web UI : expose sur le namespace gluetun (= host depuis
+      # cote container). nginx host fait le reverse proxy TLS.
       - "127.0.0.1:${PORT}:9091"
     volumes:
-      - ${DATA_DIR}:/data
+      # State gluetun (servers.json, auth config, forwarded_port, etc.)
+      - ${DATA_DIR}/gluetun:/gluetun
+      # Hook script bind-mount : appele par gluetun quand le port forwarded
+      # change. Read-only, pas de risque d'edit accidentel cote container.
+      - ${SERVICE_DIR}/update-port.sh:/scripts/update-port.sh:ro
     environment:
-      OPENVPN_PROVIDER: ${OPENVPN_PROVIDER}
-      OPENVPN_CONFIG: ${OPENVPN_CONFIG}
-      OPENVPN_USERNAME: ${OPENVPN_USERNAME}
-      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
+      VPN_SERVICE_PROVIDER: protonvpn
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
+      WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES:-10.2.0.2/32}
+      # SERVER_COUNTRIES : Proton P2P-friendly. Override via Infisical pour
+      # un autre pays. Defaut large pour fallback automatique.
+      SERVER_COUNTRIES: ${SERVER_COUNTRIES:-Switzerland,Netherlands,Iceland,Sweden}
+      # Port-forwarding NAT-PMP : negocie automatiquement, renouvele toutes
+      # les ~45s. Quand un port est attribue/renouvele/change, gluetun
+      # appelle UP_COMMAND avec le numero de port via {{PORT}}.
+      VPN_PORT_FORWARDING: "on"
+      VPN_PORT_FORWARDING_PROVIDER: protonvpn
+      VPN_PORT_FORWARDING_UP_COMMAND: "/bin/sh /scripts/update-port.sh {{PORT}}"
+      # Kill-switch nftables : aucun paquet ne sort si le VPN est down.
+      # FIREWALL=on est le default, on l'explicite pour clarte.
+      FIREWALL: "on"
+      # Bypass VPN pour le LAN (acces web UI depuis le reseau local).
+      FIREWALL_OUTBOUND_SUBNETS: ${LOCAL_NETWORK:-192.168.1.0/24}
+      TZ: ${TZ:-Europe/Paris}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-      # Kill switch : si le VPN tombe, blocage total (evite leak IP)
-      DROP_DEFAULT_ROUTE: "yes"
-
-      # Bypass VPN pour le LAN (override via LOCAL_NETWORK dans Infisical)
-      LOCAL_NETWORK: "${LOCAL_NETWORK:-192.168.1.0/24}"
-
-      # RPC : auth desactivee (gere par tinyauth en amont)
-      TRANSMISSION_WEB_UI: "transmission-web-control"
-      TRANSMISSION_RPC_AUTHENTICATION_REQUIRED: "false"
-      # Whitelist large : la securite est cote nginx + tinyauth
-      TRANSMISSION_RPC_HOST_WHITELIST: "*"
-      TRANSMISSION_RPC_WHITELIST_ENABLED: "false"
-
-      TRANSMISSION_PEER_PORT: "51413"
-      LOG_TO_STDOUT: "true"
+  transmission:
+    image: lscr.io/linuxserver/transmission:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    # Partage le namespace reseau de gluetun : Transmission sort par le VPN,
+    # son port 9091 est expose via le bloc 'ports' du container gluetun.
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ${DATA_DIR}/transmission:/config
+      - ${DATA_DIR}/downloads:/downloads
+      - ${DATA_DIR}/watch:/watch
+    environment:
       PUID: "1000"
       PGID: "1000"
-      TZ: "Europe/Paris"
+      TZ: ${TZ:-Europe/Paris}
+      # RPC auth desactivee (gere par tinyauth en amont via nginx auth_request).
+      USER: ""
+      PASS: ""
+      # Whitelist large : la securite est cote nginx + tinyauth.
+      WHITELIST: "*"
+      HOST_WHITELIST: "*"
     logging:
       driver: json-file
       options:
@@ -62,25 +103,15 @@ services:
     image: ghcr.io/steveiliop56/tinyauth:latest
     container_name: ${SERVICE_NAME}-auth
     restart: unless-stopped
+    # Reseau propre : tinyauth verifie juste des cookies, pas besoin du VPN.
     ports:
       - "127.0.0.1:${AUTH_PORT}:3000"
     volumes:
-      # Persistance de la SQLite tinyauth.db (cookies key auto-generee +
-      # sessions). Sans, chaque restart invalide toutes les sessions.
       - ${DATA_DIR}/tinyauth:/app/data
     environment:
-      # URL publique de l'app proteget (v5+ : TINYAUTH_APPURL, etait APP_URL)
       TINYAUTH_APPURL: https://${ADDRESS}
-
-      # Liste des users : "alice:$$2a$$10$$xxxxx" (plusieurs separes par virgule)
-      # Hash bcrypt genere avec :
-      #   docker run --rm ghcr.io/steveiliop56/tinyauth:latest user create -u <user> -p <pass>
       TINYAUTH_AUTH_USERS: ${TINYAUTH_USERS}
-
-      # SQLite de persistance (cookies key + sessions)
       TINYAUTH_DATABASE_PATH: /app/data/tinyauth.db
-
-      # Cookie HTTPS-only (on est derriere nginx en HTTPS)
       TINYAUTH_AUTH_SECURECOOKIE: "true"
     logging:
       driver: json-file

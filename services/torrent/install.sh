@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
-# Install Transmission via OpenVPN (haugene/transmission-openvpn) +
-# tinyauth (form-based auth devant le webUI).
+# Install Transmission via Gluetun (ProtonVPN WireGuard + NAT-PMP port-forwarding)
+# + tinyauth (form-based auth devant le webUI).
 # Service home server uniquement.
+#
+# Architecture (cf docker-compose.yml) :
+#   gluetun       : VPN WG/Proton + NAT-PMP port-fwd + kill-switch nftables
+#   transmission  : BitTorrent, partage le namespace reseau gluetun
+#   tinyauth      : form auth devant Transmission via nginx auth_request
+#
+# Le hook update-port.sh est appele par gluetun a chaque (ré)allocation de
+# port forwarded : il push le nouveau port dans Transmission via RPC.
 #
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE, VPS_USER
 #
@@ -9,14 +17,16 @@
 #   - ADDRESS, DOMAIN, PORT, AUTH_PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - DATA_DIR                    (ex: /media/pi/media/transmission)
-#   - OPENVPN_PROVIDER, OPENVPN_CONFIG
-#   - OPENVPN_USERNAME, OPENVPN_PASSWORD
-#   - TINYAUTH_USERS              (format: user:bcrypt-hash, plusieurs separes par virgule)
-#                                 generation : docker run --rm ghcr.io/steveiliop56/tinyauth:latest \
-#                                              user create -u <user> -p <password>
-#                                 (tinyauth v5+ : la cle de cookie est auto-generee
-#                                  et persistee dans /app/data/tinyauth.db, donc
-#                                  pas de SECRET a fournir)
+#   - WIREGUARD_PRIVATE_KEY       (generer depuis ProtonVPN dashboard :
+#                                  Account -> WireGuard -> Create config)
+#   - WIREGUARD_ADDRESSES         (optionnel, defaut 10.2.0.2/32 pour Proton)
+#   - SERVER_COUNTRIES            (optionnel, defaut
+#                                  "Switzerland,Netherlands,Iceland,Sweden")
+#   - LOCAL_NETWORK               (optionnel, defaut "192.168.1.0/24")
+#   - TINYAUTH_USERS              (format: user:bcrypt-hash, plusieurs separes
+#                                  par virgule. Generation :
+#                                  docker run --rm ghcr.io/steveiliop56/tinyauth:latest \
+#                                    user create -u <user> -p <password>)
 
 set -euo pipefail
 
@@ -38,8 +48,6 @@ build_runtime_env() {
   : "${PORT:?PORT manquant}"
   : "${AUTH_PORT:?AUTH_PORT manquant (port pour tinyauth, ex 9092)}"
 
-  # Single Infisical : on utilise l'identite framework via infi-token (cache
-  # 10min, --domain auto). Tout est sous /services/torrent/ en Cloud.
   local token domain pid env_slug
   token="$(infi-token --silent 2>/dev/null || true)"
   if [[ -z "$token" ]]; then
@@ -55,6 +63,7 @@ build_runtime_env() {
   umask 077
   {
     echo "SERVICE_NAME=${SERVICE_NAME}"
+    echo "SERVICE_DIR=${SERVICE_DIR}"
     echo "PORT=${PORT}"
     echo "AUTH_PORT=${AUTH_PORT}"
     echo "ADDRESS=${ADDRESS}"
@@ -69,8 +78,7 @@ build_runtime_env() {
   chgrp "$VPS_USER" "$RUNTIME_ENV" || true
   chmod 640 "$RUNTIME_ENV"
 
-  for k in DATA_DIR OPENVPN_PROVIDER OPENVPN_CONFIG OPENVPN_USERNAME OPENVPN_PASSWORD \
-           TINYAUTH_USERS; do
+  for k in DATA_DIR WIREGUARD_PRIVATE_KEY TINYAUTH_USERS; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
@@ -96,18 +104,34 @@ case "$ACTION" in
       exit 1
     fi
 
+    # Layout sous DATA_DIR : un sous-dir par container, perms VPS_USER.
+    HOST_UID_VALUE="$(id -u "$VPS_USER")"
+    HOST_GID_VALUE="$(id -g "$VPS_USER")"
+    install -d -m 755 -o "$HOST_UID_VALUE" -g "$HOST_GID_VALUE" \
+      "$DATA_DIR_VALUE/gluetun" \
+      "$DATA_DIR_VALUE/transmission" \
+      "$DATA_DIR_VALUE/downloads" \
+      "$DATA_DIR_VALUE/watch" \
+      "$DATA_DIR_VALUE/tinyauth"
+
+    chmod +x "$SERVICE_DIR/update-port.sh"
+
     cd "$SERVICE_DIR"
     $COMPOSE pull
     $COMPOSE up -d
 
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
-    echo "URL : https://${ADDRESS}/  (login form via tinyauth)"
-    echo "Data : ${DATA_DIR_VALUE}"
+    echo "URL          : https://${ADDRESS}/  (login form via tinyauth)"
+    echo "Data         : ${DATA_DIR_VALUE}/{gluetun,transmission,downloads,watch,tinyauth}"
     echo
-    echo "Verif VPN actif :"
-    echo "  docker exec ${SERVICE_NAME} curl -s https://ipinfo.io/ip"
-    echo "  → doit afficher l'IP du VPN, pas ton IP publique reelle."
+    echo "Verif VPN actif (= IP publique = IP Proton) :"
+    echo "  docker exec ${SERVICE_NAME}-vpn wget -qO- https://ipinfo.io/ip"
+    echo
+    echo "Verif port forwarded (gluetun -> Transmission) :"
+    echo "  docker logs ${SERVICE_NAME}-vpn 2>&1 | grep -i 'port forward'"
+    echo "  docker logs ${SERVICE_NAME}-vpn 2>&1 | grep 'update-port'"
+    echo "  cat ${DATA_DIR_VALUE}/gluetun/forwarded_port"
     ;;
 
   remove)
