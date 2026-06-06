@@ -18,9 +18,12 @@
 #   - SERVICE_NAME, PORT, AUTH_PORT, ADDRESS  (cloud Infisical /services/torrent/)
 #   - SERVICE_DIR                             (auto, pour bind-mount du script)
 #   - DATA_DIR                                (cloud /services/torrent/)
+#   - VPN_SERVICE_PROVIDER                    (cloud, ex "protonvpn")
+#   - VPN_TYPE                                (cloud, ex "wireguard" ou "openvpn")
+#   - VPN_PORT_FORWARDING_PROVIDER            (cloud, ex "protonvpn")
 #   - WIREGUARD_PRIVATE_KEY                   (cloud, genere depuis Proton account)
-#   - WIREGUARD_ADDRESSES                     (cloud, defaut 10.2.0.2/32 pour Proton)
-#   - SERVER_COUNTRIES                        (cloud, optionnel, defaut large)
+#   - WIREGUARD_ADDRESSES                     (cloud, ex "10.2.0.2/32" pour Proton)
+#   - SERVER_COUNTRIES                        (cloud, ex "Switzerland,Netherlands")
 #   - TINYAUTH_USERS                          (cloud)
 #   - LOCAL_NETWORK                           (cloud, optionnel)
 
@@ -44,18 +47,16 @@ services:
       # change. Read-only, pas de risque d'edit accidentel cote container.
       - ${SERVICE_DIR}/update-port.sh:/scripts/update-port.sh:ro
     environment:
-      VPN_SERVICE_PROVIDER: protonvpn
-      VPN_TYPE: wireguard
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER}
+      VPN_TYPE: ${VPN_TYPE}
       WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
-      WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES:-10.2.0.2/32}
-      # SERVER_COUNTRIES : Proton P2P-friendly. Override via Infisical pour
-      # un autre pays. Defaut large pour fallback automatique.
-      SERVER_COUNTRIES: ${SERVER_COUNTRIES:-Switzerland,Netherlands,Iceland,Sweden}
+      WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES}
+      SERVER_COUNTRIES: ${SERVER_COUNTRIES}
       # Port-forwarding NAT-PMP : negocie automatiquement, renouvele toutes
       # les ~45s. Quand un port est attribue/renouvele/change, gluetun
       # appelle UP_COMMAND avec le numero de port via {{PORT}}.
       VPN_PORT_FORWARDING: "on"
-      VPN_PORT_FORWARDING_PROVIDER: protonvpn
+      VPN_PORT_FORWARDING_PROVIDER: ${VPN_PORT_FORWARDING_PROVIDER}
       VPN_PORT_FORWARDING_UP_COMMAND: "/bin/sh /scripts/update-port.sh {{PORT}}"
       # Kill-switch nftables : aucun paquet ne sort si le VPN est down.
       # FIREWALL=on est le default, on l'explicite pour clarte.
