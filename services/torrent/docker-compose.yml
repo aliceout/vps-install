@@ -81,6 +81,10 @@ services:
       # Bypass VPN pour le LAN (acces web UI depuis le reseau local).
       FIREWALL_OUTBOUND_SUBNETS: ${LOCAL_NETWORK:-192.168.1.0/24}
       TZ: ${TZ:-Europe/Paris}
+      # Creds Transmission RPC propagees au hook update-port.sh qui tourne
+      # dans ce container et doit s'auth pour push le port forwarded.
+      TRANSMISSION_USER: ${TRANSMISSION_USER}
+      TRANSMISSION_PASS: ${TRANSMISSION_PASS}
     logging:
       driver: json-file
       options:
@@ -111,10 +115,13 @@ services:
       TZ: ${TZ:-Europe/Paris}
       # UI alternative bundle dans /web-control (cf volumes ci-dessus).
       TRANSMISSION_WEB_HOME: /web-control
-      # RPC auth desactivee (gere par tinyauth en amont via nginx auth_request).
-      USER: ""
-      PASS: ""
-      # Whitelist large : la securite est cote nginx + tinyauth.
+      # RPC auth HTTP Basic native Transmission : pour les apps externes
+      # (Android Transmission Remote, scripts) qui bypassent tinyauth.
+      # Le web UI passe lui par tinyauth (cf nginx.conf), pas concerne par
+      # ces creds en navigation normale.
+      USER: ${TRANSMISSION_USER}
+      PASS: ${TRANSMISSION_PASS}
+      # Whitelist large : la securite est cote nginx + tinyauth + RPC auth.
       WHITELIST: "*"
       HOST_WHITELIST: "*"
     logging:

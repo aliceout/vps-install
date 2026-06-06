@@ -35,6 +35,9 @@
 #   - SERVER_COUNTRIES            (ex "Switzerland" ou "Switzerland,Netherlands")
 #   - LOCAL_NETWORK               (optionnel, defaut "192.168.1.0/24")
 #   - TINYAUTH_USERS              (format user:bcrypt-hash, virgule-separe)
+#   - TRANSMISSION_USER           (user pour l'auth Basic RPC, apps externes
+#                                  comme Transmission Remote Android)
+#   - TRANSMISSION_PASS           (password fort, ex: openssl rand -base64 24)
 
 set -euo pipefail
 
@@ -89,7 +92,8 @@ build_runtime_env() {
   chmod 640 "$RUNTIME_ENV"
 
   for k in DATA_PATH VPN_SERVICE_PROVIDER VPN_TYPE VPN_PORT_FORWARDING_PROVIDER \
-           WIREGUARD_PRIVATE_KEY WIREGUARD_ADDRESSES SERVER_COUNTRIES TINYAUTH_USERS; do
+           WIREGUARD_PRIVATE_KEY WIREGUARD_ADDRESSES SERVER_COUNTRIES TINYAUTH_USERS \
+           TRANSMISSION_USER TRANSMISSION_PASS; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
