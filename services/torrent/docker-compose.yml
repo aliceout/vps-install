@@ -72,7 +72,9 @@ services:
       # c'est /tmp/gluetun/forwarded_port (in-memory, perdu au redemarrage et
       # pas visible cote host). On le pointe vers /gluetun/ qui est le volume
       # persistant -> accessible cote host dans $DATA_DIR/gluetun/.
-      VPN_PORT_FORWARDING_FILEPATH: /gluetun/forwarded_port
+      # Note : l'ancien nom VPN_PORT_FORWARDING_FILEPATH existe encore mais est
+      # ignore au profit de STATUS_FILE dans les versions recentes de gluetun.
+      VPN_PORT_FORWARDING_STATUS_FILE: /gluetun/forwarded_port
       # Kill-switch nftables : aucun paquet ne sort si le VPN est down.
       # FIREWALL=on est le default, on l'explicite pour clarte.
       FIREWALL: "on"
