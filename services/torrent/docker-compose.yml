@@ -58,6 +58,11 @@ services:
       VPN_PORT_FORWARDING: "on"
       VPN_PORT_FORWARDING_PROVIDER: ${VPN_PORT_FORWARDING_PROVIDER}
       VPN_PORT_FORWARDING_UP_COMMAND: "/bin/sh /scripts/update-port.sh {{PORT}}"
+      # Path du fichier ou gluetun ecrit le port forwarded actuel. Par defaut
+      # c'est /tmp/gluetun/forwarded_port (in-memory, perdu au redemarrage et
+      # pas visible cote host). On le pointe vers /gluetun/ qui est le volume
+      # persistant -> accessible cote host dans $DATA_DIR/gluetun/.
+      VPN_PORT_FORWARDING_FILEPATH: /gluetun/forwarded_port
       # Kill-switch nftables : aucun paquet ne sort si le VPN est down.
       # FIREWALL=on est le default, on l'explicite pour clarte.
       FIREWALL: "on"
