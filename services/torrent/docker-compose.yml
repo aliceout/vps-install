@@ -100,6 +100,8 @@ services:
     volumes:
       # Config (settings.json, torrents/, resume/) -> ops data framework.
       - ${DATA_DIR}/transmission:/config
+      # UI alternative transmission-web-control (download par install.sh).
+      - ${DATA_DIR}/web-control:/web-control:ro
       # Downloads + watch -> data user, sous DATA_PATH (Infisical).
       - ${DATA_PATH}/downloads:/downloads
       - ${DATA_PATH}/watch:/watch
@@ -107,6 +109,8 @@ services:
       PUID: "1000"
       PGID: "1000"
       TZ: ${TZ:-Europe/Paris}
+      # UI alternative bundle dans /web-control (cf volumes ci-dessus).
+      TRANSMISSION_WEB_HOME: /web-control
       # RPC auth desactivee (gere par tinyauth en amont via nginx auth_request).
       USER: ""
       PASS: ""

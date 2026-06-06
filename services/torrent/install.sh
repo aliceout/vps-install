@@ -125,12 +125,27 @@ case "$ACTION" in
       "$DATA_DIR" \
       "$DATA_DIR/gluetun" \
       "$DATA_DIR/transmission" \
-      "$DATA_DIR/tinyauth"
+      "$DATA_DIR/tinyauth" \
+      "$DATA_DIR/web-control"
 
     # DATA_PATH : donnees user (downloads + watch). Sous-dirs crees si absents.
     install -d -m 755 -o "$HOST_UID_VALUE" -g "$HOST_GID_VALUE" \
       "$DATA_PATH_VALUE/downloads" \
       "$DATA_PATH_VALUE/watch"
+
+    # Download transmission-web-control (UI alt plus moderne que le default
+    # Transmission). Pas bundle dans linuxserver/transmission, on l'install
+    # nous-meme depuis github releases (master branch, repo statique HTML/JS).
+    # Re-download a chaque install/update pour avoir la derniere version.
+    echo "Install transmission-web-control UI..."
+    find "$DATA_DIR/web-control" -mindepth 1 -delete 2>/dev/null || true
+    if curl -fsSL https://github.com/transmission-web-control/transmission-web-control/archive/refs/heads/master.tar.gz \
+        | tar -xz --strip-components=2 -C "$DATA_DIR/web-control" \
+            transmission-web-control-master/src; then
+      chown -R "$HOST_UID_VALUE:$HOST_GID_VALUE" "$DATA_DIR/web-control"
+    else
+      echo "AVERTISSEMENT: download transmission-web-control echoue, fallback sur UI defaut Transmission"
+    fi
 
     chmod +x "$SERVICE_DIR/update-port.sh"
 
