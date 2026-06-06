@@ -149,3 +149,28 @@ services:
       options:
         max-size: "5m"
         max-file: "3"
+
+  filebrowser:
+    image: gtstef/filebrowser:stable
+    container_name: ${SERVICE_NAME}-files
+    restart: unless-stopped
+    # Reseau propre : filebrowser sert juste des fichiers locaux, pas besoin
+    # de sortir par le VPN.
+    user: "1000:1000"
+    ports:
+      - "127.0.0.1:${FILEBROWSER_PORT}:80"
+    volumes:
+      # Config (config.yaml genere par install.sh, SQLite users/sessions, cache)
+      - ${DATA_DIR}/filebrowser:/home/filebrowser/data
+      # Le contenu a explorer = DATA_PATH (downloads/, watch/). Mount RW :
+      # full edit cote UI (delete, rename, upload, etc.). Attention de pas
+      # casser des torrents en cours en supprimant les fichiers en cours
+      # de seed.
+      - ${DATA_PATH}:/srv
+    environment:
+      FILEBROWSER_CONFIG: data/config.yaml
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

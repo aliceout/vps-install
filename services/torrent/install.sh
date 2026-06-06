@@ -23,7 +23,7 @@
 #     - watch/          .torrent a auto-charger
 #
 # Cles attendues dans Infisical CLOUD sous /services/torrent/ :
-#   - ADDRESS, DOMAIN, PORT, AUTH_PORT
+#   - ADDRESS, DOMAIN, PORT, AUTH_PORT, FILEBROWSER_PORT
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #   - DATA_PATH                   chemin host des downloads + watch
 #                                 (ex: /media/pi/media/transmission)
@@ -64,6 +64,7 @@ build_runtime_env() {
   : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
   : "${AUTH_PORT:?AUTH_PORT manquant (port pour tinyauth, ex 9092)}"
+  : "${FILEBROWSER_PORT:?FILEBROWSER_PORT manquant (port pour filebrowser, ex 9093)}"
 
   local token domain pid env_slug
   token="$(infi-token --silent 2>/dev/null || true)"
@@ -83,6 +84,7 @@ build_runtime_env() {
     echo "SERVICE_DIR=${SERVICE_DIR}"
     echo "PORT=${PORT}"
     echo "AUTH_PORT=${AUTH_PORT}"
+    echo "FILEBROWSER_PORT=${FILEBROWSER_PORT}"
     echo "ADDRESS=${ADDRESS}"
     echo "DATA_DIR=${DATA_DIR}"
     infisical export \
@@ -165,13 +167,40 @@ case "$ACTION" in
     HOST_GID_VALUE="$(id -g "$VPS_USER")"
 
     # DATA_DIR : ops data framework (gluetun state, transmission config,
-    # tinyauth SQLite). Sous /home/$VPS_USER/data/$SERVICE_NAME, owned VPS_USER.
+    # tinyauth SQLite, filebrowser SQLite + config.yaml).
     install -d -m 755 -o "$HOST_UID_VALUE" -g "$HOST_GID_VALUE" \
       "$DATA_DIR" \
       "$DATA_DIR/gluetun" \
       "$DATA_DIR/transmission" \
       "$DATA_DIR/tinyauth" \
-      "$DATA_DIR/web-control"
+      "$DATA_DIR/web-control" \
+      "$DATA_DIR/filebrowser"
+
+    # Genere le config.yaml filebrowser : auth mode "proxy" (nginx envoie le
+    # header Remote-User), source = /srv (le DATA_PATH bind-mount), baseURL
+    # /files pour servir depuis https://${ADDRESS}/files/. Re-genere a chaque
+    # install pour reprendre les valeurs d'Infisical.
+    cat > "$DATA_DIR/filebrowser/config.yaml" <<EOF
+server:
+  port: 80
+  database: "data/database.db"
+  cacheDir: "data/tmp"
+sources:
+  - path: "/srv"
+    name: data
+baseURL: "/files"
+externalUrl: "https://${ADDRESS}/files"
+auth:
+  methods:
+    proxy:
+      enabled: true
+      header: "Remote-User"
+      createUser: true
+    password:
+      enabled: false
+    signup: false
+EOF
+    chown "$HOST_UID_VALUE:$HOST_GID_VALUE" "$DATA_DIR/filebrowser/config.yaml"
 
     # DATA_PATH : donnees user (downloads + watch). Sous-dirs crees si absents.
     install -d -m 755 -o "$HOST_UID_VALUE" -g "$HOST_GID_VALUE" \
@@ -217,8 +246,9 @@ case "$ACTION" in
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
     echo "URL          : https://${ADDRESS}/  (login form via tinyauth)"
-    echo "Ops data     : ${DATA_DIR} (gluetun, transmission config, tinyauth)"
+    echo "Ops data     : ${DATA_DIR} (gluetun, transmission config, tinyauth, filebrowser)"
     echo "User data    : ${DATA_PATH_VALUE}/{downloads,watch}"
+    echo "File browser : https://${ADDRESS}/files/  (single user 'admin', auth via tinyauth)"
     echo
     echo "Verif VPN actif (IP de sortie = IP Proton) :"
     echo "  docker exec ${SERVICE_NAME}-vpn wget -qO- https://ipinfo.io/ip"
