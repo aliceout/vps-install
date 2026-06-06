@@ -186,9 +186,9 @@ server:
   baseURL: "/files"
   database: "data/database.db"
   cacheDir: "data/tmp"
-sources:
-  - path: "/srv"
-    name: data
+  sources:
+    - path: "/srv"
+      name: data
 auth:
   methods:
     proxy:
