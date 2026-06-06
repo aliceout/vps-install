@@ -21,15 +21,21 @@ fi
 
 RPC="http://127.0.0.1:9091/transmission/rpc"
 
-# Step 1 : GET pour capturer le session-id (Transmission repond 409 avec le
-# header X-Transmission-Session-Id, qu'il faut re-injecter dans la prochaine
-# requete). On ignore le exit code 8 de wget (= HTTP 4xx, attendu ici).
-SID=$(wget -q -S -O /dev/null "$RPC" 2>&1 \
-  | sed -nE 's/^[[:space:]]*X-Transmission-Session-Id:[[:space:]]*(.+)$/\1/p' \
-  | tr -d '\r')
+# Retry loop : Transmission peut ne pas etre encore up quand gluetun appelle
+# le hook (gluetun: healthy + tunnel up + port negocie en quelques sec,
+# Transmission demarre apres via depends_on). On laisse 60s pour qu'il
+# devienne reachable, sinon on bail.
+SID=""
+for i in $(seq 1 30); do
+  SID=$(wget -q -S -O /dev/null "$RPC" 2>&1 \
+    | sed -nE 's/^[[:space:]]*X-Transmission-Session-Id:[[:space:]]*(.+)$/\1/p' \
+    | tr -d '\r')
+  [ -n "$SID" ] && break
+  sleep 2
+done
 
 if [ -z "$SID" ]; then
-  echo "[update-port] ERREUR: pas de session-id (Transmission down ?)" >&2
+  echo "[update-port] ERREUR: Transmission unreachable apres 60s" >&2
   exit 1
 fi
 
