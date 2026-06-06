@@ -183,13 +183,12 @@ case "$ACTION" in
     cat > "$DATA_DIR/filebrowser/config.yaml" <<EOF
 server:
   port: 80
+  baseURL: "/files"
   database: "data/database.db"
   cacheDir: "data/tmp"
 sources:
   - path: "/srv"
     name: data
-baseURL: "/files"
-externalUrl: "https://${ADDRESS}/files"
 auth:
   methods:
     proxy:
