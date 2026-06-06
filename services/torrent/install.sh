@@ -198,7 +198,6 @@ auth:
       createUser: true
     password:
       enabled: false
-    signup: false
 EOF
     chown "$HOST_UID_VALUE:$HOST_GID_VALUE" "$DATA_DIR/filebrowser/config.yaml"
 
