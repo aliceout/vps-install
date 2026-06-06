@@ -133,20 +133,30 @@ case "$ACTION" in
       "$DATA_PATH_VALUE/downloads" \
       "$DATA_PATH_VALUE/watch"
 
-    # Download transmission-web-control (UI alt plus moderne que le default
-    # Transmission). Pas bundle dans linuxserver/transmission. Le repo upstream
-    # ronggang/transmission-web-control est archive depuis juin 2025 mais
-    # toujours telechargeable, et le UI est purement statique HTML/JS donc
-    # fonctionne tel quel. L'entry point est dans src/tr-web-control/, pas
-    # juste src/ (d'ou --strip-components=3 pour avoir index.html a plat).
-    echo "Install transmission-web-control UI..."
+    # Download flood-for-transmission (UI moderne style Flood, activement
+    # maintenue : repo johman10/flood-for-transmission, GPL-3.0, sortie de
+    # release zip pre-built a chaque tag, dernier en date v1.0.1 janv 2026).
+    # Pas de build step, juste un download + unzip dans web-control/.
+    # On utilise python3 -m zipfile (built-in, dispo sans installer unzip).
+    echo "Install flood-for-transmission UI..."
+    install_flood_ui() {
+      local TMPDIR TMPZIP rc=0
+      TMPDIR=$(mktemp -d)
+      TMPZIP="$TMPDIR/flood.zip"
+      if curl -fsSL https://github.com/johman10/flood-for-transmission/releases/latest/download/flood-for-transmission.zip \
+            -o "$TMPZIP" \
+         && python3 -m zipfile -e "$TMPZIP" "$TMPDIR" \
+         && cp -a "$TMPDIR/flood-for-transmission/." "$DATA_DIR/web-control/"; then
+        chown -R "$HOST_UID_VALUE:$HOST_GID_VALUE" "$DATA_DIR/web-control"
+      else
+        rc=1
+      fi
+      rm -rf "$TMPDIR"
+      return $rc
+    }
     find "$DATA_DIR/web-control" -mindepth 1 -delete 2>/dev/null || true
-    if curl -fsSL https://github.com/ronggang/transmission-web-control/archive/refs/heads/master.tar.gz \
-        | tar -xz --strip-components=3 -C "$DATA_DIR/web-control" \
-            transmission-web-control-master/src/tr-web-control; then
-      chown -R "$HOST_UID_VALUE:$HOST_GID_VALUE" "$DATA_DIR/web-control"
-    else
-      echo "AVERTISSEMENT: download transmission-web-control echoue, fallback sur UI defaut Transmission"
+    if ! install_flood_ui; then
+      echo "AVERTISSEMENT: install flood-for-transmission echoue, fallback sur UI defaut Transmission"
     fi
 
     chmod +x "$SERVICE_DIR/update-port.sh"
