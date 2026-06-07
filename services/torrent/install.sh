@@ -193,6 +193,7 @@ server:
         defaultEnabled: true
         defaultUserScope: "/"
 auth:
+  adminUsername: admin
   methods:
     proxy:
       enabled: true
