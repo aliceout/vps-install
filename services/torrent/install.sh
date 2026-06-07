@@ -204,9 +204,13 @@ auth:
 userDefaults:
   permissions:
     admin: true
+    api: true
     modify: true
     share: true
-    api: true
+    realtime: true
+    delete: true
+    create: true
+    download: true
 EOF
     chown "$HOST_UID_VALUE:$HOST_GID_VALUE" "$DATA_DIR/filebrowser/config.yaml"
 
