@@ -1,0 +1,47 @@
+# Watchtower : auto-update des containers Docker.
+#
+# Mode "full coverage" : surveille TOUS les containers (pas de filtre par
+# label). Pull les nouvelles images, recreate les containers avec la meme
+# config, et clean les vieilles images apres.
+#
+# Variables substituees depuis /var/lib/services/watchtower/runtime.env :
+#   - SERVICE_NAME                (cloud Infisical /services/watchtower/)
+#   - WATCHTOWER_SCHEDULE         (optionnel, defaut "0 0 4 * * *" = 4h00
+#                                  daily. Format cron 6-fields : seconde
+#                                  minute heure jour mois dow)
+#   - TZ                          (optionnel, defaut Europe/Paris)
+
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    volumes:
+      # Acces au docker socket : Watchtower a besoin pour lister/recreate
+      # les containers du host. Read-write parce qu'il faut docker run.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      # Schedule : 6-field cron (seconde minute heure jour mois dow).
+      # Defaut 4h00 daily, plage creuse pour limiter l'impact des restarts.
+      WATCHTOWER_SCHEDULE: "${WATCHTOWER_SCHEDULE:-0 0 4 * * *}"
+      # Clean les vieilles images apres update : evite que le disque se
+      # remplisse de tags <none> en quelques semaines.
+      WATCHTOWER_CLEANUP: "true"
+      # Rolling restart : redemarre un container a la fois, evite de tout
+      # downer simultanement (utile si dependances inter-containers, ex
+      # transmission qui depends_on gluetun).
+      WATCHTOWER_ROLLING_RESTART: "true"
+      # Ne pas demarrer les containers stoppes (= laisser les containers
+      # volontairement arretes tranquilles).
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+      # Full coverage : pas de filtrage par label, watchtower update TOUS
+      # les containers. Si tu veux exclure un container specifique :
+      # ajoute le label 'com.centurylinklabs.watchtower.enable=false'
+      # dans son service compose, et set WATCHTOWER_LABEL_ENABLE=true ici.
+      WATCHTOWER_LABEL_ENABLE: "false"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
