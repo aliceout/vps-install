@@ -1,0 +1,39 @@
+# Calibre Web : interface web pour bibliotheque Calibre existante.
+#
+# Variables substituees depuis /var/lib/services/calibre/runtime.env :
+#   - SERVICE_NAME, PORT     (cloud Infisical /services/calibre/)
+#   - DATA_DIR               racine "ops data" framework (config + DB
+#                            calibre-web). Auto-cale par install.sh sur
+#                            /home/$VPS_USER/data/calibre.
+#   - DATA_PATH              chemin host de la bibliotheque Calibre
+#                            (cloud Infisical). Doit contenir un
+#                            metadata.db existant si tu pointes sur une
+#                            lib Calibre deja constituee.
+#   - HOST_UID, HOST_GID     UID/GID du VPS_USER, auto-cale par install.sh
+
+services:
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    ports:
+      # Bind localhost only, nginx fait le reverse proxy TLS.
+      # Port interne 8083 = default linuxserver/calibre-web.
+      - "127.0.0.1:${PORT}:8083"
+    volumes:
+      # Config calibre-web (app.db, ke users, themes, etc.) -> framework
+      - ${DATA_DIR}/config:/config
+      # Bibliotheque Calibre existante (avec metadata.db dedans)
+      - ${DATA_PATH}:/books
+    environment:
+      PUID: ${HOST_UID:-1000}
+      PGID: ${HOST_GID:-1000}
+      TZ: ${TZ:-Europe/Paris}
+      # Pointe directement calibre-web sur le mount /books au lieu du
+      # wizard initial. Le user pourra changer ensuite via UI -> Admin.
+      DOCKER_MODS: ""
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
