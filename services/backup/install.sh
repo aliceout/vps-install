@@ -5,6 +5,17 @@ set -euo pipefail
 
 : "${VPS_USER:?VPS_USER manquant}"
 
+# VPS-only : ce service push les backups VERS le home server via SSH+restic
+# (les creds HOME_SSH_HOST/RESTIC_REPOSITORY/etc. sont sous Infisical Cloud
+# /services/backup/, normalement settes que pour les hosts VPS). Sur un host
+# 'server' c'est non-sens (il faudrait qu'il se backup vers lui-meme).
+HOST_TYPE="${HOST_TYPE:-$(cat /etc/infisical/host-type 2>/dev/null || true)}"
+if [[ "$HOST_TYPE" != "vps" ]]; then
+  echo "Service backup : HOST_TYPE='$HOST_TYPE' != vps, skip (service VPS-only)."
+  echo "  Le home server utilise services/server-backup pour ses backups locaux."
+  exit 0
+fi
+
 case "$ACTION" in
   install|update)
     apt-get install -y restic openssh-client
