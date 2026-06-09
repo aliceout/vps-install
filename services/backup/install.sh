@@ -98,13 +98,16 @@ install_server() {
   install -d /usr/local/sbin
 
   # Symlinks scripts
-  for s in backup-borg nextcloud-snapshot backup-rotating backup-raid; do
+  for s in backup-borg nextcloud-snapshot; do
     chmod +x "$ROOT_DIR/scripts/${s}.sh"
     ln -sf "$ROOT_DIR/scripts/${s}.sh" "/usr/local/sbin/${s}"
   done
+  # Cleanup symlinks d'anciens scripts obsoletes (backup-raid / backup-rotating
+  # ont ete vires : backup-borg mount-on-demand fait l'equivalent en mieux).
+  rm -f /usr/local/sbin/backup-raid /usr/local/sbin/backup-rotating
 
   # Config par defaut (install-if-absent pour preserver les overrides locaux)
-  for env_name in backup-borg nextcloud-snapshot backup-rotating backup-raid; do
+  for env_name in backup-borg nextcloud-snapshot; do
     if [[ ! -f "/etc/server-backup/${env_name}.env" ]]; then
       cp -a "$ROOT_DIR/config/server-backup/${env_name}.env" "/etc/server-backup/${env_name}.env"
       chmod 644 "/etc/server-backup/${env_name}.env"
@@ -126,33 +129,30 @@ EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Quotidien 02:00 - rotating tar.xz (daily/weekly/monthly + rotation auto)
-0 2 * * * root /usr/local/sbin/hc-run backup-rotating /usr/local/sbin/backup-rotating
-
 # Quotidien 03:30 - snapshot Nextcloud AIO (pg_dump + tar volumes critiques)
 # AVANT le backup borg pour qu'il soit inclus dans l'archive du jour.
 30 3 * * * root /usr/local/sbin/hc-run nextcloud-snapshot /usr/local/sbin/nextcloud-snapshot
 
-# Quotidien 04:00 - backup borg rotatif
+# Quotidien 04:00 - backup borg rotatif (mount-on-demand sur Backup-SSD,
+# umount complet apres -> SSD invisible le reste du temps).
 0 4 * * * root /usr/local/sbin/hc-run backup-borg /usr/local/sbin/backup-borg
-
-# Bi-mensuel 1er et 15 du mois 05:00 - backup rsync vers SSD externe.
-0 5 1,15 * * root /usr/local/sbin/hc-run backup-raid /usr/local/sbin/backup-raid
 EOF
   chmod 644 /etc/cron.d/server-backup
 
   echo "Backup server installe."
-  echo "- Config : /etc/server-backup/*.env (a editer pour overrider FOLDERS, UUIDs, etc.)"
-  echo "- Scripts : backup-borg, nextcloud-snapshot, backup-rotating, backup-raid"
-  echo "- Cron : /etc/cron.d/server-backup (4 jobs : 02:00, 03:30, 04:00, raid bi-mensuel)"
+  echo "- Config : /etc/server-backup/*.env (a editer pour overrider UUID, folders, retention)"
+  echo "- Scripts : backup-borg (mount-on-demand), nextcloud-snapshot"
+  echo "- Cron : /etc/cron.d/server-backup (2 jobs : 03:30 nc-snapshot, 04:00 borg)"
   echo "- Logs : /var/log/server-backup/"
 }
 
 remove_server() {
   rm -f /etc/cron.d/server-backup /etc/logrotate.d/server-backup
-  for s in backup-borg nextcloud-snapshot backup-rotating backup-raid; do
+  for s in backup-borg nextcloud-snapshot; do
     rm -f "/usr/local/sbin/${s}"
   done
+  # Aussi les obsoletes au cas ou ils trainent encore d'une ancienne install
+  rm -f /usr/local/sbin/backup-raid /usr/local/sbin/backup-rotating
   echo "Backup server cron + scripts retires. /etc/server-backup/ et /var/log/server-backup/ preserves."
 }
 
@@ -161,7 +161,7 @@ status_server() {
   [[ -f /etc/cron.d/server-backup ]] && cat /etc/cron.d/server-backup || echo "(pas installe)"
   echo
   echo "=== Scripts deployes ==="
-  for s in backup-borg nextcloud-snapshot backup-rotating backup-raid; do
+  for s in backup-borg nextcloud-snapshot; do
     if [[ -L "/usr/local/sbin/${s}" ]]; then
       echo "  $s -> $(readlink -f "/usr/local/sbin/${s}")"
     else
