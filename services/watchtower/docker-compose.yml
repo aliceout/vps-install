@@ -13,7 +13,10 @@
 
 services:
   watchtower:
-    image: containrrr/watchtower:latest
+    # nickfedor/watchtower : fork activement maintenu de containrrr/watchtower
+    # (l'original utilise une lib docker-client trop vieille, fail sur les
+    # daemons Docker 23+ avec "API version 1.25 is too old, minimum 1.40").
+    image: nickfedor/watchtower:latest
     container_name: ${SERVICE_NAME}
     restart: unless-stopped
     volumes:
