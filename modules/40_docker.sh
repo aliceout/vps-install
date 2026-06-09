@@ -49,7 +49,7 @@ usermod -aG docker "$VPS_USER"
 # (ERROR: The "until" filter is not supported with "--volumes"). Donc :
 #   1. system prune --filter until=168h (images, containers, network, build cache)
 #   2. volume prune (volumes anonymes uniquement, les nommes restent)
-cat > /etc/cron.d/vps-docker-prune <<'EOF'
+cat > /etc/cron.d/docker-prune <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -59,10 +59,13 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 0 4 * * 0 root /usr/local/sbin/hc-run docker-prune bash -c '/usr/bin/docker system prune -af --filter "until=168h" && /usr/bin/docker volume prune -af' >> /var/log/docker-prune.log 2>&1
 5 4 * * 0 root /usr/local/sbin/hc-run docker-buildx-prune /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
 EOF
-chmod 644 /etc/cron.d/vps-docker-prune
+# Cleanup ancien nom (rename vps-* -> sans prefixe puisque tourne sur VPS + Server)
+rm -f /etc/cron.d/vps-docker-prune /etc/logrotate.d/vps-docker-prune
+
+chmod 644 /etc/cron.d/docker-prune
 
 # Logrotate pour le log du prune lui-meme
-cat > /etc/logrotate.d/vps-docker-prune <<'EOF'
+cat > /etc/logrotate.d/docker-prune <<'EOF'
 /var/log/docker-prune.log {
     monthly
     rotate 6
