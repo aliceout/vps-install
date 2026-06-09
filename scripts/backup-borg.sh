@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Backup borg multi-folders.
 #
-# Lit la config depuis /etc/server-scripts/backup-borg.env (pose par le
+# Lit la config depuis /etc/server-backup/backup-borg.env (pose par le
 # module 41_server_scripts.sh, surchargeable par l'admin du host).
 # Boucle sur les dossiers definis, run "borg create" pour chacun, et exit
 # 1 si au moins une sauvegarde a echoue (compteur d'erreurs global) -> le
 # wrapper hc-run remonte alors un fail sur Healthchecks.
 #
-# Log dans /var/log/server-scripts/backup-borg.log (rotate par logrotate).
+# Log dans /var/log/server-backup/backup-borg.log (rotate par logrotate).
 set -uo pipefail
 
-CONFIG_FILE="/etc/server-scripts/backup-borg.env"
-LOG_FILE="/var/log/server-scripts/backup-borg.log"
+CONFIG_FILE="/etc/server-backup/backup-borg.env"
+LOG_FILE="/var/log/server-backup/backup-borg.log"
 
 if [[ ! -s "$CONFIG_FILE" ]]; then
   echo "ERREUR: config absente: $CONFIG_FILE" >&2

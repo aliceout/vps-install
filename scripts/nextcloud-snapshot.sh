@@ -17,8 +17,8 @@
 
 set -Eeuo pipefail
 
-CONFIG_FILE="/etc/server-scripts/nextcloud-snapshot.env"
-LOG_DIR="/var/log/server-scripts"
+CONFIG_FILE="/etc/server-backup/nextcloud-snapshot.env"
+LOG_DIR="/var/log/server-backup"
 LOG_FILE="$LOG_DIR/nextcloud-snapshot.log"
 
 install -d -m 755 "$LOG_DIR"
