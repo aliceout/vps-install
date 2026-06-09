@@ -149,7 +149,7 @@ ln -sf /opt/vps-install/scripts/audit-digest.sh    /usr/local/sbin/audit-digest
 # --- Cron unifie des audits --------------------------------------------------
 # Toutes les commandes sont wrappees avec hc-run pour pinger Healthchecks
 # (no-op si la cle n'est pas encore configuree).
-cat > /etc/cron.d/vps-audit-tools <<'EOF'
+cat > /etc/cron.d/audit-tools <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -166,10 +166,13 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Quotidien 08:00 - digest Telegram (silencieux si rien d'interessant)
 0 8 * * * root /usr/local/sbin/hc-run audit-digest /usr/local/sbin/audit-digest >> /var/log/audit/digest.log 2>&1
 EOF
-chmod 644 /etc/cron.d/vps-audit-tools
+# Cleanup ancien nom (rename vps-audit-tools -> audit-tools, tourne sur VPS + Server)
+rm -f /etc/cron.d/vps-audit-tools /etc/logrotate.d/vps-audit-tools
+
+chmod 644 /etc/cron.d/audit-tools
 
 # Logrotate
-cat > /etc/logrotate.d/vps-audit-tools <<'EOF'
+cat > /etc/logrotate.d/audit-tools <<'EOF'
 /var/log/audit/*.log {
     weekly
     rotate 8

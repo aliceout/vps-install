@@ -28,9 +28,11 @@ EOF
 chmod +x /usr/local/sbin/apt-daily-update.sh /usr/local/sbin/apt-daily-upgrade.sh
 
 rm -f /etc/cron.d/apt-daily /etc/cron.d/certbot-dns
+# Cleanup ancien nom (rename vps-bootstrap -> bootstrap, tourne sur VPS + Server)
+rm -f /etc/cron.d/vps-bootstrap
 
 # (Tous les jours) 03:17 update, 03:27 upgrade
-cat > /etc/cron.d/vps-bootstrap <<'EOF'
+cat > /etc/cron.d/bootstrap <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
