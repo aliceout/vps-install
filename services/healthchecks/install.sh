@@ -34,7 +34,7 @@ build_runtime_env() {
   : "${ADDRESS:?ADDRESS manquant}"
   : "${PORT:?PORT manquant}"
 
-  local token domain pid env_slug
+  local token domain pid env_slug host_uid host_gid
   token="$(infi-token --silent 2>/dev/null || true)"
   if [[ -z "$token" ]]; then
     echo "ERREUR: infi-token KO (creds /etc/infisical/* ou connectivite ?)"
@@ -44,6 +44,9 @@ build_runtime_env() {
   pid="$(cat /etc/infisical/project-id)"
   env_slug="$(cat /etc/infisical/environment)"
 
+  host_uid="$(id -u "$VPS_USER")"
+  host_gid="$(id -g "$VPS_USER")"
+
   install -d -m 700 -o root -g "$VPS_USER" "$RUNTIME_DIR"
 
   umask 077
@@ -52,6 +55,8 @@ build_runtime_env() {
     echo "PORT=${PORT}"
     echo "ADDRESS=${ADDRESS}"
     echo "DATA_DIR=${DATA_DIR}"
+    echo "HOST_UID=${host_uid}"
+    echo "HOST_GID=${host_gid}"
     infisical export \
       --domain="$domain" \
       --projectId="$pid" \
