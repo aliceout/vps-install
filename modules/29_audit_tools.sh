@@ -67,10 +67,13 @@ else
   install -d -m 700 /etc/infisical/agent.d
   install -d -m 700 /etc/secrets
 
-  # La cle est sous /infra/<host_type> (per-host) car chaque host a son propre
-  # projet Healthchecks -> chaque host doit pinger avec sa propre cle.
+  # HEALTHCHECKS_PING_KEY est sous /infra/<host_type>/ (per-host) car chaque
+  # host a son propre projet HC -> propre cle de ping.
+  # HEALTHCHECKS_URL_BASE est sous /infra/shared/ : meme valeur pour tous les
+  # hosts (= URL de l'instance self-hosted, ou defaut hc-ping.com si pas set).
   cat > /etc/infisical/templates/_healthchecks.tmpl <<EOF
 HEALTHCHECKS_PING_KEY={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/${HOST_TYPE}" "HEALTHCHECKS_PING_KEY" }}{{ .Value }}{{- end }}
+HEALTHCHECKS_URL_BASE={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/shared" "HEALTHCHECKS_URL_BASE" }}{{ .Value }}{{- end }}
 EOF
 
   cat > /etc/infisical/agent.d/_healthchecks.yaml <<'EOF'

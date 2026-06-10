@@ -18,10 +18,12 @@ if [[ -z "$slug" ]]; then
 fi
 
 PING_KEY=""
+URL_BASE="https://hc-ping.com"
 if [[ -s /etc/secrets/healthchecks.env ]]; then
   # shellcheck disable=SC1091
   source /etc/secrets/healthchecks.env
   PING_KEY="${HEALTHCHECKS_PING_KEY:-}"
+  URL_BASE="${HEALTHCHECKS_URL_BASE:-https://hc-ping.com}"
 fi
 
 HOST_TYPE_VAL=""
@@ -41,4 +43,4 @@ case "$status" in
 esac
 
 curl -fsS -m 10 --retry 3 -o /dev/null \
-  "https://hc-ping.com/${PING_KEY}/${slug}${suffix}?create=1" 2>/dev/null || true
+  "${URL_BASE}/${PING_KEY}/${slug}${suffix}?create=1" 2>/dev/null || true

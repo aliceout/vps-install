@@ -1,0 +1,46 @@
+# Healthchecks.io self-hosted : monitoring de crons via pings HTTP.
+# Image officielle, SQLite (suffisant pour un usage perso, <1k checks).
+#
+# Variables substituees depuis /var/lib/services/healthchecks/runtime.env :
+#   - SERVICE_NAME, PORT, ADDRESS, DOMAIN (cloud Infisical /services/healthchecks/)
+#   - DATA_DIR (auto-cale par install.sh)
+#   - SECRET_KEY, SUPERUSER_EMAIL, SUPERUSER_PASSWORD (Infisical)
+#   - SITE_NAME (optionnel, defaut "Healthchecks")
+#   - SMTP_* (optionnel, pour notifications email — Telegram dispo via UI)
+
+services:
+  healthchecks:
+    image: healthchecks/healthchecks:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    ports:
+      # Bind localhost only, nginx fait le reverse proxy TLS
+      - "127.0.0.1:${PORT}:8000"
+    volumes:
+      # SQLite DB + media uploads (badges, etc.)
+      - ${DATA_DIR}/data:/data
+    environment:
+      DEBUG: "False"
+      ALLOWED_HOSTS: ${ADDRESS}
+      DEFAULT_FROM_EMAIL: noreply@${DOMAIN}
+      SECRET_KEY: ${SECRET_KEY}
+      SITE_NAME: ${SITE_NAME:-Healthchecks}
+      SITE_ROOT: "https://${ADDRESS}"
+      SUPERUSER_EMAIL: ${SUPERUSER_EMAIL}
+      SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD}
+      DB: sqlite
+      DB_NAME: /data/hc.sqlite
+      # SMTP optionnel (Telegram + Slack disponibles cote UI sans SMTP)
+      EMAIL_HOST: ${SMTP_HOST:-}
+      EMAIL_PORT: ${SMTP_PORT:-587}
+      EMAIL_HOST_USER: ${SMTP_USER:-}
+      EMAIL_HOST_PASSWORD: ${SMTP_PASS:-}
+      EMAIL_USE_TLS: ${SMTP_USE_TLS:-True}
+      # Le ping_key des checks est genere par HC a la creation des projets,
+      # pas besoin de pre-configurer ici. Le user copie son ping_key depuis
+      # l'UI dans Infisical /infra/<host_type>/HEALTHCHECKS_PING_KEY.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

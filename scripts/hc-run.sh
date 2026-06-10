@@ -2,8 +2,12 @@
 # Wrap une commande cron avec un ping Healthchecks (start + result).
 # Usage: hc-run <slug> <command> [args...]
 #
-# Lit HEALTHCHECKS_PING_KEY depuis /etc/secrets/healthchecks.env (sync via
-# Infisical agent depuis /infra/shared/HEALTHCHECKS_PING_KEY).
+# Lit HEALTHCHECKS_PING_KEY + HEALTHCHECKS_URL_BASE depuis
+# /etc/secrets/healthchecks.env (sync via Infisical agent).
+#
+# HEALTHCHECKS_URL_BASE :
+#   - default https://hc-ping.com  (= service SaaS healthchecks.io)
+#   - self-hosted ex https://hc.example.com/ping
 #
 # Si la cle est absente (Infisical pas encore configure, secret pas defini),
 # le wrapper exec direct la commande sans pinger -> safe pour le bootstrap
@@ -23,10 +27,12 @@ slug="$1"; shift
 
 # Charge la cle Healthchecks depuis le fichier sync par l'agent Infisical
 PING_KEY=""
+URL_BASE="https://hc-ping.com"
 if [[ -s /etc/secrets/healthchecks.env ]]; then
   # shellcheck disable=SC1091
   source /etc/secrets/healthchecks.env
   PING_KEY="${HEALTHCHECKS_PING_KEY:-}"
+  URL_BASE="${HEALTHCHECKS_URL_BASE:-https://hc-ping.com}"
 fi
 
 # Prefixe le slug par HOST_TYPE pour distinguer les checks vps/server
@@ -41,7 +47,7 @@ if [[ -z "$PING_KEY" ]]; then
   exec "$@"
 fi
 
-url="https://hc-ping.com/${PING_KEY}/${slug}"
+url="${URL_BASE}/${PING_KEY}/${slug}"
 
 # ?create=1 : auto-cree le check au premier ping s'il n'existe pas encore
 # (sinon Healthchecks renvoie 404 sur slug inconnu).
