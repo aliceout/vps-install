@@ -52,7 +52,7 @@ if [[ ! -f /var/lib/aide/aide.db ]]; then
 fi
 
 # --- Healthchecks template (Infisical agent) --------------------------------
-# Sync /infra/shared/HEALTHCHECKS_PING_KEY -> /etc/secrets/healthchecks.env
+# Sync /infra/shared/HEALTHCHECKS_PING_KEY -> /etc/secrets/hc-ping.env
 # Le wrapper hc-run lit cette cle pour pinger https://hc-ping.com/<key>/<slug>.
 # Si le secret n'est pas defini cote Infisical, le fichier sera vide et hc-run
 # fera un no-op (exec direct sans ping) -> safe pour le bootstrap initial.
@@ -78,7 +78,7 @@ EOF
 
   cat > /etc/infisical/agent.d/_healthchecks.yaml <<'EOF'
   - source-path: /etc/infisical/templates/_healthchecks.tmpl
-    destination-path: /etc/secrets/healthchecks.env
+    destination-path: /etc/secrets/hc-ping.env
     config:
       polling-interval: 300s
 EOF

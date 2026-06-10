@@ -3,7 +3,11 @@
 # Usage: hc-run <slug> <command> [args...]
 #
 # Lit HEALTHCHECKS_PING_KEY + HEALTHCHECKS_URL_BASE depuis
-# /etc/secrets/healthchecks.env (sync via Infisical agent).
+# /etc/secrets/hc-ping.env (sync via Infisical agent).
+#
+# Fichier separe de /etc/secrets/healthchecks.env (qui appartient au service
+# self-hosted healthchecks et contient son SECRET_KEY, ADDRESS, etc.). Le
+# rename evite la collision quand les 2 templates tournent sur le meme host.
 #
 # HEALTHCHECKS_URL_BASE :
 #   - default https://hc-ping.com  (= service SaaS healthchecks.io)
@@ -28,12 +32,16 @@ slug="$1"; shift
 # Charge la cle Healthchecks depuis le fichier sync par l'agent Infisical
 PING_KEY=""
 URL_BASE="https://hc-ping.com"
-if [[ -s /etc/secrets/healthchecks.env ]]; then
-  # shellcheck disable=SC1091
-  source /etc/secrets/healthchecks.env
-  PING_KEY="${HEALTHCHECKS_PING_KEY:-}"
-  URL_BASE="${HEALTHCHECKS_URL_BASE:-https://hc-ping.com}"
-fi
+# Fallback : lit l'ancien fichier d'abord (au cas ou un host n'a pas re-bootstrap),
+# puis le nouveau qui ecrase si present.
+for f in /etc/secrets/healthchecks.env /etc/secrets/hc-ping.env; do
+  if [[ -s "$f" ]]; then
+    # shellcheck disable=SC1090
+    source "$f"
+    PING_KEY="${HEALTHCHECKS_PING_KEY:-$PING_KEY}"
+    URL_BASE="${HEALTHCHECKS_URL_BASE:-$URL_BASE}"
+  fi
+done
 
 # Prefixe le slug par HOST_TYPE pour distinguer les checks vps/server
 HOST_TYPE_VAL=""
