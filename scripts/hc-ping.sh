@@ -19,12 +19,14 @@ fi
 
 PING_KEY=""
 URL_BASE="https://hc-ping.com"
-if [[ -s /etc/secrets/healthchecks.env ]]; then
-  # shellcheck disable=SC1091
-  source /etc/secrets/healthchecks.env
-  PING_KEY="${HEALTHCHECKS_PING_KEY:-}"
-  URL_BASE="${HEALTHCHECKS_URL_BASE:-https://hc-ping.com}"
-fi
+for f in /etc/secrets/healthchecks.env /etc/secrets/hc-ping.env; do
+  if [[ -s "$f" ]]; then
+    # shellcheck disable=SC1090
+    source "$f"
+    PING_KEY="${HEALTHCHECKS_PING_KEY:-$PING_KEY}"
+    URL_BASE="${HEALTHCHECKS_URL_BASE:-$URL_BASE}"
+  fi
+done
 
 HOST_TYPE_VAL=""
 if [[ -s /etc/infisical/host-type ]]; then
