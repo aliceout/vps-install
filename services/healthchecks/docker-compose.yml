@@ -30,6 +30,9 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       SITE_NAME: ${SITE_NAME:-Healthchecks}
       SITE_ROOT: "https://${ADDRESS}"
+      # RP_ID = Relying Party ID, requis pour 2FA (TOTP + WebAuthn).
+      # Doit etre le domaine sans schema (ex: hc.example.com).
+      RP_ID: ${ADDRESS}
       SUPERUSER_EMAIL: ${SUPERUSER_EMAIL}
       SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD}
       DB: sqlite
