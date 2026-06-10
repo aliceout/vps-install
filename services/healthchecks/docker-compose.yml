@@ -33,6 +33,10 @@ services:
       # RP_ID = Relying Party ID, requis pour 2FA (TOTP + WebAuthn).
       # Doit etre le domaine sans schema (ex: hc.example.com).
       RP_ID: ${ADDRESS}
+      # Telegram bot (optionnel) : si TELEGRAM_TOKEN est set, l'integration
+      # apparait dans l'UI. Creer un bot via @BotFather sur Telegram.
+      TELEGRAM_BOT_NAME: ${TELEGRAM_BOT_NAME:-ExampleBot}
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
       SUPERUSER_EMAIL: ${SUPERUSER_EMAIL}
       SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD}
       DB: sqlite
