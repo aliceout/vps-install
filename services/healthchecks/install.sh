@@ -95,22 +95,59 @@ case "$ACTION" in
     $COMPOSE pull
     $COMPOSE up -d
 
+    # Auto-creation idempotente du superuser via Django ORM.
+    # L'image officielle ne supporte pas DJANGO_SUPERUSER_* a l'entrypoint, donc
+    # on le fait nous-memes apres compose up. Re-run = update du pass + flags
+    # (= utile si on change SUPERUSER_PASSWORD dans Infisical).
+    SUPERUSER_EMAIL_VALUE="$(grep -E '^SUPERUSER_EMAIL=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
+    SUPERUSER_PASSWORD_VALUE="$(grep -E '^SUPERUSER_PASSWORD=' "$RUNTIME_ENV" | cut -d= -f2- | tr -d "'\"")"
+    if [[ -n "$SUPERUSER_EMAIL_VALUE" && -n "$SUPERUSER_PASSWORD_VALUE" ]]; then
+      echo "Attente du demarrage de Healthchecks pour creer/maj le superuser..."
+      for i in $(seq 1 30); do
+        if docker exec "$SERVICE_NAME" curl -fsS http://127.0.0.1:8000/api/v3/status/ >/dev/null 2>&1; then
+          break
+        fi
+        sleep 2
+      done
+
+      echo "Setup superuser (${SUPERUSER_EMAIL_VALUE})..."
+      docker exec -i \
+        -e HC_EMAIL="$SUPERUSER_EMAIL_VALUE" \
+        -e HC_PASSWORD="$SUPERUSER_PASSWORD_VALUE" \
+        "$SERVICE_NAME" \
+        ./manage.py shell <<'PYEOF' || echo "AVERTISSEMENT: setup superuser KO (cf logs container)"
+import os
+from django.contrib.auth.models import User
+email = os.environ["HC_EMAIL"]
+password = os.environ["HC_PASSWORD"]
+user, created = User.objects.get_or_create(
+    username=email,
+    defaults={"email": email, "is_staff": True, "is_superuser": True},
+)
+user.set_password(password)
+user.is_staff = True
+user.is_superuser = True
+user.email = email
+user.save()
+print(f"{'created' if created else 'updated'}: {email}")
+PYEOF
+    else
+      echo "INFO: SUPERUSER_EMAIL/PASSWORD vides dans runtime.env, skip auto-creation."
+      echo "  (tu pourras t'inscrire via https://${ADDRESS}/accounts/signup/)"
+    fi
+
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
     echo "URL          : https://${ADDRESS}/"
     echo "Ops data     : ${DATA_DIR}/data (SQLite DB + media)"
     echo
-    echo "Premier login :"
-    echo "  1. Visite https://${ADDRESS}/accounts/login/"
-    echo "  2. user/pass = SUPERUSER_EMAIL / SUPERUSER_PASSWORD (Infisical)"
-    echo "  3. Cree un projet (ex: 'VPS' ou 'Server'), recupere son ping_key"
-    echo "  4. Mets-le dans Infisical /infra/<host_type>/HEALTHCHECKS_PING_KEY"
+    echo "Login : ${SUPERUSER_EMAIL_VALUE:-(SUPERUSER_EMAIL absent)} / SUPERUSER_PASSWORD (Infisical)"
     echo
-    echo "Puis sur chaque host (vps + home server) :"
-    echo "  - Set HEALTHCHECKS_URL_BASE=https://${ADDRESS}/ping dans Infisical"
-    echo "    /infra/shared/ pour rediriger les pings vers ton instance"
-    echo "  - infisical-agent picke la nouvelle config au prochain poll (5min)"
-    echo "  - Les hc-run construiront URL = \$HEALTHCHECKS_URL_BASE/\$PING_KEY/\$slug"
+    echo "Puis dans l'UI :"
+    echo "  1. Cree un projet (ex: 'VPS' ou 'Server'), recupere son ping_key"
+    echo "  2. Mets-le dans Infisical /infra/<host_type>/HEALTHCHECKS_PING_KEY"
+    echo "  3. Set /infra/shared/HEALTHCHECKS_URL_BASE=https://${ADDRESS}/ping"
+    echo "  4. infisical-agent repolls toutes les 5min, ou systemctl restart"
     ;;
 
   remove)
