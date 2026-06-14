@@ -160,7 +160,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 15 5 * * * root /usr/local/sbin/hc-run aide-check bash -c '/usr/bin/aide --check > /var/log/audit/aide.log 2>&1 || true'
 
 # Hebdomadaire dimanche 05:45 - lynis audit complet
-45 5 * * 0 root /usr/local/sbin/hc-run lynis-audit /usr/bin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat
+45 5 * * 0 root /usr/local/sbin/hc-run lynis-audit /usr/sbin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat
 
 # Hebdomadaire dimanche 06:30 - regen baseline AIDE (absorbe les apt upgrade
 # de la semaine pour eviter les faux positifs)
