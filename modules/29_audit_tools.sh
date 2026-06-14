@@ -160,7 +160,10 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 15 5 * * * root /usr/local/sbin/hc-run aide-check bash -c '/usr/bin/aide --check > /var/log/audit/aide.log 2>&1 || true'
 
 # Hebdomadaire dimanche 05:45 - lynis audit complet
-45 5 * * 0 root /usr/local/sbin/hc-run lynis-audit /usr/sbin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat
+# Pre-step : si /run/lynis.pid existe mais que le PID n'est plus vivant,
+# c'est un orphelin d'un run precedent tue (SIGHUP, OOM, reboot) -> on
+# le nettoie sinon lynis exit immediatement "another instance running".
+45 5 * * 0 root /usr/local/sbin/hc-run lynis-audit bash -c 'P=/run/lynis.pid; [ -f "$P" ] && ! kill -0 "$(cat "$P" 2>/dev/null)" 2>/dev/null && rm -f "$P"; exec /usr/sbin/lynis audit system --cronjob --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat'
 
 # Hebdomadaire dimanche 06:30 - regen baseline AIDE (absorbe les apt upgrade
 # de la semaine pour eviter les faux positifs)
@@ -186,8 +189,14 @@ cat > /etc/logrotate.d/audit-tools <<'EOF'
 }
 EOF
 
-# Run initial une fois : snapshot de reference lynis
-(
+# Run initial une fois : snapshot de reference lynis.
+# setsid -f : detache completement du shell de bootstrap (nouveau session
+# leader, pas de controlling terminal) -> survit a la fin de la session SSH
+# sans recevoir SIGHUP. Sinon lynis meurt en background et laisse
+# /run/lynis.pid orphelin -> le cron de dimanche se bloque dessus.
+setsid -f bash -c '
   echo "=== Lynis initial scan $(date -Is) ==="
-  lynis audit system --quick --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat 2>/dev/null || true
-) >/dev/null 2>&1 &
+  /usr/sbin/lynis audit system --quick --quiet --logfile /var/log/audit/lynis.log --report-file /var/log/audit/lynis-report.dat 2>/dev/null
+  # Garantie : nettoie le PID file si lynis a ete tue avant son propre cleanup
+  rm -f /run/lynis.pid
+' </dev/null >/dev/null 2>&1
