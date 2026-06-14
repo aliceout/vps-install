@@ -41,10 +41,10 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
       TELEGRAM_CHAT_ID_CERTBOT      # ...
 
     services/
-      backup/                  # Sauvegarde restic push ephemere vers home
+      backup/                  # Miroir rsync VPS->home (historique cote home via Borg)
         HOME_SSH_HOST, HOME_SSH_PORT, HOME_SSH_USER, HOME_SSH_PRIVKEY
-        RESTIC_REPOSITORY, RESTIC_PASSWORD
-        BACKUP_PATHS           # optionnel (defaut: /home/$VPS_USER/data)
+        REMOTE_PATH            # dossier dest sur home (ex /data/backups/vps-mirror)
+        SOURCE_PATH            # optionnel (defaut: /home/$VPS_USER/data)
       webhooks/                # Webhooks receiver (GitHub + GitLab) - vhost only
         ADDRESS, DOMAIN, DNS_PROVIDER, DNS_TOKEN_NAME
       pdf/                     # Stirling PDF
@@ -139,17 +139,18 @@ Toutes les alertes et digests Telegram passent par `notify-telegram`, qui fetch 
 
 ## `/services/backup/`
 
-Ces cles sont fetchees **a chaque run** par `backup-run.sh` et `backup-restore.sh`. La cle privee SSH n'atterrit jamais sur disque : piped dans `ssh-add` via stdin, vit en memoire de `ssh-agent` le temps du run.
+Ces cles sont fetchees **a chaque run** par `backup-rsync.sh` et `backup-restore.sh`. La cle privee SSH n'atterrit jamais sur disque : piped dans `ssh-add` via stdin, vit en memoire de `ssh-agent` le temps du run.
+
+Flow : rsync miroir VPS->home. L'historique est gere cote home par le Borg quotidien qui snapshot le dossier de destination.
 
 | Cle | Type | Exemple | Role |
 |-----|------|---------|------|
 | `HOME_SSH_HOST` | string | `home.mondomaine.fr` | FQDN ou IP du home server |
-| `HOME_SSH_PORT` | int | `22` | port SSH du home |
-| `HOME_SSH_USER` | string | `backup` | user SFTP-chroot dedie |
+| `HOME_SSH_PORT` | int | `22` | port SSH du home (defaut 22) |
+| `HOME_SSH_USER` | string | `backup-vps` | user SSH dedie cote home |
 | `HOME_SSH_PRIVKEY` | secret | `-----BEGIN OPENSSH...` | cle privee ed25519 |
-| `RESTIC_REPOSITORY` | string | `sftp:backup@home:/storage` | URL du repo restic |
-| `RESTIC_PASSWORD` | secret | `...` | mdp de chiffrement |
-| `BACKUP_PATHS` | string | `/home/choupi/data` | **optionnel**, defaut `/home/<VPS_USER>/data` |
+| `REMOTE_PATH` | string | `/data/backups/vps-mirror` | dossier dest cote home (a ajouter dans BORG_FOLDERS pour snapshot) |
+| `SOURCE_PATH` | string | `/home/choupi/data` | **optionnel**, defaut `/home/<VPS_USER>/data` |
 
 ## `/services/webhooks/<host_type>/`
 

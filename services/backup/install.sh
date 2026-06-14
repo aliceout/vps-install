@@ -20,15 +20,19 @@ HOST_TYPE="${HOST_TYPE:-$(cat /etc/infisical/host-type 2>/dev/null || true)}"
 # Variante VPS : push restic vers home server
 # ============================================================================
 install_vps() {
-  apt-get install -y restic openssh-client
+  apt-get install -y rsync openssh-client
 
   # Racine des donnees persistantes : /home/$VPS_USER/data/
   install -d -o "$VPS_USER" -g "$VPS_USER" -m 755 "/home/$VPS_USER/data"
 
+  # Cleanup ancien flow restic (backup-run.sh + backup-restore.sh restic-based)
+  # remplaces par backup-rsync.sh + nouveau backup-restore.sh reverse-rsync.
+  rm -f /usr/local/sbin/backup-run
+
   # Symlinks scripts (un git pull = propagation des fix)
   install -d /usr/local/sbin
-  chmod +x "$ROOT_DIR/scripts/backup-run.sh" "$ROOT_DIR/scripts/backup-restore.sh"
-  ln -sf "$ROOT_DIR/scripts/backup-run.sh"     /usr/local/sbin/backup-run
+  chmod +x "$ROOT_DIR/scripts/backup-rsync.sh" "$ROOT_DIR/scripts/backup-restore.sh"
+  ln -sf "$ROOT_DIR/scripts/backup-rsync.sh"   /usr/local/sbin/backup-rsync
   ln -sf "$ROOT_DIR/scripts/backup-restore.sh" /usr/local/sbin/backup-restore
 
   cat > /etc/logrotate.d/vps-backup <<'EOF'
@@ -47,24 +51,26 @@ EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-15 0,6,12,18 * * * root /usr/local/sbin/hc-run backup /usr/local/sbin/backup-run >> /var/log/vps-backup.log 2>&1
+15 0,6,12,18 * * * root /usr/local/sbin/hc-run backup /usr/local/sbin/backup-rsync >> /var/log/vps-backup.log 2>&1
 EOF
   chmod 644 /etc/cron.d/vps-backup
 
   touch /var/log/vps-backup.log
   chmod 640 /var/log/vps-backup.log
 
-  echo "Backup VPS installe."
+  echo "Backup VPS installe (flow rsync simple, historique cote home via Borg)."
   echo "- Cron : 4x/jour (00:15, 06:15, 12:15, 18:15), log /var/log/vps-backup.log"
-  echo "- Run : sudo backup-run"
-  echo "- Restore : sudo backup-restore /var/lib/services/<nom>"
+  echo "- Run : sudo backup-rsync"
+  echo "- Restore : sudo backup-restore /home/$VPS_USER/data/<nom>"
 }
 
 remove_vps() {
   rm -f /etc/cron.d/vps-backup
   rm -f /etc/logrotate.d/vps-backup
-  rm -f /usr/local/sbin/backup-run /usr/local/sbin/backup-restore
-  echo "Backup VPS cron + scripts retires. Le repo restic cote home N'EST PAS touche."
+  rm -f /usr/local/sbin/backup-rsync /usr/local/sbin/backup-restore
+  # Cleanup ancien symlink restic au cas ou
+  rm -f /usr/local/sbin/backup-run
+  echo "Backup VPS cron + scripts retires. Le miroir cote home N'EST PAS touche."
 }
 
 status_vps() {

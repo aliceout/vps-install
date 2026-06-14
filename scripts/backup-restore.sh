@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Restore un path depuis le dernier snapshot restic.
-# Meme pattern ephemere que backup-run.
+# Restore depuis le miroir rsync cote home server.
+# Reverse rsync (home -> VPS) sur le path demande.
 #
 # Usage: backup-restore <absolute-path>
-#   Ex: backup-restore /var/lib/services/ghost
+#   Ex: backup-restore /home/choupi/data/ghost
 #
 # Safety: skip si le path cible existe deja ET contient quelque chose.
+#
+# Note: ne restore que l'etat COURANT du miroir cote home. Pour un retour
+# arriere a un point dans le passe, parcourir les snapshots Borg cote home
+# (les data du VPS sont versionnees la-bas).
 
 set -euo pipefail
 set +x
@@ -16,7 +20,6 @@ if [[ -z "$TARGET" || "$TARGET" != /* ]]; then
   exit 2
 fi
 
-# Si le dossier contient deja des donnees, on ne touche pas.
 if [[ -d "$TARGET" ]] && [[ -n "$(ls -A "$TARGET" 2>/dev/null)" ]]; then
   echo "$TARGET non vide, skip restore."
   exit 0
@@ -27,7 +30,6 @@ fi
 PROJECT_ID="$(cat /etc/infisical/project-id)"
 ENV_SLUG="$(cat /etc/infisical/environment)"
 
-# infi-token gere creds, domain self-hosted et cache 10min.
 TOKEN="$(infi-token --silent 2>/dev/null || true)"
 if [[ -z "$TOKEN" ]]; then
   echo "Restore: login Infisical echoue, abandon" >&2
@@ -42,24 +44,45 @@ fetch() {
     --token="$TOKEN" --plain 2>/dev/null || true
 }
 
+HOME_SSH_HOST="$(fetch HOME_SSH_HOST)"
 HOME_SSH_PORT="$(fetch HOME_SSH_PORT)"
+HOME_SSH_USER="$(fetch HOME_SSH_USER)"
 HOME_SSH_PRIVKEY="$(fetch HOME_SSH_PRIVKEY)"
-RESTIC_PASSWORD="$(fetch RESTIC_PASSWORD)"
-RESTIC_REPOSITORY="$(fetch RESTIC_REPOSITORY)"
+REMOTE_PATH="$(fetch REMOTE_PATH)"
+SOURCE_PATH="$(fetch SOURCE_PATH)"
 
+: "${HOME_SSH_HOST:?HOME_SSH_HOST manquant}"
+: "${HOME_SSH_USER:?HOME_SSH_USER manquant}"
 : "${HOME_SSH_PRIVKEY:?HOME_SSH_PRIVKEY manquant}"
-: "${RESTIC_PASSWORD:?RESTIC_PASSWORD manquant}"
-: "${RESTIC_REPOSITORY:?RESTIC_REPOSITORY manquant}"
+: "${REMOTE_PATH:?REMOTE_PATH manquant}"
 
 HOME_SSH_PORT="${HOME_SSH_PORT:-22}"
+
+if [[ -z "${SOURCE_PATH:-}" ]]; then
+  VPS_USER_NAME="$(cat /etc/infisical/vps-user 2>/dev/null || echo '')"
+  SOURCE_PATH="/home/${VPS_USER_NAME}/data"
+fi
+SOURCE_PATH="${SOURCE_PATH%/}"
+REMOTE_PATH="${REMOTE_PATH%/}"
+
+# TARGET doit etre sous SOURCE_PATH pour qu'on sache ou il vit cote home.
+# Ex: SOURCE_PATH=/home/choupi/data, TARGET=/home/choupi/data/ghost
+#     -> sub_path=ghost -> remote: REMOTE_PATH/ghost/
+case "$TARGET" in
+  "$SOURCE_PATH"|"$SOURCE_PATH"/*) ;;
+  *)
+    echo "Restore: TARGET ($TARGET) hors de SOURCE_PATH ($SOURCE_PATH), pas dans le scope du miroir." >&2
+    exit 2
+    ;;
+esac
+sub_path="${TARGET#$SOURCE_PATH}"
+sub_path="${sub_path#/}"
 
 # --- ssh-agent ephemere -----------------------------------------------------
 
 eval "$(ssh-agent -s)" >/dev/null
 trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
 
-# Check explicitement le rc : si ssh-add echoue (cle malformee, agent KO),
-# restic tomberait sur un prompt password silencieux et hang.
 ssh_add_rc=0
 ssh_add_out="$(printf '%s\n' "$HOME_SSH_PRIVKEY" | ssh-add - 2>&1)" || ssh_add_rc=$?
 if [[ $ssh_add_rc -ne 0 ]]; then
@@ -69,30 +92,18 @@ fi
 HOME_SSH_PRIVKEY=""
 unset HOME_SSH_PRIVKEY ssh_add_out ssh_add_rc
 
-# --- Restic restore ---------------------------------------------------------
+# --- Reverse rsync ----------------------------------------------------------
 
-export RESTIC_PASSWORD RESTIC_REPOSITORY
+mkdir -p "$TARGET"
 
-SFTP_ARGS="-o BatchMode=yes -p ${HOME_SSH_PORT} -o StrictHostKeyChecking=accept-new"
+remote_src="${REMOTE_PATH}/${sub_path}"
+[[ -n "$sub_path" ]] && remote_src="${remote_src%/}/"
 
-# Si le repo n'existe pas encore, rien a restorer
-if ! restic --option sftp.args="$SFTP_ARGS" snapshots >/dev/null 2>&1; then
-  echo "Pas de repo restic, rien a restorer."
-  exit 0
-fi
+echo "[$(date -Is)] backup-restore: ${HOME_SSH_USER}@${HOME_SSH_HOST}:${remote_src} -> $TARGET/"
 
-echo "[$(date -Is)] Restore du dernier snapshot pour $TARGET ..."
+rsync -av \
+  -e "ssh -p ${HOME_SSH_PORT} -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+  "${HOME_SSH_USER}@${HOME_SSH_HOST}:${remote_src}" \
+  "${TARGET%/}/"
 
-# --path <abs-path>  = filtre 'latest' aux snapshots qui ont effectivement
-#                      backup $TARGET (sinon on pourrait piocher un snapshot
-#                      sans cette donnee)
-# --include <path>   = filtre les chemins a restorer (literal-segment match,
-#                      donc 'foo' ne capture pas 'foo-old')
-# --target /         = restore aux chemins absolus d'origine
-restic --option sftp.args="$SFTP_ARGS" restore latest \
-  --path "$TARGET" \
-  --include "$TARGET" \
-  --target / \
-  --verbose=1
-
-echo "[$(date -Is)] Restore done"
+echo "[$(date -Is)] backup-restore OK"
