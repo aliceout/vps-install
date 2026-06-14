@@ -31,10 +31,12 @@ services:
       # Clean les vieilles images apres update : evite que le disque se
       # remplisse de tags <none> en quelques semaines.
       WATCHTOWER_CLEANUP: "true"
-      # Rolling restart : redemarre un container a la fois, evite de tout
-      # downer simultanement (utile si dependances inter-containers, ex
-      # transmission qui depends_on gluetun).
-      WATCHTOWER_ROLLING_RESTART: "true"
+      # Rolling restart : restart un container a la fois. Mais incompatible
+      # avec les stacks ou un container partage network_mode avec un autre
+      # (ex: transmission depend de gluetun -> doivent restart ensemble).
+      # On le laisse OFF -> tous les containers d'une stack restart en bloc
+      # quand watchtower update une de leurs images.
+      WATCHTOWER_ROLLING_RESTART: "false"
       # Ne pas demarrer les containers stoppes (= laisser les containers
       # volontairement arretes tranquilles).
       WATCHTOWER_INCLUDE_STOPPED: "false"
