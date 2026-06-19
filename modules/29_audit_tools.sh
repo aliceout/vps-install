@@ -208,6 +208,19 @@ cat > /etc/logrotate.d/audit-tools <<'EOF'
 }
 EOF
 
+# Logrotate du journal des echecs de ping HC (ecrit par hc-run/hc-ping quand
+# un ping echoue malgre les retries). Normalement vide -> notifempty.
+cat > /etc/logrotate.d/hc-ping <<'EOF'
+/var/log/hc-ping.log {
+    monthly
+    rotate 6
+    missingok
+    notifempty
+    compress
+    delaycompress
+}
+EOF
+
 # Run initial une fois : snapshot de reference lynis.
 # setsid -f : detache completement du shell de bootstrap (nouveau session
 # leader, pas de controlling terminal) -> survit a la fin de la session SSH
