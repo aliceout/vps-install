@@ -96,6 +96,10 @@ Les cles marquees **optionnel** peuvent etre absentes.
 | `GITLAB_SSH_PRIVKEY` | host-specific | secret | idem | `15_git_ssh.sh` | **optionnel** |
 | `GHCR_TOKEN` | host-specific | secret | `ghp_...` | `40_docker.sh` | **optionnel** - PAT GitHub. Une par host pour traçage |
 | `GHCR_USER` | host-specific | string | `aliceout` | `40_docker.sh` | **optionnel** - username GitHub. Default: `aliceout` |
+| `HEALTHCHECKS_PING_KEY` | host-specific | secret | `xxxxx` | `29_audit_tools.sh` (`hc-run`/`hc-ping`) | **optionnel** - cle de ping du projet HC de ce host. Absente -> les crons pingent rien (no-op) |
+| `HEALTHCHECKS_API_KEY` | host-specific | secret | `xxxxx` | `29_audit_tools.sh` (`hc-provision`) | **optionnel** - cle Management API du **meme projet** HC. Sert a fixer le planning cron des checks (sinon periode defaut 1j -> faux rouges sur les crons hebdo/bi-quotidiens). Genere dans l'instance HC: projet -> Settings -> API Access -> "API key" (full access) |
+| `HEALTHCHECKS_URL_BASE` | shared | string | `https://hc.lilys.cc/ping` | `hc-run`/`hc-ping` | **optionnel** - base URL de ping de l'instance self-hosted. Defaut `https://hc-ping.com` (SaaS) |
+| `HEALTHCHECKS_API_URL` | shared | string | `https://hc.lilys.cc/api/v3` | `hc-provision` | **optionnel** - base URL de la Management API self-hosted. Absente -> hc-provision no-op (planning a regler a la main) |
 
 ### Mode d'install : `fresh` vs `existing`
 

@@ -69,11 +69,15 @@ else
 
   # HEALTHCHECKS_PING_KEY est sous /infra/<host_type>/ (per-host) car chaque
   # host a son propre projet HC -> propre cle de ping.
-  # HEALTHCHECKS_URL_BASE est sous /infra/shared/ : meme valeur pour tous les
-  # hosts (= URL de l'instance self-hosted, ou defaut hc-ping.com si pas set).
+  # HEALTHCHECKS_API_KEY idem (per-host) : cle Management API du meme projet,
+  # utilisee par hc-provision pour fixer le planning cron de chaque check.
+  # HEALTHCHECKS_URL_BASE + HEALTHCHECKS_API_URL sont sous /infra/shared/ :
+  # memes valeurs pour tous les hosts (= URL de l'instance self-hosted).
   cat > /etc/infisical/templates/_healthchecks.tmpl <<EOF
 HEALTHCHECKS_PING_KEY={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/${HOST_TYPE}" "HEALTHCHECKS_PING_KEY" }}{{ .Value }}{{- end }}
+HEALTHCHECKS_API_KEY={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/${HOST_TYPE}" "HEALTHCHECKS_API_KEY" }}{{ .Value }}{{- end }}
 HEALTHCHECKS_URL_BASE={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/shared" "HEALTHCHECKS_URL_BASE" }}{{ .Value }}{{- end }}
+HEALTHCHECKS_API_URL={{- with getSecretByName "${INFISICAL_PROJECT_ID}" "${INFISICAL_ENV}" "/infra/shared" "HEALTHCHECKS_API_URL" }}{{ .Value }}{{- end }}
 EOF
 
   cat > /etc/infisical/agent.d/_healthchecks.yaml <<'EOF'
@@ -107,6 +111,14 @@ ln -sf /opt/vps-install/scripts/hc-run.sh /usr/local/sbin/hc-run
 # wires via OnSuccess=/OnFailure= dans des drop-ins service.d/.
 chmod +x "$ROOT_DIR/scripts/hc-ping.sh"
 ln -sf /opt/vps-install/scripts/hc-ping.sh /usr/local/sbin/hc-ping
+
+# --- hc-provision : fixe le planning cron d'un check via la Management API ---
+# Sans ca, un check auto-cree par un ping herite de la periode par defaut
+# (1 jour) -> les crons hebdo/bi-quotidiens sont rouges la plupart du temps.
+# No-op si HEALTHCHECKS_API_KEY/_URL pas configures (instance SaaS, ou agent
+# Infisical pas encore sync au 1er bootstrap).
+chmod +x "$ROOT_DIR/scripts/hc-provision.sh"
+ln -sf /opt/vps-install/scripts/hc-provision.sh /usr/local/sbin/hc-provision
 
 # Template units reutilisables : OnSuccess=hc-ping@<slug>.service ping le
 # slug en mode "ok", OnFailure=hc-ping-fail@<slug>.service ping en "fail".
@@ -176,6 +188,13 @@ EOF
 rm -f /etc/cron.d/vps-audit-tools /etc/logrotate.d/vps-audit-tools
 
 chmod 644 /etc/cron.d/audit-tools
+
+# Provisionne le planning HC des checks NON-quotidiens (sinon ils heritent
+# de la periode par defaut 1j et sortent rouges 6j/7). Les checks quotidiens
+# (aide-check 05:15, audit-digest 08:00) gardent le defaut 1j, c'est correct.
+# grace 86400 = 1 jour de tolerance sur ces checks hebdo.
+hc-provision lynis-audit "45 5 * * 0" 86400 || true
+hc-provision aide-update "30 6 * * 0" 86400 || true
 
 # Logrotate
 cat > /etc/logrotate.d/audit-tools <<'EOF'

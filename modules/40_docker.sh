@@ -53,16 +53,24 @@ cat > /etc/cron.d/docker-prune <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Dimanche 04:00 - prune docker complet (system + volumes anonymes + buildx),
-# wrappes Healthchecks. system + volumes sont split (docker ne supporte pas
-# --volumes avec --filter "until=").
-0 4 * * 0 root /usr/local/sbin/hc-run docker-prune bash -c '/usr/bin/docker system prune -af --filter "until=168h" && /usr/bin/docker volume prune -af' >> /var/log/docker-prune.log 2>&1
-5 4 * * 0 root /usr/local/sbin/hc-run docker-buildx-prune /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+# Tous les 2 jours 04:00 - prune docker complet (system + volumes anonymes +
+# buildx), wrappes Healthchecks. system + volumes sont split (docker ne
+# supporte pas --volumes avec --filter "until="). Le filtre until=168h garde
+# tout ce qui a < 7j, donc une cadence bi-quotidienne ne supprime jamais du
+# recent.
+0 4 */2 * * root /usr/local/sbin/hc-run docker-prune bash -c '/usr/bin/docker system prune -af --filter "until=168h" && /usr/bin/docker volume prune -af' >> /var/log/docker-prune.log 2>&1
+5 4 */2 * * root /usr/local/sbin/hc-run docker-buildx-prune /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
 EOF
 # Cleanup ancien nom (rename vps-* -> sans prefixe puisque tourne sur VPS + Server)
 rm -f /etc/cron.d/vps-docker-prune /etc/logrotate.d/vps-docker-prune
 
 chmod 644 /etc/cron.d/docker-prune
+
+# Provisionne le planning HC (sinon periode par defaut 1j -> rouge les jours
+# off). Cadence */2 jours : grace 86400 (1j) couvre le decalage de bord de
+# mois ou un reboot. Voir scripts/hc-provision.sh.
+hc-provision docker-prune "0 4 */2 * *" 86400 || true
+hc-provision docker-buildx-prune "5 4 */2 * *" 86400 || true
 
 # Logrotate pour le log du prune lui-meme
 cat > /etc/logrotate.d/docker-prune <<'EOF'
