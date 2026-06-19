@@ -44,5 +44,13 @@ case "$status" in
   *)     suffix="/${status}" ;;
 esac
 
-curl -fsS -m 10 --retry 3 -o /dev/null \
-  "${URL_BASE}/${PING_KEY}/${slug}${suffix}?create=1" 2>/dev/null || true
+# Ping robuste + observable : retries agressifs et, en cas d'echec definitif,
+# trace dans /var/log/hc-ping.log (sans la cle de ping). Voir hc-run.sh.
+rc=0
+curl -fsS -m 10 --retry 5 --retry-delay 2 --retry-all-errors -o /dev/null \
+  "${URL_BASE}/${PING_KEY}/${slug}${suffix}?create=1" 2>/dev/null || rc=$?
+if (( rc != 0 )); then
+  printf '%s hc-ping slug=%s stage=%s base=%s curl_rc=%s\n' \
+    "$(date -Is)" "$slug" "$status" "$URL_BASE" "$rc" \
+    >> /var/log/hc-ping.log 2>/dev/null || true
+fi
