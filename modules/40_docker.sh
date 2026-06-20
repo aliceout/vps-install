@@ -42,35 +42,35 @@ systemctl enable --now docker
 systemctl restart docker
 usermod -aG docker "$VPS_USER"
 
-# Cron weekly : prune des images / containers / build cache non utilises.
-# Le filter "until=168h" garde les images recentes meme si temporairement
-# non utilisees (evite de re-pull immediatement apres push). On split en
-# 2 etapes parce que docker rejette le combo --volumes + --filter "until=..."
-# (ERROR: The "until" filter is not supported with "--volumes"). Donc :
-#   1. system prune --filter until=168h (images, containers, network, build cache)
-#   2. volume prune (volumes anonymes uniquement, les nommes restent)
+# Cron quotidien : prune images / containers / build cache / volumes non
+# utilises. Le filtre "until=48h" garde 2 jours de rollback (image du
+# deploiement precedent reste dispo si un crash impose un rollback) mais prune
+# tout le reste. system + volumes splittes parce que docker rejette le combo
+# --volumes + --filter "until=..." (ERROR: The "until" filter is not supported
+# with "--volumes"). Donc :
+#   1. system prune --filter until=48h (images, containers, networks, build cache)
+#   2. volume prune sans filtre (volumes orphelins, plus agressif)
+# Cadence quotidienne (et plus */2j) car avec des deploys frequents (chaque
+# push GHCR Nodea = 2 images sha-XXXX de ~500MB), une fenetre de 2j laisse
+# accumuler ~10 GB d'images orphelines avant le prochain prune.
 cat > /etc/cron.d/docker-prune <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Tous les 2 jours 04:00 - prune docker complet (system + volumes anonymes +
-# buildx), wrappes Healthchecks. system + volumes sont split (docker ne
-# supporte pas --volumes avec --filter "until="). Le filtre until=168h garde
-# tout ce qui a < 7j, donc une cadence bi-quotidienne ne supprime jamais du
-# recent.
-0 4 */2 * * root /usr/local/sbin/hc-run docker-prune bash -c '/usr/bin/docker system prune -af --filter "until=168h" && /usr/bin/docker volume prune -af' >> /var/log/docker-prune.log 2>&1
-5 4 */2 * * root /usr/local/sbin/hc-run docker-buildx-prune /usr/bin/docker buildx prune -af --filter "until=168h" >> /var/log/docker-prune.log 2>&1
+# Quotidien 04:00 - prune docker complet (system + volumes + buildx), wrappes
+# Healthchecks. Filtre until=48h garde 2j de rollback.
+0 4 * * * root /usr/local/sbin/hc-run docker-prune bash -c '/usr/bin/docker system prune -af --filter "until=48h" && /usr/bin/docker volume prune -af' >> /var/log/docker-prune.log 2>&1
+5 4 * * * root /usr/local/sbin/hc-run docker-buildx-prune /usr/bin/docker buildx prune -af --filter "until=48h" >> /var/log/docker-prune.log 2>&1
 EOF
 # Cleanup ancien nom (rename vps-* -> sans prefixe puisque tourne sur VPS + Server)
 rm -f /etc/cron.d/vps-docker-prune /etc/logrotate.d/vps-docker-prune
 
 chmod 644 /etc/cron.d/docker-prune
 
-# Provisionne le planning HC (sinon periode par defaut 1j -> rouge les jours
-# off). Cadence */2 jours : grace 86400 (1j) couvre le decalage de bord de
-# mois ou un reboot. Voir scripts/hc-provision.sh.
-hc-provision docker-prune "0 4 */2 * *" 86400 || true
-hc-provision docker-buildx-prune "5 4 */2 * *" 86400 || true
+# Provisionne le planning HC. Cadence quotidienne : grace 86400 (1j) couvre
+# un reboot ou une nuit ou docker etait sous charge. Voir scripts/hc-provision.sh.
+hc-provision docker-prune "0 4 * * *" 86400 || true
+hc-provision docker-buildx-prune "5 4 * * *" 86400 || true
 
 # Logrotate pour le log du prune lui-meme
 cat > /etc/logrotate.d/docker-prune <<'EOF'
