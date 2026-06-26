@@ -8,43 +8,72 @@
 <style>
   :root { color-scheme: dark; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; }
-  body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at 50% 40%, #161821 0%, #0b0c10 70%);
-    color: #e7e7ea;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    letter-spacing: .04em;
-    overflow: hidden;
-  }
-  .wrap {
-    text-align: center;
-    user-select: none;
-  }
-  .name {
-    font-size: clamp(2.5rem, 12vw, 6rem);
-    font-weight: 500;
-    line-height: 1;
-  }
-  .cursor {
-    display: inline-block;
-    width: .06em;
-    margin-left: .08em;
-    background: currentColor;
-    animation: blink 1.1s steps(1) infinite;
-  }
-  @keyframes blink { 50% { opacity: 0; } }
-  .name, .cursor { vertical-align: baseline; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; }
+  /* Respecte les utilisateurs qui coupent les animations : fond noir fixe. */
   @media (prefers-reduced-motion: reduce) {
-    .cursor { animation: none; }
+    #matrix { display: none; }
   }
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <span class="name">alyss<span class="cursor">&nbsp;</span></span>
-  </div>
+  <canvas id="matrix"></canvas>
+<script>
+(function () {
+  var canvas = document.getElementById('matrix');
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var ctx = canvas.getContext('2d');
+
+  // Jeu de caracteres facon cmatrix : katakana + chiffres + quelques latins.
+  var chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾚﾛﾜﾝ0123456789ABCDEFZ:.="*+-<>'.split('');
+
+  var fontSize = 16, columns, drops;
+
+  function reset() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    columns = Math.floor(canvas.width / fontSize);
+    drops = [];
+    for (var i = 0; i < columns; i++) {
+      // Depart aleatoire en hauteur pour eviter une 1re ligne synchronisee.
+      drops[i] = Math.floor(Math.random() * -canvas.height / fontSize);
+    }
+  }
+
+  function draw() {
+    // Voile noir semi-transparent : laisse une trainee derriere chaque goutte.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.font = fontSize + 'px ui-monospace, Menlo, Consolas, monospace';
+
+    for (var i = 0; i < drops.length; i++) {
+      var text = chars[Math.floor(Math.random() * chars.length)];
+      var x = i * fontSize;
+      var y = drops[i] * fontSize;
+
+      // Tete de colonne plus claire, queue en vert classique.
+      ctx.fillStyle = Math.random() > 0.975 ? '#d6ffd6' : '#00ff66';
+      ctx.fillText(text, x, y);
+
+      if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  }
+
+  var last = 0;
+  function loop(now) {
+    requestAnimationFrame(loop);
+    // ~30 fps : suffisant pour l'effet, doux pour le CPU.
+    if (now - last < 33) return;
+    last = now;
+    draw();
+  }
+
+  reset();
+  window.addEventListener('resize', reset);
+  requestAnimationFrame(loop);
+})();
+</script>
 </body>
 </html>
