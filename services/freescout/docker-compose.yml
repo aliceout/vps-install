@@ -1,10 +1,13 @@
 # FreeScout - helpdesk / boite mail partagee (PHP/Laravel + MariaDB).
 # Image communautaire nfrastack (ex-tiredofit), config 100% par env vars.
 # Variables substituees depuis /var/lib/services/freescout/runtime.env :
-#   - SERVICE_NAME, PORT, ADDRESS, DATA_DIR   (injectes par install.sh)
-#   - DB_NAME, DB_USER, DB_PASS               (Infisical Cloud /services/freescout/)
-#   - ADMIN_EMAIL, ADMIN_PASS                 (Infisical Cloud /services/freescout/)
-#   - ADMIN_FIRST_NAME, ADMIN_LAST_NAME, TZ   (optionnels)
+#   - SERVICE_NAME, PORT, ADDRESS, DATA_DIR        (injectes par install.sh)
+#   - DB_DATABASE, DB_USERNAME, DB_PASSWORD        (Infisical Cloud /services/freescout/)
+#   - ADMIN_EMAIL, ADMIN_PASSWORD                  (Infisical Cloud /services/freescout/)
+#   - APP_KEY                                       (Infisical, stabilite chiffrement Laravel)
+#   - ADMIN_FIRST_NAME, ADMIN_LAST_NAME, TZ        (optionnels)
+# Les noms Infisical (DB_DATABASE/DB_USERNAME/DB_PASSWORD/ADMIN_PASSWORD) sont
+# remappes ici vers les env vars natives de l'image (DB_NAME/DB_USER/DB_PASS/...).
 
 services:
   db:
@@ -12,9 +15,9 @@ services:
     container_name: ${SERVICE_NAME}-db
     restart: unless-stopped
     environment:
-      MARIADB_DATABASE: ${DB_NAME}
-      MARIADB_USER: ${DB_USER}
-      MARIADB_PASSWORD: ${DB_PASS}
+      MARIADB_DATABASE: ${DB_DATABASE}
+      MARIADB_USER: ${DB_USERNAME}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
       # Pas de root password persiste : seul le user applicatif sert. L'entrypoint
       # mariadb chown /var/lib/mysql au boot (run root puis drop vers mysql).
       MARIADB_RANDOM_ROOT_PASSWORD: "yes"
@@ -40,9 +43,12 @@ services:
       DB_TYPE: mysql
       DB_HOST: db
       DB_PORT: "3306"
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_DATABASE}
+      DB_USER: ${DB_USERNAME}
+      DB_PASS: ${DB_PASSWORD}
+      # Cle Laravel fournie via Infisical : evite une regeneration a chaque
+      # redeploy (sinon sessions/donnees chiffrees invalidees).
+      APP_KEY: ${APP_KEY:-}
       # URL publique : derivee d'ADDRESS (pas de cle SITE_URL dediee en Infisical).
       APP_URL: https://${ADDRESS}
       # On est derriere nginx qui termine le TLS : indispensable pour que
@@ -51,7 +57,7 @@ services:
       FREESCOUT_APP_TIMEZONE: ${TZ:-Europe/Paris}
       # Compte admin cree au 1er boot (idempotent cote image).
       ADMIN_EMAIL: ${ADMIN_EMAIL}
-      ADMIN_PASS: ${ADMIN_PASS}
+      ADMIN_PASS: ${ADMIN_PASSWORD}
       ADMIN_FIRST_NAME: ${ADMIN_FIRST_NAME:-Admin}
       ADMIN_LAST_NAME: ${ADMIN_LAST_NAME:-User}
     volumes:

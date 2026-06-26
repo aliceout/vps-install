@@ -7,14 +7,16 @@
 # Cles attendues dans Infisical CLOUD sous /services/freescout/ :
 #   - ADDRESS, DOMAIN, PORT                  (PORT local proxifie par nginx, ex 8068)
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
-#   - DB_NAME, DB_USER, DB_PASS              (DB_PASS : openssl rand -hex 16)
-#   - ADMIN_EMAIL, ADMIN_PASS               (1er compte admin, ADMIN_PASS : openssl rand -hex 12)
-#   - ADMIN_FIRST_NAME, ADMIN_LAST_NAME     (optionnels, defaults Admin/User)
-#   - TZ                                     (optionnel, defaut Europe/Paris)
+#   - DB_DATABASE, DB_USERNAME, DB_PASSWORD  (DB_PASSWORD : openssl rand -hex 16)
+#   - ADMIN_EMAIL, ADMIN_PASSWORD            (1er compte admin, openssl rand -hex 12)
+#   - APP_KEY                                 (cle Laravel : echo "base64:$(openssl rand -base64 32)")
+#   - ADMIN_FIRST_NAME, ADMIN_LAST_NAME      (optionnels, defaults Admin/User)
+#   - TZ                                      (optionnel, defaut Europe/Paris)
 #
 # Mail : configure dans l'UI FreeScout apres install (Settings > Mail Settings
-# pour le mail systeme + une Mailbox par boite). Pas de SMTP au boot.
-# APP_URL est derive d'ADDRESS, APP_KEY est genere par l'image (rien a stocker).
+# pour le mail systeme + une Mailbox par boite). Les cles SMTP_*/MAIL_FROM
+# eventuellement presentes en Infisical ne sont PAS utilisees par l'image.
+# APP_URL est derive d'ADDRESS.
 
 set -euo pipefail
 
@@ -67,7 +69,7 @@ build_runtime_env() {
   chgrp "$VPS_USER" "$RUNTIME_ENV" || true
   chmod 640 "$RUNTIME_ENV"
 
-  for k in DB_NAME DB_USER DB_PASS ADMIN_EMAIL ADMIN_PASS; do
+  for k in DB_DATABASE DB_USERNAME DB_PASSWORD ADMIN_EMAIL ADMIN_PASSWORD; do
     if ! grep -q "^${k}=" "$RUNTIME_ENV"; then
       echo "AVERTISSEMENT: ${k} absent de /services/${SERVICE_NAME}/ dans Infisical Cloud."
     fi
@@ -96,7 +98,7 @@ case "$ACTION" in
     echo
     echo "=== ${SERVICE_NAME} demarre ==="
     echo "URL   : https://${ADDRESS}/"
-    echo "Admin : ${ADMIN_EMAIL:-<ADMIN_EMAIL>} / mot de passe = ADMIN_PASS (Infisical)"
+    echo "Admin : ${ADMIN_EMAIL:-<ADMIN_EMAIL>} / mot de passe = ADMIN_PASSWORD (Infisical)"
     echo "Mail  : configure Settings > Mail Settings + une Mailbox par boite dans l'UI."
     echo "Data  : ${DATA_DIR} (db + data, backup auto via /home/${VPS_USER}/data/)"
     ;;
