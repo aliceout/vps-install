@@ -56,10 +56,11 @@ services:
       # redeploy (sinon sessions/donnees chiffrees invalidees).
       APP_KEY: ${APP_KEY:-}
       # URL publique : derivee d'ADDRESS (pas de cle SITE_URL dediee en Infisical).
-      APP_URL: https://${ADDRESS}
-      # On est derriere nginx qui termine le TLS : indispensable pour que
-      # FreeScout genere des liens https et ne boucle pas en redirect.
-      FREESCOUT_APP_PROXY: "true"
+      # Le HTTPS derriere nginx marche via APP_URL=https + les headers
+      # X-Forwarded de proxy.conf. NE PAS mettre FREESCOUT_APP_PROXY : dans
+      # FreeScout APP_PROXY = proxy HTTP *sortant* pour Guzzle (pas le reverse
+      # proxy) -> une valeur non vide casse tous les appels API (catalogue de
+      # modules, licences, check update) avec un cURL error 28.
       FREESCOUT_APP_TIMEZONE: ${TZ:-Europe/Paris}
       # Compte admin cree au 1er boot (idempotent cote image).
       ADMIN_EMAIL: ${ADMIN_EMAIL}
