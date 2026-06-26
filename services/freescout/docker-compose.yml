@@ -34,6 +34,12 @@ services:
     container_name: ${SERVICE_NAME}
     restart: unless-stopped
     pull_policy: always
+    # Pas d'egress IPv6 sur ce VPS : freescout.net publie une AAAA, cURL tente
+    # l'IPv6 et pend 10s (WpApi timeout, catalogue de modules KO). On coupe
+    # l'IPv6 dans le container -> tout passe en IPv4 (qui marche).
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
     depends_on:
       db:
         condition: service_healthy
