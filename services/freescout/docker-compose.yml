@@ -55,12 +55,13 @@ services:
       # Cle Laravel fournie via Infisical : evite une regeneration a chaque
       # redeploy (sinon sessions/donnees chiffrees invalidees).
       APP_KEY: ${APP_KEY:-}
-      # URL publique : derivee d'ADDRESS (pas de cle SITE_URL dediee en Infisical).
-      # Le HTTPS derriere nginx marche via APP_URL=https + les headers
-      # X-Forwarded de proxy.conf. NE PAS mettre FREESCOUT_APP_PROXY : dans
-      # FreeScout APP_PROXY = proxy HTTP *sortant* pour Guzzle (pas le reverse
-      # proxy) -> une valeur non vide casse tous les appels API (catalogue de
-      # modules, licences, check update) avec un cURL error 28.
+      # URL publique : derivee d'ADDRESS (pas de cle APP_URL/SITE_URL en Infisical).
+      # REQUISE par l'init de l'image (40-freescout) : sans elle -> halt -> 502.
+      APP_URL: https://${ADDRESS}
+      # NE PAS mettre FREESCOUT_APP_PROXY : dans FreeScout APP_PROXY = proxy HTTP
+      # *sortant* pour Guzzle (pas le reverse proxy). Une valeur non vide casse
+      # tous les appels API (catalogue de modules, licences) -> cURL error 28.
+      # Le HTTPS derriere nginx marche via APP_URL=https + les headers X-Forwarded.
       FREESCOUT_APP_TIMEZONE: ${TZ:-Europe/Paris}
       # Compte admin cree au 1er boot (idempotent cote image).
       ADMIN_EMAIL: ${ADMIN_EMAIL}
