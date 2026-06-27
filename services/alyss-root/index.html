@@ -9,24 +9,74 @@
   :root { color-scheme: dark; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; background: #000; overflow: hidden; }
-  canvas { display: block; }
-  /* Respecte les utilisateurs qui coupent les animations : fond noir fixe. */
+  canvas { display: block; position: fixed; inset: 0; }
+
+  /* Citation overlay */
+  .quote {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8vw;
+    pointer-events: none;
+    text-align: center;
+    /* Voile radial sombre derriere le texte pour la lisibilite sur la pluie. */
+    background: radial-gradient(ellipse 60% 40% at 50% 50%, rgba(0,0,0,.72) 0%, rgba(0,0,0,0) 70%);
+    opacity: 0;
+    transition: opacity .6s ease;
+  }
+  .quote.show { opacity: 1; }
+  .quote span {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(1.1rem, 3.4vw, 2.2rem);
+    line-height: 1.5;
+    color: #d6ffd6;
+    text-shadow: 0 0 8px rgba(0,255,102,.55), 0 2px 6px rgba(0,0,0,.9);
+    white-space: pre-wrap;
+    max-width: 22em;
+  }
+  /* Caracteres encore en cours de "decodage" : plus sombres. */
+  .quote .dud { color: #00aa44; opacity: .75; text-shadow: 0 0 6px rgba(0,170,68,.4); }
+
   @media (prefers-reduced-motion: reduce) {
     #matrix { display: none; }
+    .quote { opacity: 1; transition: none; background: none; }
   }
 </style>
 </head>
 <body>
   <canvas id="matrix"></canvas>
+  <div class="quote" id="quote"><span></span></div>
 <script>
 (function () {
+  // ----- Citations (neutres / anonymes). Edite librement ce tableau. -----
+  var QUOTES = [
+    "Wake up.",
+    "Follow the white rabbit.",
+    "There is no spoon.",
+    "The quieter you become, the more you are able to hear.",
+    "Not everything that counts can be counted.",
+    "What is real? How do you define real?",
+    "Everything that has a beginning has an end.",
+    "Free your mind."
+  ];
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var quoteEl = document.getElementById('quote');
+  var quoteSpan = quoteEl.firstElementChild;
+
+  // ---------- Mode statique (animations coupees) ----------
+  if (reduce) {
+    quoteSpan.textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    quoteEl.classList.add('show');
+    return;
+  }
+
+  // ---------- Pluie Matrix ----------
   var canvas = document.getElementById('matrix');
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var ctx = canvas.getContext('2d');
-
-  // Jeu de caracteres facon cmatrix : katakana + chiffres + quelques latins.
   var chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾚﾛﾜﾝ0123456789ABCDEFZ:.="*+-<>'.split('');
-
   var fontSize = 16, columns, drops;
 
   function reset() {
@@ -34,45 +84,88 @@
     canvas.height = window.innerHeight;
     columns = Math.floor(canvas.width / fontSize);
     drops = [];
-    for (var i = 0; i < columns; i++) {
-      // Depart aleatoire en hauteur pour eviter une 1re ligne synchronisee.
-      drops[i] = Math.floor(Math.random() * -canvas.height / fontSize);
-    }
+    for (var i = 0; i < columns; i++) drops[i] = Math.floor(Math.random() * -canvas.height / fontSize);
   }
-
   function draw() {
-    // Voile noir semi-transparent : laisse une trainee derriere chaque goutte.
     ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     ctx.font = fontSize + 'px ui-monospace, Menlo, Consolas, monospace';
-
     for (var i = 0; i < drops.length; i++) {
       var text = chars[Math.floor(Math.random() * chars.length)];
-      var x = i * fontSize;
-      var y = drops[i] * fontSize;
-
-      // Tete de colonne plus claire, queue en vert classique.
       ctx.fillStyle = Math.random() > 0.975 ? '#d6ffd6' : '#00ff66';
-      ctx.fillText(text, x, y);
-
-      if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+      if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
       drops[i]++;
     }
   }
-
   var last = 0;
   function loop(now) {
     requestAnimationFrame(loop);
-    // ~30 fps : suffisant pour l'effet, doux pour le CPU.
-    if (now - last < 33) return;
+    if (now - last < 33) return; // ~30 fps
     last = now;
     draw();
   }
-
   reset();
   window.addEventListener('resize', reset);
   requestAnimationFrame(loop);
+
+  // ---------- Effet "decodage" de la citation ----------
+  var SCRAMBLE = '!<>-_\\/[]{}=+*^?#0123ｱｦﾐﾑﾒｷｸｹ'.split('');
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  // Anime quoteSpan depuis le texte courant vers `to`. Chaque caractere passe
+  // par une phase de glyphes aleatoires avant de se "verrouiller". Renvoie une
+  // Promise resolue quand tout est stabilise.
+  function scrambleTo(to) {
+    var from = quoteSpan.textContent;
+    var len = Math.max(from.length, to.length);
+    var queue = [];
+    for (var i = 0; i < len; i++) {
+      var fromCh = from[i] || '';
+      var toCh = to[i] || '';
+      var start = Math.floor(rnd(0, 40));
+      var end = start + Math.floor(rnd(20, 60));
+      queue.push({ from: fromCh, to: toCh, start: start, end: end, char: '' });
+    }
+    return new Promise(function (resolve) {
+      var frame = 0;
+      (function update() {
+        var out = '', done = 0;
+        for (var i = 0; i < queue.length; i++) {
+          var q = queue[i];
+          if (frame >= q.end) { done++; out += q.to; }
+          else if (frame >= q.start) {
+            if (!q.char || Math.random() < 0.28) q.char = SCRAMBLE[Math.floor(Math.random() * SCRAMBLE.length)];
+            out += '<span class="dud">' + q.char + '</span>';
+          } else { out += q.from; }
+        }
+        quoteSpan.innerHTML = out;
+        if (done === queue.length) { resolve(); return; }
+        frame++;
+        requestAnimationFrame(update);
+      })();
+    });
+  }
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // Boucle : decode-in -> hold -> decode-out (vers vide) -> pause -> suivante.
+  var lastIdx = -1;
+  (async function cycle() {
+    await sleep(1500); // laisse la pluie demarrer
+    while (true) {
+      var idx;
+      do { idx = Math.floor(Math.random() * QUOTES.length); } while (idx === lastIdx && QUOTES.length > 1);
+      lastIdx = idx;
+
+      quoteEl.classList.add('show');
+      await scrambleTo(QUOTES[idx]);
+      await sleep(6000);            // duree d'affichage
+      await scrambleTo('');         // se re-brouille puis disparait
+      quoteEl.classList.remove('show');
+      await sleep(rnd(7000, 12000)); // pause avec juste la pluie
+    }
+  })();
 })();
 </script>
 </body>
