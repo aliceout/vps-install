@@ -1,0 +1,26 @@
+# Vaultwarden - gestionnaire de mots de passe compatible Bitwarden (Rust, mono-conteneur).
+# Interpolation (${...}) depuis /var/lib/services/vaultwarden/runtime.env :
+#   SERVICE_NAME, PORT, ADDRESS, DATA_DIR  (injectes par install.sh)
+# Config applicative : 100% depuis Infisical (/services/vaultwarden/) via le sink
+# /etc/secrets/vaultwarden.env (env_file). Rien en dur ici.
+# ponytail: pas de PUID/PGID (no-op image officielle, root), pas de port 3012
+# (WebSocket sur le port 80 depuis vaultwarden 1.29), pas de LOG_FILE (docker logs).
+
+services:
+  app:
+    image: vaultwarden/server:latest
+    container_name: ${SERVICE_NAME}
+    restart: unless-stopped
+    pull_policy: always
+    ports:
+      - "127.0.0.1:${PORT}:80"
+    # Toute la config (SIGNUPS_ALLOWED, ADMIN_TOKEN, SMTP_*, LOG_LEVEL, ...) vient
+    # d'Infisical via ce sink. SMTP_SECURITY=force_tls pour le port 465.
+    env_file:
+      - /etc/secrets/vaultwarden.env
+    environment:
+      # Seule surcharge : l'env vaultwarden DOMAIN attend l'URL complete, alors
+      # que la cle Infisical DOMAIN est l'apex du cert wildcard. Derive d'ADDRESS.
+      DOMAIN: https://${ADDRESS}
+    volumes:
+      - ${DATA_DIR}:/data
