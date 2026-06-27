@@ -3,7 +3,7 @@
 #
 # Recu en env: ACTION, SERVICE_NAME, SERVICE_DIR, SECRETS_FILE
 #
-# Cles attendues dans Infisical CLOUD sous /services/alyss-root/ :
+# Cles attendues dans Infisical CLOUD sous /services/alyss/ :
 #   - ADDRESS=alyss.cc
 #   - DOMAIN=alyss.cc
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
