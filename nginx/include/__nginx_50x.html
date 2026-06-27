@@ -33,14 +33,11 @@
     min-height: 1.3em;
   }
   .sub { margin-top: 1rem; color: #9affb0; font-size: clamp(.9rem, 2.6vw, 1.15rem); }
-  .dots::after { content: ""; animation: dots 1.4s steps(4, end) infinite; }
-  @keyframes dots { 0%{content:"";} 25%{content:".";} 50%{content:"..";} 75%{content:"...";} }
   .hint { margin-top: 1.75rem; font-size: .8rem; color: #4caf6a; }
   .dud { color: #00aa44; opacity: .75; }
   @media (prefers-reduced-motion: reduce) {
     #matrix { display: none; }
     .panel { background: none; }
-    .dots::after { content: "..."; animation: none; }
   }
 </style>
 </head>
@@ -49,7 +46,7 @@
   <div class="panel">
     <div class="code">ERREUR <!--#echo var="status" --></div>
     <h1 id="title">La matrice redémarre</h1>
-    <div class="sub">Merci de patienter<span class="dots"></span></div>
+    <div class="sub">Merci de patienter…</div>
     <p class="hint">Reconnexion automatique dans 30 secondes.</p>
   </div>
 <script>
@@ -78,7 +75,7 @@
   var last = 0;
   (function loop(now) {
     requestAnimationFrame(loop);
-    if (now - last < 33) return; last = now; draw();
+    if (now - last < 80) return; last = now; draw();
   })(0);
   reset();
   window.addEventListener('resize', reset);
