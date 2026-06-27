@@ -19,6 +19,7 @@
     padding: 8vw; text-align: center;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     color: #d6ffd6;
+    user-select: none; -webkit-user-select: none;
     background: radial-gradient(ellipse 60% 45% at 50% 50%, rgba(0,0,0,.78) 0%, rgba(0,0,0,0) 70%);
   }
   .code {
@@ -46,8 +47,8 @@
   <div class="panel">
     <div class="code">ERREUR <!--#echo var="status" --></div>
     <h1 id="title">La matrice redémarre</h1>
-    <div class="sub">Merci de patienter…</div>
-    <p class="hint">Reconnexion automatique dans 30 secondes.</p>
+    <div class="sub">Merci de patienter</div>
+    <p class="hint">Tentative de reconnexion automatique dans 30 secondes</p>
   </div>
 <script>
 (function () {
@@ -80,29 +81,42 @@
   reset();
   window.addEventListener('resize', reset);
 
-  // ----- Decodage du titre (une fois) -----
+  // ----- Decodage sequentiel : titre -> sous-titre -> hint (l'un apres l'autre) -----
   var SCRAMBLE = '!<>-_\\/[]{}=+*^?#0123ｱｦﾐﾑﾒｷｸｹ'.split('');
-  var el = document.getElementById('title'), target = el.textContent;
-  var queue = [];
-  for (var i = 0; i < target.length; i++) {
-    var s = Math.floor(Math.random() * 30), e = s + 20 + Math.floor(Math.random() * 40);
-    queue.push({ to: target[i], start: s, end: e, ch: '' });
-  }
-  var frame = 0;
-  (function upd() {
-    var out = '', done = 0;
-    for (var i = 0; i < queue.length; i++) {
-      var q = queue[i];
-      if (frame >= q.end) { done++; out += q.to; }
-      else if (frame >= q.start) {
-        if (!q.ch || Math.random() < 0.28) q.ch = SCRAMBLE[Math.floor(Math.random() * SCRAMBLE.length)];
-        out += '<span class="dud">' + q.ch + '</span>';
-      } else { out += (q.to === ' ' ? ' ' : ''); }
+  function decode(el, done, onHalf) {
+    var target = el.getAttribute('data-txt'), queue = [], maxEnd = 0;
+    for (var i = 0; i < target.length; i++) {
+      var s = Math.floor(Math.random() * 75), e = s + 50 + Math.floor(Math.random() * 100);
+      if (e > maxEnd) maxEnd = e;
+      queue.push({ to: target[i], start: s, end: e, ch: '' });
     }
-    el.innerHTML = out;
-    if (done === queue.length) return;
-    frame++; requestAnimationFrame(upd);
-  })();
+    var frame = 0, half = false;
+    (function upd() {
+      var out = '', d = 0;
+      for (var i = 0; i < queue.length; i++) {
+        var q = queue[i];
+        if (frame >= q.end) { d++; out += q.to; }
+        else if (frame >= q.start) {
+          if (!q.ch || Math.random() < 0.28) q.ch = SCRAMBLE[Math.floor(Math.random() * SCRAMBLE.length)];
+          out += '<span class="dud">' + q.ch + '</span>';
+        } else { out += (q.to === ' ' ? ' ' : ''); }
+      }
+      el.innerHTML = out;
+      if (!half && frame >= maxEnd / 2) { half = true; if (onHalf) onHalf(); }
+      if (d === queue.length) { if (done) done(); return; }
+      frame++; requestAnimationFrame(upd);
+    })();
+  }
+  // On blanchit les lignes, puis : titre + sous-titre ensemble, et le hint
+  // une fois ces deux-la termines.
+  var lines = [document.getElementById('title'),
+               document.querySelector('.sub'),
+               document.querySelector('.hint')];
+  lines.forEach(function (el) { el.setAttribute('data-txt', el.textContent); el.textContent = ''; });
+  var n = 0;
+  function pairHalf() { if (++n === 2) decode(lines[2]); }
+  decode(lines[0], null, pairHalf);
+  decode(lines[1], null, pairHalf);
 })();
 </script>
 </body>
