@@ -9,7 +9,7 @@
 #   - DNS_PROVIDER, DNS_TOKEN_NAME
 #
 # Aucun secret applicatif : c'est une page statique anonyme. Le vhost est rendu
-# par scripts/service.sh (apply_nginx) ; ici on ne fait que deposer le HTML.
+# par scripts/service.sh (apply_nginx) ; ici on depose le HTML + le son ambient.
 
 set -euo pipefail
 
@@ -19,7 +19,9 @@ case "$ACTION" in
   install|update)
     install -d -m 755 "$WEBROOT"
     install -m 644 "$SERVICE_DIR/index.html" "$WEBROOT/index.html"
-    echo "Holding page deployee: $WEBROOT/index.html"
+    # Musique d'ambiance CC0 (John Bartmann - Nightshift), servie en local.
+    install -m 644 "$SERVICE_DIR/ambient.mp3" "$WEBROOT/ambient.mp3"
+    echo "Holding page + son deployes: $WEBROOT/"
     ;;
 
   remove)
