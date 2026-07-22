@@ -1,0 +1,28 @@
+# CrowdSec whitelist : exempte le trafic de SYNC Nextcloud (WebDAV) des
+# scenarios de VOLUME (http-crawl-non-statics, flood, http-probing).
+#
+# Pourquoi :
+# - Une sync Nextcloud, surtout un vault Cryptomator (= des milliers de petits
+#   fichiers chiffres), genere un ENORME debit de requetes PROPFIND/PUT/MOVE
+#   sur /remote.php/dav/. Meme en 2xx, ce volume declenche les scenarios de
+#   crawl/flood -> ban de l'utilisateur legitime en plein sync.
+# - La whitelist 4xx (immich-nc-4xx.yaml) ne suffit pas : ici c'est surtout
+#   des 2xx, donc on whiteliste par CHEMIN, tous statuts confondus.
+#
+# On ne peut PAS whitelister par IP (utilisateur nomade : voyages + VPN, IP
+# changeante), d'ou l'approche par chemin.
+#
+# Risque accepte : un bruteforce / DoS HTTP cible sur /remote.php/dav/ ne sera
+# plus attrape par les scenarios de VOLUME nginx. Mais 1) ces endpoints sont
+# auth-required, 2) Nextcloud a sa propre protection bruteforce applicative,
+# 3) l'auth WebDAV echouee se detecte via la collection crowdsecurity/nextcloud
+# (parsing des logs NC), pas via le status HTTP.
+name: alyss/whitelist-nextcloud-sync
+description: "Exempte le WebDAV Nextcloud (sync) des scenarios de volume CrowdSec"
+whitelist:
+  reason: "Sync Nextcloud/WebDAV : gros volume de requetes legitimes, sinon http-crawl/flood ban l'utilisateur nomade (IP non whitelistable)"
+  expression:
+    # WebDAV moderne (client desktop, mobile, chunked uploads /uploads/)
+    - evt.Meta.http_path startsWith "/remote.php/dav/"
+    # WebDAV legacy
+    - evt.Meta.http_path startsWith "/remote.php/webdav/"
