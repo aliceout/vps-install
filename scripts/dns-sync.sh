@@ -3,16 +3,17 @@
 # Multi-provider : lit /etc/certbot/providers.conf pour savoir quel
 # token utiliser par apex.
 #
-# Pour l'instant le sync A record n'est implemente que pour Infomaniak.
-# Les domaines dont l'apex est chez OVH sont skippes (log WARN).
+# Sync A record implemente pour Infomaniak ET OVH. Le provider par apex est lu
+# dans /etc/certbot/providers.conf. OVH utilise l'API a requetes signees
+# (X-Ovh-Signature), les creds viennent du meme ini que certbot.
 #
 # Usage:
 #   dns-sync                      # auto-discover depuis /etc/nginx/conf/*.conf
 #   dns-sync foo.bar.fr ...       # liste explicite
 #
 # Pre-requis:
-#   - /etc/certbot/creds/infomaniak/<name>.ini (genere par certbot-refresh-creds)
-#   - jq, curl
+#   - /etc/certbot/creds/<provider>/<name>.ini (genere par certbot-refresh-creds)
+#   - jq, curl, openssl (ou sha1sum)
 
 set -uo pipefail
 
@@ -209,6 +210,104 @@ guess_apex() {
   echo "${labels[n-2]}.${labels[n-1]}"
 }
 
+# ---- OVH API helpers --------------------------------------------------------
+# OVH exige des requetes signees. On charge les creds depuis le meme ini que
+# certbot (/etc/certbot/creds/ovh/<name>.ini) puis on signe chaque appel :
+#   X-Ovh-Signature = "$1$" + sha1(AS+"+"+CK+"+"+METHOD+"+"+URL+"+"+BODY+"+"+TS)
+# Le timestamp doit etre aligne sur l'horloge OVH -> on calcule un offset via
+# /auth/time (non signe) au chargement des creds.
+
+OVH_AK=""; OVH_AS=""; OVH_CK=""; OVH_BASE=""; OVH_TIME_OFFSET=0
+
+sha1_hex() {
+  if command -v sha1sum >/dev/null 2>&1; then
+    sha1sum | awk '{print $1}'
+  else
+    openssl sha1 2>/dev/null | awk '{print $NF}'
+  fi
+}
+
+load_ovh_creds() {
+  local name="$1" ini="$CREDS_DIR/ovh/${name}.ini" ep=""
+  [[ -s "$ini" ]] || { log "creds OVH absents: $ini"; return 1; }
+  OVH_AK="$(awk -F= '/^dns_ovh_application_key/{print $2; exit}'    "$ini" | tr -d ' \t\r')"
+  OVH_AS="$(awk -F= '/^dns_ovh_application_secret/{print $2; exit}' "$ini" | tr -d ' \t\r')"
+  OVH_CK="$(awk -F= '/^dns_ovh_consumer_key/{print $2; exit}'       "$ini" | tr -d ' \t\r')"
+  ep="$(awk -F= '/^dns_ovh_endpoint/{print $2; exit}'              "$ini" | tr -d ' \t\r')"
+  case "$ep" in
+    ovh-ca) OVH_BASE="https://ca.api.ovh.com/1.0" ;;
+    ovh-us) OVH_BASE="https://api.us.ovhcloud.com/1.0" ;;
+    ovh-eu|"") OVH_BASE="https://eu.api.ovh.com/1.0" ;;
+    *) OVH_BASE="https://eu.api.ovh.com/1.0" ;;
+  esac
+  [[ -n "$OVH_AK" && -n "$OVH_AS" && -n "$OVH_CK" ]] || { log "creds OVH incomplets: $ini"; return 1; }
+
+  local srv
+  srv="$(curl -fsS --max-time 10 "${OVH_BASE}/auth/time" 2>/dev/null || true)"
+  if [[ "$srv" =~ ^[0-9]+$ ]]; then
+    OVH_TIME_OFFSET=$(( srv - $(date +%s) ))
+  else
+    OVH_TIME_OFFSET=0
+  fi
+}
+
+ovh_api() {
+  local method="$1" path="$2" body="${3:-}"
+  local url="${OVH_BASE}${path}" ts sig
+  ts=$(( $(date +%s) + OVH_TIME_OFFSET ))
+  sig="\$1\$$(printf '%s' "${OVH_AS}+${OVH_CK}+${method}+${url}+${body}+${ts}" | sha1_hex)"
+  local -a args=( -fsSL --max-time 15 -X "$method"
+    -H "X-Ovh-Application: $OVH_AK"
+    -H "X-Ovh-Consumer: $OVH_CK"
+    -H "X-Ovh-Timestamp: $ts"
+    -H "X-Ovh-Signature: $sig" )
+  if [[ -n "$body" ]]; then
+    args+=( -H "Content-Type: application/json" --data "$body" )
+  fi
+  curl "${args[@]}" "$url"
+}
+
+sync_one_ovh() {
+  local apex="$1" fqdn="$2" name="$3"
+  load_ovh_creds "$name" || return 1
+
+  # subDomain OVH = partie avant l'apex ("" pour l'apex lui-meme)
+  local sub
+  if [[ "$fqdn" == "$apex" ]]; then sub=""; else sub="${fqdn%.$apex}"; fi
+
+  local ids id
+  ids="$(ovh_api GET "/domain/zone/${apex}/record?fieldType=A&subDomain=${sub}" 2>/dev/null || true)"
+  id="$(printf '%s' "$ids" | jq -r 'if type=="array" then .[0] else empty end' 2>/dev/null)"
+
+  local create_body update_body
+  create_body="$(jq -n --arg s "$sub" --arg t "$PUBLIC_IP" --argjson ttl "$TTL" \
+    '{fieldType:"A", subDomain:$s, target:$t, ttl:$ttl}')"
+  update_body="$(jq -n --arg t "$PUBLIC_IP" --argjson ttl "$TTL" \
+    '{target:$t, ttl:$ttl}')"
+
+  local changed=0
+  if [[ -z "$id" || "$id" == "null" ]]; then
+    log "CREATE A $fqdn -> $PUBLIC_IP (OVH)"
+    ovh_api POST "/domain/zone/${apex}/record" "$create_body" >/dev/null || { log "CREATE KO $fqdn (OVH)"; return 1; }
+    changed=1
+  else
+    local current
+    current="$(ovh_api GET "/domain/zone/${apex}/record/${id}" 2>/dev/null | jq -r '.target' 2>/dev/null || true)"
+    if [[ "$current" != "$PUBLIC_IP" ]]; then
+      log "UPDATE A $fqdn $current -> $PUBLIC_IP (OVH)"
+      ovh_api PUT "/domain/zone/${apex}/record/${id}" "$update_body" >/dev/null || { log "UPDATE KO $fqdn (OVH)"; return 1; }
+      changed=1
+    else
+      log "OK     A $fqdn -> $PUBLIC_IP (OVH, a jour)"
+    fi
+  fi
+
+  # OVH n'applique les changements de zone qu'apres un refresh explicite.
+  if (( changed )); then
+    ovh_api POST "/domain/zone/${apex}/refresh" "" >/dev/null 2>&1 || log "WARN refresh zone $apex KO (OVH)"
+  fi
+}
+
 # ---- Dispatch par provider --------------------------------------------------
 
 rc=0
@@ -217,7 +316,12 @@ for d in "${DOMAINS[@]}"; do
   provider="${APEX_PROVIDER[$apex]:-}"
 
   if [[ "$provider" == "ovh" ]]; then
-    log "SKIP   A $d (apex $apex chez OVH, sync non implementee)"
+    name="${APEX_TOKEN_NAME[$apex]:-}"
+    if [[ -z "$name" ]]; then
+      log "SKIP   A $d (apex $apex chez OVH mais pas de token dans providers.conf)"
+      continue
+    fi
+    sync_one_ovh "$apex" "$d" "$name" || { rc=1; log "Sync A OVH echouee pour $d"; }
     continue
   fi
 
