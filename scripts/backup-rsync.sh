@@ -10,13 +10,16 @@
 #
 # Declenche par cron (/etc/cron.d/vps-backup).
 #
-# Secrets Infisical sous /services/backup/ :
-#   - HOME_SSH_HOST     (required) hostname/IP du home
-#   - HOME_SSH_PORT     (defaut 22)
+# Secrets Infisical sous /infra/vps/backup/ (convention infra du repo) :
+#   - HOME_SSH_HOST     (required) domaine/IP du home. Idealement un domaine
+#                       deja suivi par le dns-sync du home -> DDNS gratuit,
+#                       pas d'IP a maintenir a la main.
 #   - HOME_SSH_USER     (required) user SSH dedie cote home (ex backup-vps)
 #   - HOME_SSH_PRIVKEY  (required) cle privee ed25519 multiligne
 #   - REMOTE_PATH       (required) dossier de destination cote home
 #   - SOURCE_PATH       (optionnel, defaut /home/$VPS_USER/data)
+#   - HOME_SSH_PORT     (optionnel) port SSH du home. A defaut on lit
+#                       SSH_PORT sous /infra/server, sinon 22.
 
 set -euo pipefail
 # Disable tracing pour eviter une fuite de la cle dans les logs
@@ -34,21 +37,30 @@ if [[ -z "$TOKEN" ]]; then
 fi
 DOMAIN="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
 
+BACKUP_PATH="/infra/vps/backup"
+SERVER_PATH="/infra/server"
+
+# fetch <key> [path]  (path defaut = /infra/vps/backup)
 fetch() {
-  infisical secrets get "$1" \
+  local key="$1" path="${2:-$BACKUP_PATH}"
+  infisical secrets get "$key" \
     --domain="$DOMAIN" \
-    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path=/services/backup \
+    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path="$path" \
     --token="$TOKEN" --plain 2>/dev/null || true
 }
 
 HOME_SSH_HOST="$(fetch HOME_SSH_HOST)"
-HOME_SSH_PORT="$(fetch HOME_SSH_PORT)"
 HOME_SSH_USER="$(fetch HOME_SSH_USER)"
 HOME_SSH_PRIVKEY="$(fetch HOME_SSH_PRIVKEY)"
 REMOTE_PATH="$(fetch REMOTE_PATH)"
 SOURCE_PATH="$(fetch SOURCE_PATH)"
 
-: "${HOME_SSH_HOST:?HOME_SSH_HOST manquant dans /services/backup/}"
+# Port : HOME_SSH_PORT sous /infra/vps/backup si present, sinon on reutilise
+# SSH_PORT sous /infra/server (le port SSH du home), sinon 22.
+HOME_SSH_PORT="$(fetch HOME_SSH_PORT)"
+[[ -z "$HOME_SSH_PORT" ]] && HOME_SSH_PORT="$(fetch SSH_PORT "$SERVER_PATH")"
+
+: "${HOME_SSH_HOST:?HOME_SSH_HOST manquant dans /infra/vps/backup/}"
 : "${HOME_SSH_USER:?HOME_SSH_USER manquant}"
 : "${HOME_SSH_PRIVKEY:?HOME_SSH_PRIVKEY manquant}"
 : "${REMOTE_PATH:?REMOTE_PATH manquant}"

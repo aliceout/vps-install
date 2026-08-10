@@ -37,21 +37,30 @@ if [[ -z "$TOKEN" ]]; then
 fi
 DOMAIN="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
 
+BACKUP_PATH="/infra/vps/backup"
+SERVER_PATH="/infra/server"
+
+# fetch <key> [path]  (path defaut = /infra/vps/backup)
 fetch() {
-  infisical secrets get "$1" \
+  local key="$1" path="${2:-$BACKUP_PATH}"
+  infisical secrets get "$key" \
     --domain="$DOMAIN" \
-    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path=/services/backup \
+    --projectId="$PROJECT_ID" --env="$ENV_SLUG" --path="$path" \
     --token="$TOKEN" --plain 2>/dev/null || true
 }
 
 HOME_SSH_HOST="$(fetch HOME_SSH_HOST)"
-HOME_SSH_PORT="$(fetch HOME_SSH_PORT)"
 HOME_SSH_USER="$(fetch HOME_SSH_USER)"
 HOME_SSH_PRIVKEY="$(fetch HOME_SSH_PRIVKEY)"
 REMOTE_PATH="$(fetch REMOTE_PATH)"
 SOURCE_PATH="$(fetch SOURCE_PATH)"
 
-: "${HOME_SSH_HOST:?HOME_SSH_HOST manquant}"
+# Port : HOME_SSH_PORT sous /infra/vps/backup si present, sinon SSH_PORT
+# sous /infra/server, sinon 22.
+HOME_SSH_PORT="$(fetch HOME_SSH_PORT)"
+[[ -z "$HOME_SSH_PORT" ]] && HOME_SSH_PORT="$(fetch SSH_PORT "$SERVER_PATH")"
+
+: "${HOME_SSH_HOST:?HOME_SSH_HOST manquant dans /infra/vps/backup/}"
 : "${HOME_SSH_USER:?HOME_SSH_USER manquant}"
 : "${HOME_SSH_PRIVKEY:?HOME_SSH_PRIVKEY manquant}"
 : "${REMOTE_PATH:?REMOTE_PATH manquant}"

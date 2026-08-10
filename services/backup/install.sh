@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Service unifie backup : detecte HOST_TYPE et installe la variante adequate.
 #
-#   - HOST_TYPE=vps     : push restic vers le home server via SSH (creds dans
-#                         Infisical /services/backup/). 4x/jour.
+#   - HOST_TYPE=vps     : push rsync (miroir) vers le home server via SSH (creds
+#                         dans Infisical /infra/vps/backup/). 4x/jour.
 #   - HOST_TYPE=server  : backup local (borg rotatif + tar.xz rotating + raid
 #                         sur SSD externe + snapshot Nextcloud AIO). Tout en
 #                         local sur le home server, pas de creds reseau.

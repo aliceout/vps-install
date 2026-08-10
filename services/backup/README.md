@@ -41,16 +41,18 @@ Ca :
 - Cron 4x/jour (00:15, 06:15, 12:15, 18:15)
 - Logrotate hebdo
 
-## Secrets Infisical — `/services/backup/`
+## Secrets Infisical — `/infra/vps/backup/`
+
+(convention infra du repo, comme `/infra/vps/GITHUB_SSH_PRIVKEY`, `/infra/<host>/GHCR_TOKEN`, etc.)
 
 | Cle | Type | Exemple | Role |
 |-----|------|---------|------|
-| `HOME_SSH_HOST` | string | `home.mondomaine.fr` | FQDN ou IP publique du home |
-| `HOME_SSH_PORT` | int | `22` | port SSH du home (defaut 22) |
+| `HOME_SSH_HOST` | string | `vault.alyss.cc` | domaine (ou IP) du home. Un domaine deja suivi par le dns-sync du home = DDNS gratuit (pas d'IP a maintenir a la main) |
 | `HOME_SSH_USER` | string | `backup-vps` | user dedie cote home |
 | `HOME_SSH_PRIVKEY` | secret multiligne | `-----BEGIN OPENSSH PRIVATE KEY-----...` | cle privee ed25519 (jamais ecrite sur disque VPS) |
-| `REMOTE_PATH` | string | `/data/backups/vps-mirror` | dossier de destination cote home (doit etre dans le scope de Borg) |
+| `REMOTE_PATH` | string | `/media/pi/data/vps-mirror` | dossier de destination cote home (doit etre dans le scope de Borg) |
 | `SOURCE_PATH` | string | `/home/choupi/data` | optionnel, defaut `/home/$VPS_USER/data` |
+| `HOME_SSH_PORT` | int | `2222` | optionnel. A defaut, le script lit `SSH_PORT` sous `/infra/server`, sinon 22 |
 
 ## Setup cote home server (a faire une fois)
 
