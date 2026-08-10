@@ -84,6 +84,81 @@ status_vps() {
 # ============================================================================
 # Variante server : backup local (borg + rotating + raid + nc-snapshot)
 # ============================================================================
+
+# Configure la RECEPTION des backups pousses par le VPS (rsync over ssh).
+# Opt-in + idempotent : ne fait rien tant que BACKUP_VPS_PUBKEY n'est pas defini
+# dans Infisical /infra/server/ (lisible par le home). Pose tout ce qu'on
+# configurait a la main -> un home reconstruit recoit les backups sans interv.
+#   - BACKUP_VPS_PUBKEY  (requis) pubkey SSH autorisee a pousser (publique, safe)
+#   - BACKUP_VPS_DEST    (optionnel, defaut /media/pi/data/vps-mirror)
+#   - BACKUP_VPS_USER    (optionnel, defaut backup-vps)
+setup_vps_backup_receiver() {
+  local token domain pid env_slug
+  token="$(infi-token --silent 2>/dev/null || true)"
+  if [[ -z "$token" ]]; then
+    echo "- Receiver VPS: infi-token KO, skip (relance apres config Infisical)."
+    return 0
+  fi
+  domain="$(infi-token --domain --silent 2>/dev/null || echo 'https://app.infisical.com')"
+  pid="$(cat /etc/infisical/project-id 2>/dev/null || true)"
+  env_slug="$(cat /etc/infisical/environment 2>/dev/null || true)"
+
+  rfetch() {
+    infisical secrets get "$1" \
+      --domain="$domain" --projectId="$pid" --env="$env_slug" \
+      --path=/infra/server --token="$token" --plain 2>/dev/null || true
+  }
+
+  local pubkey dest ruser
+  pubkey="$(rfetch BACKUP_VPS_PUBKEY)"
+  if [[ -z "$pubkey" ]]; then
+    echo "- Receiver VPS: BACKUP_VPS_PUBKEY absent de /infra/server/, reception non configuree (normal si ce home ne recoit pas de backup VPS)."
+    return 0
+  fi
+  dest="$(rfetch BACKUP_VPS_DEST)";  dest="${dest:-/media/pi/data/vps-mirror}"
+  ruser="$(rfetch BACKUP_VPS_USER)"; ruser="${ruser:-backup-vps}"
+
+  command -v rrsync >/dev/null 2>&1 || apt-get install -y rsync >/dev/null 2>&1 || true
+
+  # User dedie : shell reel requis (rsync over ssh), password verrouille (cle only)
+  if ! id -u "$ruser" >/dev/null 2>&1; then
+    useradd -m -s /bin/bash "$ruser"
+    passwd -l "$ruser" >/dev/null 2>&1 || true
+  fi
+
+  # Dossier destination (sous le scope Borg -> l'historique est versionne)
+  install -d -o "$ruser" -g "$ruser" -m 750 "$dest"
+
+  # Traversee (x seulement) de chaque parent, sinon $ruser n'atteint pas $dest
+  # (ex /media/pi en 700 pi:pi bloque). Pas de +r -> pas de listing possible.
+  local p="$dest"
+  while :; do
+    p="$(dirname "$p")"
+    [[ "$p" == "/" || -z "$p" ]] && break
+    chmod o+x "$p" 2>/dev/null || true
+  done
+
+  # authorized_keys : la cle ne peut QUE rsync (lecture+ecriture) dans $dest
+  install -d -o "$ruser" -g "$ruser" -m 700 "/home/${ruser}/.ssh"
+  printf 'command="rrsync %s",no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding %s\n' \
+    "$dest" "$pubkey" > "/home/${ruser}/.ssh/authorized_keys"
+  chown "${ruser}:${ruser}" "/home/${ruser}/.ssh/authorized_keys"
+  chmod 600 "/home/${ruser}/.ssh/authorized_keys"
+
+  # sshd : autorise $ruser via un drop-in ADDITIF (AllowUsers est cumulatif ; on
+  # ne touche pas 00-vps-hardening.conf gere par le module 10).
+  local dropin="/etc/ssh/sshd_config.d/20-backup-vps.conf"
+  printf '# Genere par vps-install (service backup) : user de reception du backup VPS.\nAllowUsers %s\n' "$ruser" > "$dropin"
+  chmod 644 "$dropin"
+  if sshd -t 2>/dev/null; then
+    systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+    echo "- Receiver VPS configure : user=$ruser, dest=$dest, sshd autorise (reload OK)."
+  else
+    rm -f "$dropin"
+    echo "AVERTISSEMENT: sshd -t KO apres drop-in receiver -> drop-in retire, sshd inchange." >&2
+  fi
+}
+
 install_server() {
   apt-get install -y borgbackup rsync xz-utils tar
 
@@ -144,6 +219,9 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 0 4 * * * root /usr/local/sbin/hc-run backup-borg /usr/local/sbin/backup-borg
 EOF
   chmod 644 /etc/cron.d/server-backup
+
+  # Reception des backups pousses par le VPS (opt-in via /infra/server/BACKUP_VPS_PUBKEY)
+  setup_vps_backup_receiver
 
   echo "Backup server installe."
   echo "- Config : /etc/server-backup/*.env (a editer pour overrider UUID, folders, retention)"
