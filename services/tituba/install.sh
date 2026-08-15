@@ -119,9 +119,12 @@ EOF
     }
     echo
     echo "=== ${SERVICE_NAME} : 1er demarrage ==="
-    echo "IMPORTANT : la base est migree mais VIDE. Cree le compte admin (une fois) :"
-    echo "  docker exec -e SEED_ROOT_EMAIL=<toi@ex.org> -e SEED_ROOT_PASSWORD='<12+ car>' \\"
-    echo "    ${SERVICE_NAME}-payload ./node_modules/.bin/tsx scripts/seed-config.ts"
+    echo "Le compte admin et la config de base sont poses AUTOMATIQUEMENT au"
+    echo "boot du container payload (migrate + seed, cf. Dockerfile du repo)."
+    echo "Les creds root viennent d'Infisical /services/tituba/payload :"
+    echo "  SEED_ROOT_EMAIL, SEED_ROOT_PASSWORD (>= 12 caracteres)."
+    echo "Aucune etape manuelle : verifie juste qu'elles y sont avant le 1er up."
+    echo "Admin dispo ensuite sur https://<ADDRESS>/cms/admin"
     ;;
 
   remove)
