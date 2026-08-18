@@ -32,6 +32,10 @@ Le bootstrap et les services hebergent sur le VPS tirent tous leurs secrets depu
           APPLICATION_SECRET
           CONSUMER_KEY
           ENDPOINT             # ovh-eu | ovh-ca | ovh-us
+      spaceship/
+        perso/                 # sous-dossier par label Spaceship (2 valeurs)
+          API_KEY
+          API_SECRET
 
     telegram/                  # Notifications Telegram
       TELEGRAM_BOT_TOKEN
@@ -122,11 +126,15 @@ Permet de gerer des certs et des records DNS chez **plusieurs providers** (et pl
 | `ovh/<label>/APPLICATION_SECRET` | |
 | `ovh/<label>/CONSUMER_KEY` | |
 | `ovh/<label>/ENDPOINT` | `ovh-eu` / `ovh-ca` / `ovh-us` |
+| `spaceship/<label>/API_KEY` | creds Spaceship (2 secrets par label, dans un sous-dossier dedie) |
+| `spaceship/<label>/API_SECRET` | |
 
 Generer les creds OVH : https://eu.api.ovh.com/createToken/ avec droits GET/POST/DELETE sur `/domain/zone/*` (ou specifique a un domaine : `/domain/zone/alice.fr/*`).
 
+Generer les creds Spaceship : espace client Spaceship -> API Manager -> creer une paire cle/secret avec la permission de gestion DNS. L'`API_SECRET` n'est affiche qu'une seule fois a la creation.
+
 Chaque service qui a un vhost declare dans sa config (`/services/<name>/`) :
-- `DNS_PROVIDER=infomaniak` (ou `ovh`)
+- `DNS_PROVIDER=infomaniak` (ou `ovh`, ou `spaceship`)
 - `DNS_TOKEN_NAME=perso` (pointe sur le label sous le provider)
 
 Le pre-hook `certbot-refresh-creds` (appele avant chaque `certbot renew`) regenere automatiquement les ini files `/etc/certbot/creds/<provider>/<label>.ini` depuis ces secrets, donc rotation de token transparente.
@@ -166,7 +174,7 @@ Le receiver webhooks tourne potentiellement sur plusieurs hosts (`vps` et `serve
 |-----|---------|------|
 | `ADDRESS` | `webhooks.backlice.dev` (vps) / `hooks.lan.tld` (server) | FQDN de l'expo |
 | `DOMAIN` | `backlice.dev` | apex cert wildcard |
-| `DNS_PROVIDER` | `infomaniak` | `infomaniak` ou `ovh` |
+| `DNS_PROVIDER` | `infomaniak` | `infomaniak`, `ovh` ou `spaceship` |
 | `DNS_TOKEN_NAME` | `perso` | label du token sous `/certbot/<provider>/` |
 
 ### Sous-dossier `hook/` par service deployee via webhook
@@ -196,7 +204,7 @@ Pour TOUT service expose via nginx, on met au minimum ces 4 cles :
 |-----|------|
 | `ADDRESS` | FQDN = `server_name` nginx + record DNS A |
 | `DOMAIN` | apex du cert wildcard |
-| `DNS_PROVIDER` | `infomaniak` ou `ovh` (choisit le plugin certbot et le backend DNS sync) |
+| `DNS_PROVIDER` | `infomaniak`, `ovh` ou `spaceship` (choisit le plugin certbot et le backend DNS sync) |
 | `DNS_TOKEN_NAME` | label du token sous `/certbot/<provider>/` |
 
 Ces cles sont referencees dans le `nginx.conf` du service via `__ADDRESS__` / `__DOMAIN__` / `__PORT__`. `scripts/service.sh` substitue au moment du `services install <nom>`.
@@ -244,5 +252,5 @@ journalctl -u infisical-agent -n 50
 cat /etc/certbot/providers.conf
 
 # Creds certbot regenerees par le pre-hook
-ls /etc/certbot/creds/infomaniak/ /etc/certbot/creds/ovh/
+ls /etc/certbot/creds/infomaniak/ /etc/certbot/creds/ovh/ /etc/certbot/creds/spaceship/
 ```

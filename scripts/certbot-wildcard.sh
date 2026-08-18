@@ -6,6 +6,7 @@
 #   certbot-wildcard <apex> <provider> <token_name>
 #   ex: certbot-wildcard alice.fr ovh client1
 #       certbot-wildcard backlice.dev infomaniak perso
+#       certbot-wildcard backlice.eu spaceship perso
 #
 # Credentials attendus (regeneres par certbot-refresh-creds, pre-hook de
 # certbot.timer) :
@@ -64,7 +65,8 @@ update_providers_conf() {
 case "$PROVIDER" in
   infomaniak) CREDS="$CREDS_DIR/infomaniak/${TOKEN_NAME}.ini" ;;
   ovh)        CREDS="$CREDS_DIR/ovh/${TOKEN_NAME}.ini" ;;
-  *) echo "Provider inconnu: $PROVIDER (attendu: infomaniak|ovh)" >&2; exit 1 ;;
+  spaceship)  CREDS="$CREDS_DIR/spaceship/${TOKEN_NAME}.ini" ;;
+  *) echo "Provider inconnu: $PROVIDER (attendu: infomaniak|ovh|spaceship)" >&2; exit 1 ;;
 esac
 update_providers_conf "$APEX" "$PROVIDER" "$TOKEN_NAME"
 [[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
@@ -117,6 +119,26 @@ case "$PROVIDER" in
       --authenticator dns-ovh \
       --dns-ovh-credentials "$CREDS" \
       --dns-ovh-propagation-seconds 120 \
+      -d "$APEX" -d "*.${APEX}" \
+      --preferred-challenges dns \
+      --agree-tos --non-interactive \
+      --email "$EMAIL" \
+      --keep-until-expiring --expand 2>&1 | tee "$CERTBOT_OUT" || true
+    rc="${PIPESTATUS[0]}"
+    ;;
+  spaceship)
+    # Le plugin certbot-dns-spaceship n'attend pas la propagation par lui-meme.
+    # Le flag --dns-spaceship-propagation-seconds n'existe que si le plugin
+    # herite de la base dns_common ; on ne le passe QUE s'il est reconnu (sinon
+    # certbot rejette l'argument et l'emission echoue). Defaut sinon.
+    local_prop=()
+    if "$CERTBOT_BIN" --help dns-spaceship 2>/dev/null | grep -q -- '--dns-spaceship-propagation-seconds'; then
+      local_prop=(--dns-spaceship-propagation-seconds 120)
+    fi
+    "$CERTBOT_BIN" certonly \
+      --authenticator dns-spaceship \
+      --dns-spaceship-credentials "$CREDS" \
+      "${local_prop[@]}" \
       -d "$APEX" -d "*.${APEX}" \
       --preferred-challenges dns \
       --agree-tos --non-interactive \

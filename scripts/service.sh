@@ -359,7 +359,7 @@ ensure_cert() {
 
   if [[ -z "$provider" || -z "$token_name" ]]; then
     say_warn "DNS_PROVIDER et DNS_TOKEN_NAME manquants dans /etc/secrets/, skip cert pour $apex."
-    echo "  Ajoute dans Infisical /services/<name>/ : DNS_PROVIDER=<infomaniak|ovh> + DNS_TOKEN_NAME=<label>"
+    echo "  Ajoute dans Infisical /services/<name>/ : DNS_PROVIDER=<infomaniak|ovh|spaceship> + DNS_TOKEN_NAME=<label>"
     return 1
   fi
 

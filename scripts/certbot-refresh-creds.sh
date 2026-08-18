@@ -7,6 +7,7 @@
 # pour savoir quelles creds fetcher. Ecrit :
 #   /etc/certbot/creds/infomaniak/<name>.ini
 #   /etc/certbot/creds/ovh/<name>.ini
+#   /etc/certbot/creds/spaceship/<name>.ini
 #
 # Sort toujours 0 : ne pas casser un renew si Infisical est HS, les ini
 # existants devraient encore marcher sauf rotation recente.
@@ -77,6 +78,29 @@ EOF
   chmod 600 "$CREDS_DIR/ovh/${name}.ini"
 }
 
+write_spaceship() {
+  local name="$1"
+  local key_val secret_val
+  key_val="$(fetch "/certbot/spaceship/${name}" API_KEY)"
+  secret_val="$(fetch "/certbot/spaceship/${name}" API_SECRET)"
+
+  if [[ -z "$key_val" || -z "$secret_val" ]]; then
+    echo "Creds Spaceship incomplets sous /certbot/spaceship/${name}, skip." >&2
+    return 0
+  fi
+
+  install -d -m 700 "$CREDS_DIR/spaceship"
+  umask 077
+  # Format attendu par le plugin certbot-dns-spaceship : section [spaceship]
+  # avec les cles api_key / api_secret. dns-sync lit le meme fichier.
+  cat > "$CREDS_DIR/spaceship/${name}.ini" <<EOF
+[spaceship]
+api_key = ${key_val}
+api_secret = ${secret_val}
+EOF
+  chmod 600 "$CREDS_DIR/spaceship/${name}.ini"
+}
+
 # Dedoublonne (provider, name) avant de fetch
 declare -A seen
 if [[ -f "$PROVIDERS_CONF" ]]; then
@@ -98,6 +122,9 @@ if [[ -f "$PROVIDERS_CONF" ]]; then
         ;;
       ovh)
         write_ovh "$name"
+        ;;
+      spaceship)
+        write_spaceship "$name"
         ;;
       *)
         echo "Provider inconnu '$provider' pour $apex, skip." >&2

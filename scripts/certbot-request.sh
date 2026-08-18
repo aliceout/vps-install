@@ -37,7 +37,8 @@ CERTBOT_BIN="/usr/local/bin/certbot"
 case "$PROVIDER" in
   infomaniak) CREDS="$CREDS_DIR/infomaniak/${TOKEN_NAME}.ini" ;;
   ovh)        CREDS="$CREDS_DIR/ovh/${TOKEN_NAME}.ini" ;;
-  *) echo "Provider inconnu: $PROVIDER" >&2; exit 1 ;;
+  spaceship)  CREDS="$CREDS_DIR/spaceship/${TOKEN_NAME}.ini" ;;
+  *) echo "Provider inconnu: $PROVIDER (attendu: infomaniak|ovh|spaceship)" >&2; exit 1 ;;
 esac
 [[ -x "$REFRESH_BIN" ]] && "$REFRESH_BIN" >/dev/null 2>&1 || true
 
@@ -72,6 +73,23 @@ for DOMAIN in "${DOMAINS[@]}"; do
         --authenticator dns-ovh \
         --dns-ovh-credentials "$CREDS" \
         --dns-ovh-propagation-seconds 120 \
+        -d "$DOMAIN" \
+        --preferred-challenges dns \
+        --agree-tos --non-interactive \
+        --email "$EMAIL" \
+        --keep-until-expiring
+      ;;
+    spaceship)
+      # --dns-spaceship-propagation-seconds n'est passe que s'il est reconnu
+      # par le plugin (voir certbot-wildcard.sh pour le detail).
+      prop=()
+      if "$CERTBOT_BIN" --help dns-spaceship 2>/dev/null | grep -q -- '--dns-spaceship-propagation-seconds'; then
+        prop=(--dns-spaceship-propagation-seconds 120)
+      fi
+      "$CERTBOT_BIN" certonly \
+        --authenticator dns-spaceship \
+        --dns-spaceship-credentials "$CREDS" \
+        "${prop[@]}" \
         -d "$DOMAIN" \
         --preferred-challenges dns \
         --agree-tos --non-interactive \

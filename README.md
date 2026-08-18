@@ -60,7 +60,7 @@ Les credentials sont ensuite persistes dans `/etc/infisical/` et reutilises auto
 - **Zsh + oh-my-zsh + powerlevel10k** (config p10k + zshrc avec alias, pfetch banner, `histo`, `tools`, alias `services`)
 - **Outils CLI** : lsd, bat, zoxide, fzf, btop, htop, ncdu, glances, lnav, ctop, lazydocker, pfetch, lolcat
 - **Cron** : apt update/upgrade, refresh CrowdSec hub, sync DNS (auto-heal records A sur IP publique)
-- **Certbot multi-provider** : DNS Infomaniak + OVH, plusieurs tokens par provider (pour heberger des services de clients differents), renouvellement automatique avec rotation de token transparente (pre-hook refresh depuis Infisical)
+- **Certbot multi-provider** : DNS Infomaniak + OVH + Spaceship, plusieurs tokens par provider (pour heberger des services de clients differents), renouvellement automatique avec rotation de token transparente (pre-hook refresh depuis Infisical)
 
 ## Apres le bootstrap : installer des services
 
@@ -105,7 +105,7 @@ modules/                 etapes numerotees (00 -> 99)
   50_nginx.sh            reverse proxy (optionnel)
   60_zsh.sh              zsh + oh-my-zsh + p10k + deploiement .zshrc/.p10k.zsh
   70_cron_updates.sh     cron apt + blocklists
-  75_certbot.sh          certbot + plugins Infomaniak/OVH + pre-hook refresh creds (optionnel)
+  75_certbot.sh          certbot + plugins Infomaniak/OVH/Spaceship + pre-hook refresh creds (optionnel)
   99_summary.sh          recap post-install
 nginx/                   templates vhost + includes globaux
 config/
@@ -118,7 +118,7 @@ scripts/
   certbot-wildcard.sh      cert wildcard apex + *.apex (<apex> [<provider> <name>])
   certbot-dns.sh           renouvellement cron (wrapper certbot renew)
   certbot-refresh-creds.sh pre-hook certbot renew : regen ini creds depuis Infisical
-  dns-sync.sh              sync auto records A sur IP publique (Infomaniak)
+  dns-sync.sh              sync auto records A sur IP publique (Infomaniak/OVH/Spaceship)
 services/                services heberges sur le VPS (un dossier par service)
   README.md              structure d'un service
   _template_docker/      squelette docker-compose

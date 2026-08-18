@@ -4,13 +4,14 @@ set -euo pipefail
 # Fallback quand le module tourne standalone (sans bootstrap.sh qui exporte ROOT_DIR).
 ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
-echo "Certbot (DNS Infomaniak + OVH) multi-provider"
+echo "Certbot (DNS Infomaniak + OVH + Spaceship) multi-provider"
 
 # Plugins :
 # - certbot officiel (PyPI)
 # - fork certbot-dns-infomaniak utilisant l'API v2 (l'upstream v1 est casse)
 #   ref: https://github.com/Infomaniak/certbot-dns-infomaniak/issues/47
 # - certbot-dns-ovh officiel (maintenu par certbot, pas un fork)
+# - certbot-dns-spaceship (plugin tiers, DNS-01 via l'API Spaceship)
 apt-get install -y python3-venv python3-pip git
 
 apt-get remove -y python3-certbot-dns-infomaniak python3-certbot-dns-ovh certbot 2>/dev/null || true
@@ -40,6 +41,11 @@ CERTBOT_DNS_INFOMANIAK_PIN="${CERTBOT_DNS_INFOMANIAK_PIN:-main}"
 /opt/certbot-venv/bin/pip install --upgrade --quiet \
   "git+https://github.com/aliceout/certbot-dns-infomaniak.git@${CERTBOT_DNS_INFOMANIAK_PIN}"
 /opt/certbot-venv/bin/pip install --upgrade --quiet certbot-dns-ovh
+# Plugin tiers Spaceship (PyPI, version-two/certbot_dns_spaceship). Etant tiers
+# (pas maintenu par certbot), on peut le figer contre un push casse/malveillant
+# en amont via CERTBOT_DNS_SPACESHIP_PIN (ex: '==1.0.0'). Defaut : derniere.
+/opt/certbot-venv/bin/pip install --upgrade --quiet \
+  "certbot-dns-spaceship${CERTBOT_DNS_SPACESHIP_PIN:-}"
 ln -sf /opt/certbot-venv/bin/certbot /usr/local/bin/certbot
 
 install -d -m 700 /etc/letsencrypt
@@ -47,6 +53,7 @@ install -d -m 755 /etc/certbot
 install -d -m 700 /etc/certbot/creds
 install -d -m 700 /etc/certbot/creds/infomaniak
 install -d -m 700 /etc/certbot/creds/ovh
+install -d -m 700 /etc/certbot/creds/spaceship
 touch /etc/certbot/providers.conf
 chmod 644 /etc/certbot/providers.conf
 

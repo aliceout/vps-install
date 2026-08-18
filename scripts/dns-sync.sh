@@ -3,9 +3,10 @@
 # Multi-provider : lit /etc/certbot/providers.conf pour savoir quel
 # token utiliser par apex.
 #
-# Sync A record implemente pour Infomaniak ET OVH. Le provider par apex est lu
-# dans /etc/certbot/providers.conf. OVH utilise l'API a requetes signees
-# (X-Ovh-Signature), les creds viennent du meme ini que certbot.
+# Sync A record implemente pour Infomaniak, OVH ET Spaceship. Le provider par
+# apex est lu dans /etc/certbot/providers.conf. OVH utilise l'API a requetes
+# signees (X-Ovh-Signature) ; Spaceship une API a cles (X-Api-Key /
+# X-Api-Secret). Dans les deux cas les creds viennent du meme ini que certbot.
 #
 # Usage:
 #   dns-sync                      # auto-discover depuis /etc/nginx/conf/*.conf
@@ -308,6 +309,81 @@ sync_one_ovh() {
   fi
 }
 
+# ---- Spaceship API helpers --------------------------------------------------
+# Spaceship expose une API a cles (pas de signature) : deux headers
+#   X-Api-Key / X-Api-Secret
+# Les creds viennent du meme ini que certbot (le plugin certbot-dns-spaceship
+# lit ce fichier au format [spaceship] api_key/api_secret) :
+#   /etc/certbot/creds/spaceship/<name>.ini
+# Le champ IP d'un record A s'appelle "address" (PAS "value"), le "name" est
+# RELATIF a l'apex ("" pour l'apex lui-meme). L'ecriture se fait par upsert :
+#   PUT /dns/records/<apex>  body {force:true, items:[{type,name,address,ttl}]}
+# force:true ecrase le record A de meme (name,type) et LAISSE le reste de la
+# zone intact (ce n'est PAS un remplacement complet de zone).
+
+SPACESHIP_BASE="https://spaceship.dev/api/v1"
+SPACESHIP_KEY=""; SPACESHIP_SECRET=""
+
+load_spaceship_creds() {
+  local name="$1" ini="$CREDS_DIR/spaceship/${name}.ini"
+  [[ -s "$ini" ]] || { log "creds Spaceship absents: $ini"; return 1; }
+  # Format ini du plugin certbot : section [spaceship], cles api_key/api_secret.
+  # On tolere espaces autour du '=' ; on retire tout ce qui precede le 1er '='.
+  SPACESHIP_KEY="$(awk -F= '/^[[:space:]]*api_key[[:space:]]*=/{sub(/^[^=]*=/,""); gsub(/[[:space:]]/,""); print; exit}'    "$ini")"
+  SPACESHIP_SECRET="$(awk -F= '/^[[:space:]]*api_secret[[:space:]]*=/{sub(/^[^=]*=/,""); gsub(/[[:space:]]/,""); print; exit}' "$ini")"
+  [[ -n "$SPACESHIP_KEY" && -n "$SPACESHIP_SECRET" ]] || { log "creds Spaceship incomplets: $ini"; return 1; }
+}
+
+spaceship_api() {
+  local method="$1" path="$2" body="${3:-}"
+  local -a args=( -fsSL --max-time 15 -X "$method"
+    -H "X-Api-Key: $SPACESHIP_KEY"
+    -H "X-Api-Secret: $SPACESHIP_SECRET"
+    -H "Accept: application/json" )
+  if [[ -n "$body" ]]; then
+    args+=( -H "Content-Type: application/json" --data "$body" )
+  fi
+  curl "${args[@]}" "${SPACESHIP_BASE}${path}"
+}
+
+sync_one_spaceship() {
+  local apex="$1" fqdn="$2" name="$3"
+  load_spaceship_creds "$name" || return 1
+
+  # name Spaceship = relatif a l'apex : "" pour l'apex, sinon le prefixe.
+  local sub
+  if [[ "$fqdn" == "$apex" ]]; then sub=""; else sub="${fqdn%.$apex}"; fi
+
+  # Liste les records de la zone et cherche le A de notre sous-domaine.
+  # On matche large sur l'apex (""/"@"/".") pour couvrir toutes les
+  # representations possibles cote API.
+  local list current
+  list="$(spaceship_api GET "/dns/records/${apex}?take=500&skip=0" 2>/dev/null || true)"
+  current="$(printf '%s' "$list" | jq -r --arg s "$sub" '
+    (.items // [])
+    | map(select(.type=="A" and (
+        .name==$s or ($s=="" and (.name=="@" or .name=="."))
+      )))
+    | (.[0].address // empty)' 2>/dev/null || true)"
+
+  if [[ "$current" == "$PUBLIC_IP" ]]; then
+    log "OK     A $fqdn -> $PUBLIC_IP (Spaceship, a jour)"
+    return 0
+  fi
+
+  local body
+  body="$(jq -n --arg s "$sub" --arg t "$PUBLIC_IP" --argjson ttl "$TTL" \
+    '{force:true, items:[{type:"A", name:$s, address:$t, ttl:$ttl}]}')"
+
+  if [[ -z "$current" ]]; then
+    log "CREATE A $fqdn -> $PUBLIC_IP (Spaceship)"
+  else
+    log "UPDATE A $fqdn $current -> $PUBLIC_IP (Spaceship)"
+  fi
+  spaceship_api PUT "/dns/records/${apex}" "$body" >/dev/null \
+    || { log "WRITE KO $fqdn (Spaceship)"; return 1; }
+}
+
 # ---- Dispatch par provider --------------------------------------------------
 
 rc=0
@@ -322,6 +398,16 @@ for d in "${DOMAINS[@]}"; do
       continue
     fi
     sync_one_ovh "$apex" "$d" "$name" || { rc=1; log "Sync A OVH echouee pour $d"; }
+    continue
+  fi
+
+  if [[ "$provider" == "spaceship" ]]; then
+    name="${APEX_TOKEN_NAME[$apex]:-}"
+    if [[ -z "$name" ]]; then
+      log "SKIP   A $d (apex $apex chez Spaceship mais pas de token dans providers.conf)"
+      continue
+    fi
+    sync_one_spaceship "$apex" "$d" "$name" || { rc=1; log "Sync A Spaceship echouee pour $d"; }
     continue
   fi
 
