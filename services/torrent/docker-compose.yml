@@ -151,12 +151,13 @@ services:
         max-file: "3"
 
   filebrowser:
-    # Epingle sur la derniere v1. Le tag :stable a bascule sur la v2.0.0
+    # Epingle sur la branche 1.x (tag 1-stable : correctifs v1, jamais de
+    # saut en v2). Le tag :stable a bascule sur la v2.0.0
     # (release cassante : base bbolt -> SQLite ET config.yaml restructure) ;
     # avec la config v1 generee par install.sh, la v2 boucle sur
     # "old database path is set in the config". Ne PAS repasser sur :stable
     # sans migrer le config.yaml (install.sh) au format v2.
-    image: gtstef/filebrowser:v1.5.5
+    image: gtstef/filebrowser:1-stable
     container_name: ${SERVICE_NAME}-files
     restart: unless-stopped
     # Reseau propre : filebrowser sert juste des fichiers locaux, pas besoin
