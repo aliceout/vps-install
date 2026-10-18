@@ -531,6 +531,14 @@ apply_nginx() {
   fi
 
   local dst="$NGINX_CONF_DIR/$name.conf"
+  # Sauvegarde du vhost en place (s'il existe) AVANT de l'ecraser : si le
+  # nouveau casse nginx -t (ex: cert pas encore emis -> include absent), on
+  # remet l'ancien au lieu de laisser le service sans vhost du tout.
+  local prev=""
+  if [[ -f "$dst" ]]; then
+    prev="$(mktemp)"
+    cp -p "$dst" "$prev"
+  fi
   cp "$rendered" "$dst"
   chmod 644 "$dst"
   rm -f "$rendered"
@@ -538,12 +546,18 @@ apply_nginx() {
   if nginx -t 2>/dev/null; then
     systemctl reload nginx || true
     echo "Vhost nginx installe: $dst (domaines: ${domains[*]:-aucun})"
+    [[ -n "$prev" ]] && rm -f "$prev"
   else
-    # Vhost casse : on le degage pour ne pas bloquer les autres au prochain reload
-    say_err "nginx -t KO apres ajout de $dst. Vhost retire pour preserver nginx."
+    say_err "nginx -t KO apres ajout de $dst."
     nginx -t 2>&1 | sed 's/^/  /' || true
     mv "$dst" "${dst}.broken"
-    echo "Vhost casse archive en ${dst}.broken (corrige et renomme pour reessayer)."
+    echo "Nouveau vhost archive en ${dst}.broken (corrige et relance l'update)."
+    if [[ -n "$prev" ]]; then
+      mv "$prev" "$dst"
+      echo "Ancien vhost restaure : $dst (le service reste servi comme avant)."
+    else
+      echo "Pas d'ancien vhost a restaurer : le service n'est pas servi par nginx."
+    fi
     nginx -t 2>/dev/null && systemctl reload nginx || true
     return 1
   fi
