@@ -8,8 +8,7 @@ echo "Certbot (DNS Infomaniak + OVH + Spaceship) multi-provider"
 
 # Plugins :
 # - certbot officiel (PyPI)
-# - fork certbot-dns-infomaniak utilisant l'API v2 (l'upstream v1 est casse)
-#   ref: https://github.com/Infomaniak/certbot-dns-infomaniak/issues/47
+# - certbot-dns-infomaniak officiel (API v2 depuis la 0.3.1, cf issue #47 / PR #53)
 # - certbot-dns-ovh officiel (maintenu par certbot, pas un fork)
 # - certbot-dns-spaceship (plugin tiers, DNS-01 via l'API Spaceship)
 apt-get install -y python3-venv python3-pip git
@@ -31,15 +30,22 @@ if [[ ! -x /opt/certbot-venv/bin/certbot ]]; then
 fi
 /opt/certbot-venv/bin/pip install --upgrade --quiet pip
 /opt/certbot-venv/bin/pip install --upgrade --quiet certbot
-# Pin du fork certbot-dns-infomaniak : installer depuis HEAD ('main' par
-# defaut) signifie qu'un push malveillant ou un bug introduit cassera tous
-# les renewals au prochain bootstrap. Override via CERTBOT_DNS_INFOMANIAK_PIN
-# avec un SHA / tag pour figer (ex: CERTBOT_DNS_INFOMANIAK_PIN=v2.0.1 ou
-# un sha 40 chars). Voir https://github.com/aliceout/certbot-dns-infomaniak
-# pour la liste des tags / SHA stables.
-CERTBOT_DNS_INFOMANIAK_PIN="${CERTBOT_DNS_INFOMANIAK_PIN:-main}"
+# certbot-dns-infomaniak officiel (PyPI). L'API v2 est integree upstream
+# depuis la 0.3.1 (aout 2026, cf Infomaniak/certbot-dns-infomaniak#53), ce
+# qui rend obsolete l'ancien fork aliceout/certbot-dns-infomaniak (plus
+# accessible : un pip install git+https le faisait bloquer sur un prompt
+# d'identifiants GitHub). Ini et flags inchanges (dns_infomaniak_token).
+#
+# Migration des machines deja installees : le fork porte le meme nom de
+# paquet, eventuellement avec une version plus haute, donc --upgrade le
+# garderait. On le desinstalle explicitement s'il vient de git.
+if /opt/certbot-venv/bin/pip freeze 2>/dev/null | grep -qE '^certbot-dns-infomaniak @ git\+'; then
+  echo "Remplacement du fork git certbot-dns-infomaniak par le paquet officiel..."
+  /opt/certbot-venv/bin/pip uninstall -y --quiet certbot-dns-infomaniak
+fi
+# Override possible via CERTBOT_DNS_INFOMANIAK_PIN (specifieur pip, ex '==0.3.3').
 /opt/certbot-venv/bin/pip install --upgrade --quiet \
-  "git+https://github.com/aliceout/certbot-dns-infomaniak.git@${CERTBOT_DNS_INFOMANIAK_PIN}"
+  "certbot-dns-infomaniak${CERTBOT_DNS_INFOMANIAK_PIN:->=0.3.1}"
 /opt/certbot-venv/bin/pip install --upgrade --quiet certbot-dns-ovh
 # Plugin tiers Spaceship (PyPI, version-two/certbot_dns_spaceship). Etant tiers
 # (pas maintenu par certbot), on peut le figer contre un push casse/malveillant
